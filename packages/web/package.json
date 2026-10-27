@@ -1,0 +1,30 @@
+{
+  "name": "@sanakenno/web",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sanakenno/server": "workspace:*",
+    "@sanakenno/shared": "workspace:*",
+    "@tanstack/react-query": "^5.69.0",
+    "hono": "^4.7.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.14",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.0.14",
+    "typescript": "^6.0.2",
+    "vite": "^7.3.1"
+  }
+}

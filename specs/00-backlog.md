@@ -1,0 +1,14 @@
+# Sanakenno 2.0 — Sequenced Spec Backlog
+
+Each spec is a self-contained vertical slice designed for a single autonomous agent run followed by a 1-Screen Curation Brief.
+
+| #   | Spec                                                                           | Status     | Scope Summary                                                                                                                                                           |
+| --- | ------------------------------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 00  | **Agent-First Workbench & Canary**                                             | `shipped`  | Monorepo scaffolding, Kysely + Hono RPC + React canary (`/api/health`), `tests/architecture.test.ts`, and agent skills.                                                 |
+| 01  | [Shared Domain & Full Kysely DB Schema](01-shared-domain-and-kysely-schema.md) | `approved` | Port pure Finnish scoring, hints, stats, sync-merge, Kotus links + full Kysely schema & migrations compatible with 1.0 `sanakenno.db`.                                  |
+| 02  | **Daily Puzzle & Archive Slice (Server + RPC)**                                | `pending`  | Port `puzzle-engine` (Helsinki rotation, `slot` vs `display_number`), `GET /api/puzzle`, `GET /api/puzzle/:number/words`, and `GET /api/archive` via Kysely + Hono RPC. |
+| 03  | **Core Gameplay UI Slice (Web)**                                               | `pending`  | Port `Honeycomb`, `WordInput`, `RankProgress`, `FoundWords`, `HintPanels`, and slim `useGameStore` wired to Hono RPC + TanStack Query.                                  |
+| 04  | **Modals, Themes & Local Persistence Slice**                                   | `pending`  | Port `ArchiveModal`, `StatsModal`, `RulesModal`, `SettingsModal`, midnight rollover hook, and CSS token theme switcher.                                                 |
+| 05  | **Player Auth, Cross-Device Sync & Telemetry**                                 | `pending`  | Port player Bearer auth, transfer email flow, `/api/player/sync` (using TanStack Query mutations), `word-find`, `failed-guess`, and `achievement` routes.               |
+| 06  | **Admin Slices (Puzzles, Suggestions, Analytics)**                             | `pending`  | Replace the old 1,546-line `admin.ts` monolith with three clean vertical slices: `admin-puzzles`, `admin-suggestions`, and `admin-analytics` (server + web UI).         |
+| 07  | **PWA, Production Parity & Switchover Verification**                           | `pending`  | Port `vite-plugin-pwa`, verify against a real snapshot of `sanakenno.db` and `kotus_words.txt`, and run full Playwright E2E suite.                                      |
