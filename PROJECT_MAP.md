@@ -37,7 +37,7 @@ sanakenno-next/
 Two numbers identify a puzzle and are **never** interchangeable:
 
 - **`slot`** (`puzzle_number` in storage/API): Permanent primary key. Soft-deleted puzzles keep their `slot` forever so `player_stats`, `player_puzzle_states`, `word_finds`, and `localStorage` keys stay valid. New puzzles append at `nextFreeSlot()`.
-- **`display_number`**: 1-based index among _active_ (`deleted_at IS NULL`) puzzles. Soft-deleting a puzzle closes the gap. Cycle positions must always be derived from active slot indices, never slot arithmetic.
+- **`display_number`**: 1-based index among _active_ (`is_active = 1`) puzzles. Soft-deleting a puzzle closes the gap. Cycle positions must always be derived from active slot indices, never slot arithmetic.
 
 ### 2. Timezone
 

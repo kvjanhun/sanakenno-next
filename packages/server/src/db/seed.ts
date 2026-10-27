@@ -19,22 +19,16 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
     .insertInto('puzzles')
     .values([
       {
-        letters: 'AEIKLNS',
-        center_letter: 'A',
-        words: JSON.stringify(['AIKA', 'KANA', 'LASI', 'SANA', 'KANSALLINEN']),
-        max_score: 26,
-        pangrams: JSON.stringify(['KANSALLINEN']),
-        hint_data: null,
-        deleted_at: null,
+        slot: 1,
+        letters: 'a,e,i,k,l,n,s',
+        center: 'a',
+        is_active: 1,
       },
       {
-        letters: 'EHIKNNO',
-        center_letter: 'N',
-        words: JSON.stringify(['KENNO', 'ONNI', 'HIENO', 'KEINONEN']),
-        max_score: 21,
-        pangrams: JSON.stringify(['KEINONEN']),
-        hint_data: null,
-        deleted_at: null,
+        slot: 2,
+        letters: 'e,h,i,k,n,o,s',
+        center: 'n',
+        is_active: 1,
       },
     ])
     .execute();

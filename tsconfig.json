@@ -2,7 +2,13 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "paths": {
+      "react": ["./packages/web/node_modules/@types/react"],
+      "react/*": ["./packages/web/node_modules/@types/react/*"],
+      "@tanstack/react-query": ["./packages/web/node_modules/@tanstack/react-query"],
+      "zustand": ["./packages/web/node_modules/zustand"]
+    }
   },
   "include": ["tests/**/*", "vitest.config.ts", "playwright.config.ts"]
 }

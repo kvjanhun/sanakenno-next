@@ -3,13 +3,10 @@ import type { Generated } from 'kysely';
 export interface PuzzlesTable {
   slot: Generated<number>;
   letters: string;
-  center_letter: string;
-  words: string;
-  max_score: number;
-  pangrams: string;
-  hint_data: string | null;
+  center: string;
+  is_active: Generated<number>;
   created_at: Generated<string>;
-  deleted_at: string | null;
+  updated_at: Generated<string>;
 }
 
 export interface ConfigTable {

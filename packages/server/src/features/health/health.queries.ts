@@ -8,7 +8,7 @@ export async function countActivePuzzles(db: Kysely<Database>): Promise<number> 
   const row = await db
     .selectFrom('puzzles')
     .select((eb) => eb.fn.countAll<number>().as('count'))
-    .where('deleted_at', 'is', null)
+    .where('is_active', '=', 1)
     .executeTakeFirstOrThrow();
 
   return Number(row.count);
