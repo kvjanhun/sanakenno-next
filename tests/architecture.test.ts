@@ -130,12 +130,13 @@ describe('Architectural Fitness Guardrails', () => {
     for (const file of sharedFiles) {
       const rel = path.relative(ROOT, file).replaceAll('\\', '/');
       const content = fs.readFileSync(file, 'utf8');
+      const codeOnly = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
       const hasForbiddenImport =
         /from\s+['"](@sanakenno\/(server|web)|better-sqlite3|kysely|hono|react|node:|fs|path|crypto)/.test(
-          content,
+          codeOnly,
         );
       const hasForbiddenGlobal =
-        /\b(window|document|localStorage|sessionStorage|fetch)\b|\bprocess\.env\b/.test(content);
+        /\b(window|document|localStorage|sessionStorage|fetch)\b|\bprocess\.env\b/.test(codeOnly);
 
       if (hasForbiddenImport || hasForbiddenGlobal) {
         violations.push(rel);

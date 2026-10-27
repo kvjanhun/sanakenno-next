@@ -1,26 +1,29 @@
 # Sanakenno 2.0 — Agent-First Operating Rules
 
-## 1. Operating Model: Spec → Execute → Critic → Curate
+## 1. Operating Model: Spec → Continuous Execute & Critic → Curate
 
-This repository is operated **agent-first**. You (the agent) work autonomously inside mechanical guardrails and present finished, verified increments for human curation.
+This repository is operated **agent-first**. You (the agent) work autonomously inside mechanical guardrails and execute **all** `approved` specs in [`specs/00-backlog.md`](specs/00-backlog.md) back-to-back before returning to the human curator.
 
-### The 4 Laws
+### The 5 Laws
 
 1. **No Code Without an Approved Spec:**
    - Every non-trivial change starts as a spec file in [`specs/`](specs/00-backlog.md) with `Status: approved`.
    - If a spec is `draft` or underspecified, refine it first (use `/grill-me` or the `spec-next` skill) and stop for sign-off.
-2. **Mechanical Gate Before Hand-Off (`pnpm check:agent`):**
-   - Never hand work back to the user until `pnpm run check:agent` passes 100% (TypeScript across Kysely + Hono RPC + React, ESLint/Prettier, `tests/architecture.test.ts`, Vitest unit/integration, and production build).
-   - If UI or routes changed, also run `pnpm run test:e2e` (or inspect via Playwright / Chrome DevTools MCP).
-3. **Independent Critic Audit:**
-   - Before presenting a solution for curation, invoke a read-only subagent using the `critic-audit` skill to verify the diff against the approved spec, check for scope creep, and confirm test quality.
-4. **The 1-Screen Curation Brief (<25 lines):**
+2. **Continuous Execution of Approved Queue (Never Stop After One Slice):**
+   - When multiple specs in [`specs/00-backlog.md`](specs/00-backlog.md) have `Status: approved`, execute them **continuously in sequence without pausing for human approval between slices**.
+   - Only stop when **every** `approved` spec in the backlog has reached `shipped`, or if an unresolvable product/UX contradiction forces a human decision.
+3. **Mechanical Gate Per Slice (`pnpm check:agent`):**
+   - No slice may be merged to `main` until `pnpm run check:agent` passes 100% (TypeScript across Kysely + Hono RPC + React, ESLint/Prettier, `tests/architecture.test.ts`, Vitest unit/integration, and production build).
+   - When UI or routes change, also run `pnpm run test:e2e`.
+4. **Independent Critic Audit Per Slice (`critic-audit`):**
+   - Before merging any slice to `main`, invoke a read-only subagent using the `critic-audit` skill to verify the diff against the spec, check for scope creep, and confirm test honesty. Self-heal any blocker findings before merging (`Status: shipped`) and advancing to the next `approved` spec.
+5. **The 1-Screen Curation Brief (<25 lines) at Queue Completion:**
    - Never dump long logs or 1,000-line essays after an autonomous run.
-   - Present a **Curation Brief** in **under 25 lines**:
+   - Once all `approved` specs are `shipped`, present a single **Curation Brief** in **under 25 lines**:
      - **Changes & Why (3–5 bullets):** Only non-obvious architectural or domain choices.
-     - **Blast Radius:** Touched feature slices, DB tables, or RPC endpoints.
-     - **Proof:** Key test names added + 1–2 embedded screenshots (when UI changes).
-     - **Curator Prompt:** Any UX/product judgment call, or "Ready to merge via `curate-accept`."
+     - **Blast Radius:** Shipped specs, feature slices, DB tables, and RPC endpoints.
+     - **Proof:** Total test counts + key E2E/integration proofs.
+     - **Curator Prompt:** Any final UX/product judgment call.
 
 ---
 

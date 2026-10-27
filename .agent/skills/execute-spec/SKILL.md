@@ -1,51 +1,48 @@
 ---
 name: execute-spec
-description: Autonomously implement an approved spec on a feature branch, run pnpm check:agent and E2E verification, run the independent critic subagent audit, and present a 1-Screen Curation Brief (<25 lines).
+description: Autonomously implement all approved specs in specs/00-backlog.md back-to-back. For each spec: implement slice + tests, pass pnpm check:agent, pass independent critic-audit subagent, merge atomically to main as shipped, and immediately advance to the next approved spec.
 ---
 
-# Execute Spec (Autonomous Loop)
+# Execute Spec Queue (Continuous Autonomous Loop)
 
-Precondition: The target spec in `specs/NN-<slug>.md` must have `Status: approved`.
+Precondition: One or more specs in `specs/00-backlog.md` have `Status: approved`.
 
-## Step 1: Isolate Work
+**CRITICAL RULE:** Never stop after implementing just one spec when more `approved` specs remain in `specs/00-backlog.md`. Loop through Steps 1–5 for **every** `approved` spec in sequence, then deliver a single Curation Brief in Step 6.
 
-Create or switch to a dedicated branch `spec/NN-<slug>` (or run inside a subagent with `Workspace: "share"`). Update the spec status to `in-progress`.
+## For Each `approved` Spec (`specs/NN-<slug>.md`):
 
-## Step 2: Implement Vertical Slice & Behaviour Tests
+### Step 1: Isolate Slice Work
 
-Build the feature following the repository boundaries in `AGENTS.md`:
+Create or switch to branch `spec/NN-<slug>`. Update status to `in-progress` in both `specs/NN-<slug>.md` and `specs/00-backlog.md`.
+
+### Step 2: Implement Vertical Slice & Behaviour Tests
+
+Delegate to a `self` subagent or build directly following `AGENTS.md` boundaries:
 
 - Shared Zod schemas & pure domain functions in `@sanakenno/shared`.
 - Typed Kysely queries in `packages/server/src/features/<slice>/<slice>.queries.ts`.
-- Hono RPC routes in `packages/server/src/features/<slice>/<slice>.routes.ts`.
+- Method-chained Hono RPC routes in `packages/server/src/features/<slice>/<slice>.routes.ts`.
 - React UI & TanStack Query hooks in `packages/web/src/features/<slice>/` using `src/api/client.ts`.
-- Descriptive unit, integration (in-memory SQLite), and E2E tests that match every acceptance criterion in the spec.
+- Unit, integration (in-memory SQLite), and E2E tests proving every acceptance criterion in the spec.
 
-## Step 3: Self-Healing Mechanical Gate
+### Step 3: Self-Healing Mechanical Gate
 
-Run:
+Run `pnpm run check:agent` (and `pnpm run test:e2e` when UI or routes change). Fix any type, lint, architecture boundary, or test failures autonomously.
 
-```sh
-pnpm run check:agent
-```
+### Step 4: Independent Critic Audit
 
-If UI or routes changed, also run:
+Invoke a read-only `research` subagent with `.agent/skills/critic-audit/SKILL.md` to audit the diff against `specs/NN-<slug>.md`. If `VERDICT: NEEDS_WORK`, fix all blocker findings and re-run `pnpm run check:agent` + `critic-audit` until `VERDICT: PASS`.
 
-```sh
-pnpm run test:e2e
-```
+### Step 5: Auto-Ship Slice & Advance to Next Approved Spec
 
-Fix any type, lint, architecture boundary, or test failures autonomously. Do not stop on red checks.
+Once `check:agent` + `critic-audit` (`VERDICT: PASS`) both succeed:
 
-## Step 4: Independent Critic Audit
+1. Flip `Status: shipped` in `specs/NN-<slug>.md` and `specs/00-backlog.md`.
+2. Update `PROJECT_MAP.md` if structure, endpoints, or data flows changed.
+3. Run `pnpm run check:agent` to verify doc/spec sync.
+4. Merge `spec/NN-<slug>` cleanly to `main` with an atomic Conventional Commit (`feat: ...`).
+5. **Immediately check `specs/00-backlog.md`**: if another `approved` spec exists, loop back to Step 1 for that spec without stopping.
 
-Invoke a read-only `research` subagent with instructions to follow `.agent/skills/critic-audit/SKILL.md` against your branch diff and `specs/NN-<slug>.md`. Address any blocker findings it reports and re-run `pnpm run check:agent`.
+## Step 6: Deliver the 1-Screen Curation Brief (<25 lines)
 
-## Step 5: Deliver the 1-Screen Curation Brief (<25 lines)
-
-Flip the spec status to `ready-for-curation` and output **at most 25 lines**:
-
-- **Changes & Why (3–5 bullets):** Only non-obvious architectural/domain decisions.
-- **Blast Radius:** Touched modules, DB tables, and RPC routes.
-- **Proof:** Key behaviour test names + 1–2 screenshots (if UI changed).
-- **Curator Action:** Any product/UX trade-off to confirm, or ask to run `curate-accept`.
+Only when **all** `approved` specs in `specs/00-backlog.md` are `shipped`, output at most 25 lines summarizing the shipped batch.

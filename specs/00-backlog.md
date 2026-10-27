@@ -1,11 +1,11 @@
 # Sanakenno 2.0 — Sequenced Spec Backlog
 
-Each spec is a self-contained vertical slice (<500 lines per file) designed for a single autonomous agent run (`execute-spec` → `critic-audit`) followed by a 1-Screen Curation Brief.
+Each spec is a self-contained vertical slice (<500 lines per file). All `approved` specs execute continuously back-to-back (`execute-spec` → `check:agent` → `critic-audit` → auto-ship to `main`) until the approved queue is empty.
 
 | #   | Spec                                                                                        | Status     | Scope Summary                                                                                                                                                           |
 | --- | ------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 00  | **Agent-First Workbench & Canary**                                                          | `shipped`  | Monorepo scaffolding, Kysely + Hono RPC + React canary (`/api/health`), `tests/architecture.test.ts`, and agent skills.                                                 |
-| 01  | [Shared Domain & Full Kysely DB Schema](01-shared-domain-and-kysely-schema.md)              | `approved` | Port pure Finnish scoring, hints, stats, sync-merge, Kotus links + full 16-table Kysely schema & migrations compatible with 1.0 `sanakenno.db`.                         |
+| 01  | [Shared Domain & Full Kysely DB Schema](01-shared-domain-and-kysely-schema.md)              | `shipped`  | Port pure Finnish scoring, hints, stats, sync-merge, Kotus links + full 16-table Kysely schema & migrations compatible with 1.0 `sanakenno.db`.                         |
 | 02  | [Daily Puzzle, Wordlist Engine & Archive RPC](02-daily-puzzle-and-archive-rpc.md)           | `approved` | Port `puzzle-engine` (`Europe/Helsinki` rotation, `slot` vs `display_number`, `kotus_words.txt`), `/api/puzzle*`, `/api/archive`, and `/api/health` (`days_remaining`). |
 | 03  | [Core Gameplay UI & Hybrid State Slice](03-core-gameplay-ui-and-state.md)                   | `approved` | Port `Honeycomb`, `WordInput`, `RankProgress`, `FoundWords`, `HintPanels`, and hybrid state (`usePuzzleQuery` + `useGameStore` <350 lines + `useUiStore`).              |
 | 04  | [Player Modals, Themes & Midnight Rollover](04-modals-themes-and-rollover.md)               | `approved` | Port `ArchiveModal`, `PuzzleWordsModal`, `StatsModal`, `RulesModal`, `SettingsModal`, `useMidnightRollover`, and CSS custom property theme/palette system.              |

@@ -1,6 +1,6 @@
 # Spec 01: Shared Domain & Full Kysely DB Schema
 
-Status: approved
+Status: shipped
 Branch: spec/01-shared-domain-and-kysely-schema
 Reference (1.0):
 

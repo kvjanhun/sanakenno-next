@@ -10,10 +10,10 @@ sanakenno-next/
   PROJECT_MAP.md             # Current architecture & domain invariants
   specs/                     # Sequenced specs driving autonomous implementation
   packages/
-    shared/                  # @sanakenno/shared — Zod schemas & pure Finnish game logic
+    shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, sync-merge, kotus, share-text, honeycomb-theme, auth-types) & Zod schemas
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer
       src/
-        db/                  # Kysely Database<Schema>, connection factory, deterministic seed
+        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-baseline migration runner, deterministic seed
         features/
           health/            # Canary vertical slice (GET /api/health)
     web/                     # @sanakenno/web — React 19 + TanStack Query + Hono RPC client

@@ -2,10 +2,13 @@ import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 const webNodeModules = path.resolve(import.meta.dirname, 'packages/web/node_modules');
+const serverNodeModules = path.resolve(import.meta.dirname, 'packages/server/node_modules');
 
 export default defineConfig({
   resolve: {
     alias: {
+      '@sanakenno/shared': path.resolve(import.meta.dirname, 'packages/shared/src/index.ts'),
+      'better-sqlite3': path.join(serverNodeModules, 'better-sqlite3'),
       react: path.join(webNodeModules, 'react'),
       'react-dom': path.join(webNodeModules, 'react-dom'),
       '@tanstack/react-query': path.join(webNodeModules, '@tanstack/react-query'),

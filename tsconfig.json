@@ -4,6 +4,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "paths": {
+      "@sanakenno/shared": ["./packages/shared/src/index.ts"],
+      "@sanakenno/server": ["./packages/server/src/app.ts"],
+      "@sanakenno/server/*": ["./packages/server/src/*"],
+      "better-sqlite3": ["./packages/server/node_modules/@types/better-sqlite3"],
       "react": ["./packages/web/node_modules/@types/react"],
       "react/*": ["./packages/web/node_modules/@types/react/*"],
       "@tanstack/react-query": ["./packages/web/node_modules/@tanstack/react-query"],
