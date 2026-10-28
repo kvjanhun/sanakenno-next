@@ -1,48 +1,24 @@
 ---
 name: execute-spec
-description: Autonomously implement all approved specs in specs/00-backlog.md back-to-back. For each spec: implement slice + tests, pass pnpm check:agent, pass independent critic-audit subagent, merge atomically to main as shipped, and immediately advance to the next approved spec.
+description: Autonomously implement all approved specs in specs/00-backlog.md back-to-back without git command prompts or shell chaining.
 ---
 
 # Execute Spec Queue (Continuous Autonomous Loop)
 
 Precondition: One or more specs in `specs/00-backlog.md` have `Status: approved`.
 
-**CRITICAL RULE:** Never stop after implementing just one spec when more `approved` specs remain in `specs/00-backlog.md`. Loop through Steps 1–5 for **every** `approved` spec in sequence, then deliver a single Curation Brief in Step 6.
+## Terminal & Autonomy Rules (Zero Prompt Friction)
+
+1. **Never Run `git` Commands Between Slices:** Track slice progress strictly via `Status: in-progress` -> `Status: shipped` in `specs/NN-<slug>.md` and `specs/00-backlog.md` using `edit_file`. Do not run `git checkout`, `git add`, `git commit`, or `git merge` between slices.
+2. **Never Chain Shell Commands (`&&`, `;`, `|`):** Prefix-based "Always Allow" in the IDE is disabled whenever a command contains `&&`, `;`, `|`, `$()`, or inline env vars. Always execute one standalone command per `run_command` call:
+   - `pnpm --dir /Users/erezac/Projects/sanakenno-next run format`
+   - `pnpm --dir /Users/erezac/Projects/sanakenno-next run check:agent`
+   - `pnpm --dir /Users/erezac/Projects/sanakenno-next run test:e2e`
 
 ## For Each `approved` Spec (`specs/NN-<slug>.md`):
 
-### Step 1: Isolate Slice Work
-
-Create or switch to branch `spec/NN-<slug>`. Update status to `in-progress` in both `specs/NN-<slug>.md` and `specs/00-backlog.md`.
-
-### Step 2: Implement Vertical Slice & Behaviour Tests
-
-Delegate to a `self` subagent or build directly following `AGENTS.md` boundaries:
-
-- Shared Zod schemas & pure domain functions in `@sanakenno/shared`.
-- Typed Kysely queries in `packages/server/src/features/<slice>/<slice>.queries.ts`.
-- Method-chained Hono RPC routes in `packages/server/src/features/<slice>/<slice>.routes.ts`.
-- React UI & TanStack Query hooks in `packages/web/src/features/<slice>/` using `src/api/client.ts`.
-- Unit, integration (in-memory SQLite), and E2E tests proving every acceptance criterion in the spec.
-
-### Step 3: Self-Healing Mechanical Gate
-
-Run `pnpm run check:agent` (and `pnpm run test:e2e` when UI or routes change). Fix any type, lint, architecture boundary, or test failures autonomously.
-
-### Step 4: Independent Critic Audit
-
-Invoke a read-only `research` subagent with `.agent/skills/critic-audit/SKILL.md` to audit the diff against `specs/NN-<slug>.md`. If `VERDICT: NEEDS_WORK`, fix all blocker findings and re-run `pnpm run check:agent` + `critic-audit` until `VERDICT: PASS`.
-
-### Step 5: Auto-Ship Slice & Advance to Next Approved Spec
-
-Once `check:agent` + `critic-audit` (`VERDICT: PASS`) both succeed:
-
-1. Flip `Status: shipped` in `specs/NN-<slug>.md` and `specs/00-backlog.md`.
-2. Update `PROJECT_MAP.md` if structure, endpoints, or data flows changed.
-3. Run `pnpm run check:agent` to verify doc/spec sync.
-4. Merge `spec/NN-<slug>` cleanly to `main` with an atomic Conventional Commit (`feat: ...`).
-5. **Immediately check `specs/00-backlog.md`**: if another `approved` spec exists, loop back to Step 1 for that spec without stopping.
-
-## Step 6: Deliver the 1-Screen Curation Brief (<25 lines)
-
-Only when **all** `approved` specs in `specs/00-backlog.md` are `shipped`, output at most 25 lines summarizing the shipped batch.
+1. **Mark `in-progress`:** Use `edit_file` to set `Status: in-progress` in `specs/NN-<slug>.md` and `specs/00-backlog.md`.
+2. **Implement Vertical Slice & Tests:** Write code and tests using `write_file` / `edit_file` following `AGENTS.md` boundaries.
+3. **Self-Healing Mechanical Gate:** Run `pnpm --dir /Users/erezac/Projects/sanakenno-next run format` and `pnpm --dir /Users/erezac/Projects/sanakenno-next run check:agent` as separate single commands. Fix any failures.
+4. **Independent Critic Audit:** Invoke a read-only `research` subagent (`critic-audit`) using only `read_file` (never `run_command`). Fix any blocker findings.
+5. **Mark `shipped` & Advance Immediately:** Use `edit_file` to set `Status: shipped` in `specs/NN-<slug>.md` and `specs/00-backlog.md`, update `PROJECT_MAP.md`, and immediately start the next `approved` spec without stopping.

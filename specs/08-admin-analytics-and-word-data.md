@@ -1,6 +1,6 @@
 # Spec 08: Admin Analytics & Word Data Slice
 
-Status: approved
+Status: shipped
 Branch: spec/08-admin-analytics-and-word-data
 Reference (1.0):
 
@@ -31,6 +31,6 @@ Port the admin telemetry & word-tuning analytics endpoints (`/api/admin/achievem
 
 ## 4. Acceptance Criteria (Test Catalog)
 
-- [ ] Integration tests in `tests/integration/admin-analytics.test.ts` verify daily achievement aggregation (unique sessions vs raw events), failed-guess filtering by date/word, and per-puzzle word-find counts including zero-count unfound words.
-- [ ] Component/E2E tests verify switching between `Tilastot` and `Sanadata` tabs in `#/admin` and sorting word finds by hardest-first.
-- [ ] `pnpm run check:agent` passes with every file under 500 lines.
+- [x] Integration tests in `tests/integration/admin-analytics.test.ts` verify daily achievement aggregation (unique sessions vs raw events), failed-guess filtering by date/word, and per-puzzle word-find counts including zero-count unfound words.
+- [x] Component/E2E tests verify switching between `Tilastot` and `Sanadata` tabs in `#/admin` and sorting word finds by hardest-first.
+- [x] `pnpm run check:agent` passes with every file under 500 lines.

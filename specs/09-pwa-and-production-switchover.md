@@ -1,6 +1,6 @@
 # Spec 09: PWA, Production Deployment & Switchover Verification
 
-Status: approved
+Status: shipped
 Branch: spec/09-pwa-and-production-switchover
 Reference (1.0):
 
@@ -34,6 +34,6 @@ Complete production readiness: configure `vite-plugin-pwa`, multi-stage Docker b
 
 ## 4. Acceptance Criteria (Test Catalog)
 
-- [ ] Unit/PWA tests verify Workbox `navigateFallbackDenylist` (`/^\/api\//`) and manifest metadata.
-- [ ] Integration test verifies opening a real 1.0 `sanakenno.db` + `kotus_words.txt` snapshot without migration or query errors.
-- [ ] Full Playwright E2E suite (`pnpm run test:e2e`) and `pnpm run check:agent` pass 100%.
+- [x] Unit/PWA tests verify Workbox `navigateFallbackDenylist` (`/^\/api\//`) and manifest metadata.
+- [x] Integration test verifies opening a real 1.0 `sanakenno.db` + `kotus_words.txt` snapshot without migration or query errors.
+- [x] Full Playwright E2E suite (`pnpm run test:e2e`) and `pnpm run check:agent` pass 100%.

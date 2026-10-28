@@ -28,6 +28,18 @@ export interface NoHintAchievementState extends NoHintAchievement {
   unlocked: boolean;
 }
 
+export const RANK_NAMES = [
+  'Etsi sanoja!',
+  'Hyvä alku',
+  'Nyt mennään!',
+  'Onnistuja',
+  'Sanavalmis',
+  'Ällistyttävä',
+  'Täysi kenno',
+] as const;
+
+export type RankName = (typeof RANK_NAMES)[number];
+
 export const RANKS: readonly Rank[] = [
   { pct: 100, name: 'Täysi kenno' },
   { pct: 70, name: 'Ällistyttävä' },

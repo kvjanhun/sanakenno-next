@@ -1,6 +1,6 @@
 # Spec 06: Admin Auth, Puzzle Editor, Schedule & Blocked Words
 
-Status: approved
+Status: shipped
 Branch: spec/06-admin-auth-and-puzzle-editor
 Reference (1.0):
 
@@ -35,6 +35,6 @@ Implement admin cookie/CSRF authentication and the core puzzle management vertic
 
 ## 4. Acceptance Criteria (Test Catalog)
 
-- [ ] Integration tests in `tests/integration/admin-puzzles.test.ts` verify admin login/logout/CSRF enforcement, duplicate letter-set rejection vs `force: true` override, soft-delete closing `display_number` gaps while preserving `slot`, slot swapping, word blocking cache invalidation, and 14-day schedule calculation.
-- [ ] Playwright E2E test verifies `#/admin` login, previewing and saving a puzzle, and viewing the schedule.
-- [ ] `pnpm run check:agent` passes with every file under 500 lines.
+- [x] Integration tests in `tests/integration/admin-puzzles.test.ts` verify admin login/logout/CSRF enforcement, duplicate letter-set rejection vs `force: true` override, soft-delete closing `display_number` gaps while preserving `slot`, slot swapping, word blocking cache invalidation, and 14-day schedule calculation.
+- [x] Playwright E2E test verifies `#/admin` login, previewing and saving a puzzle, and viewing the schedule.
+- [x] `pnpm run check:agent` passes with every file under 500 lines.

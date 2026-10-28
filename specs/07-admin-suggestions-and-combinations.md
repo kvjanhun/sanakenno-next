@@ -1,6 +1,6 @@
 # Spec 07: Admin Suggestions, Combinations & Rejections
 
-Status: approved
+Status: shipped
 Branch: spec/07-admin-suggestions-and-combinations
 Reference (1.0):
 
@@ -32,6 +32,6 @@ Port the no-spoiler puzzle suggestion engine, curated `pangram-quality.json` ass
 
 ## 4. Acceptance Criteria (Test Catalog)
 
-- [ ] Unit tests in `tests/unit/suggestion-scorer.test.ts` verify word-band target progression, neighbor overlap penalties, and `pangram-quality.json` grade filtering (`reject` excluded).
-- [ ] Integration tests in `tests/integration/admin-suggestions.test.ts` verify `/api/admin/combinations` filtering/sorting, `/api/admin/suggestion` no-spoiler response, and rejecting/restoring suggestions via `/api/admin/suggestion-rejections`.
-- [ ] `pnpm run check:agent` passes with every file under 500 lines.
+- [x] Unit tests in `tests/unit/suggestion-scorer.test.ts` verify word-band target progression, neighbor overlap penalties, and `pangram-quality.json` grade filtering (`reject` excluded).
+- [x] Integration tests in `tests/integration/admin-suggestions.test.ts` verify `/api/admin/combinations` filtering/sorting, `/api/admin/suggestion` no-spoiler response, and rejecting/restoring suggestions via `/api/admin/suggestion-rejections`.
+- [x] `pnpm run check:agent` passes with every file under 500 lines.

@@ -1,6 +1,6 @@
 # Spec 04: Player Modals, Themes & Midnight Rollover
 
-Status: approved
+Status: shipped
 Branch: spec/04-modals-themes-and-rollover
 Reference (1.0):
 
@@ -38,6 +38,6 @@ Port the player modals (`ArchiveModal`, `PuzzleWordsModal`, `StatsModal`, `Rules
 
 ## 4. Acceptance Criteria (Test Catalog)
 
-- [ ] Unit tests verify `useMidnightRollover` across `Europe/Helsinki` midnight boundaries and theme/palette DOM attribute updates (`data-palette`, `data-theme`).
-- [ ] Component/Integration tests verify `ArchiveModal` past-puzzle selection, `PuzzleWordsModal` setting `revealed_<slot> = 'true'`, and `StatsModal` rendering computed streaks and rank distribution.
-- [ ] Playwright E2E test verifies switching themes/palettes, opening `RulesModal` and `StatsModal`, and loading a past puzzle from `ArchiveModal`.
+- [x] Unit tests verify `useMidnightRollover` across `Europe/Helsinki` midnight boundaries and theme/palette DOM attribute updates (`data-palette`, `data-theme`).
+- [x] Component/Integration tests verify `ArchiveModal` past-puzzle selection, `PuzzleWordsModal` setting `revealed_<slot> = 'true'`, and `StatsModal` rendering computed streaks and rank distribution.
+- [x] Playwright E2E test verifies switching themes/palettes, opening `RulesModal` and `StatsModal`, and loading a past puzzle from `ArchiveModal`.

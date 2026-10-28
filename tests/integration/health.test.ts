@@ -21,11 +21,12 @@ describe('GET /api/health (Kysely + Hono RPC integration)', () => {
       status: 'ok',
       engine: 'kysely-sqlite',
       total_puzzles: 0,
+      days_remaining: 0,
       timezone: 'Europe/Helsinki',
     });
   });
 
-  it('counts only active (is_active = 1) puzzles after seeding', async () => {
+  it('counts only active (is_active = 1) puzzles and reports rotation headroom after seeding', async () => {
     await harness.seed();
     await harness.db
       .insertInto('puzzles')
@@ -41,5 +42,7 @@ describe('GET /api/health (Kysely + Hono RPC integration)', () => {
     const body = await res.json();
 
     expect(body.total_puzzles).toBe(2);
+    expect(body.days_remaining).toBeGreaterThanOrEqual(1);
+    expect(body.days_remaining).toBeLessThanOrEqual(2);
   });
 });

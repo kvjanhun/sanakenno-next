@@ -17,9 +17,11 @@
     "@hono/node-server": "^1.13.8",
     "@hono/zod-validator": "^0.4.3",
     "@sanakenno/shared": "workspace:*",
+    "argon2": "^0.45.1",
     "better-sqlite3": "^12.8.0",
     "hono": "^4.7.4",
     "kysely": "^0.27.6",
+    "tsx": "^4.21.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

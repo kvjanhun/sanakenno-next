@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "pnpm --parallel --filter \"@sanakenno/{server,web}\" dev",
+    "dev": "pnpm --parallel --filter @sanakenno/server --filter @sanakenno/web dev",
     "dev:server": "pnpm --filter @sanakenno/server dev",
     "dev:web": "pnpm --filter @sanakenno/web dev",
     "build": "turbo run build",
@@ -31,6 +31,7 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^25.5.0",
+    "argon2": "^0.45.1",
     "eslint": "^9.21.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-react-hooks": "^7.0.1",

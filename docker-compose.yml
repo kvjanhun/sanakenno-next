@@ -1,0 +1,64 @@
+services:
+  sanakenno-a:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    container_name: sanakenno-a
+    restart: unless-stopped
+    ports:
+      - '8081:3001'
+    volumes:
+      - ./server/data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATA_DIR=/data
+      - DB_PATH=/data/sanakenno.db
+      - TZ=Europe/Helsinki
+      - INSTANCE_ID=sanakenno-a
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - BASE_URL=${BASE_URL}
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://127.0.0.1:3100/loki/api/v1/push'
+        loki-external-labels: 'compose_service=sanakenno-a'
+
+  sanakenno-b:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    container_name: sanakenno-b
+    restart: unless-stopped
+    ports:
+      - '8082:3001'
+    volumes:
+      - ./server/data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATA_DIR=/data
+      - DB_PATH=/data/sanakenno.db
+      - TZ=Europe/Helsinki
+      - INSTANCE_ID=sanakenno-b
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - BASE_URL=${BASE_URL}
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/api/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://127.0.0.1:3100/loki/api/v1/push'
+        loki-external-labels: 'compose_service=sanakenno-b'

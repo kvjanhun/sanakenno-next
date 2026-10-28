@@ -1,13 +1,202 @@
 @import 'tailwindcss';
 
+/* ------------------------------------------------------------------------ */
+/* Design tokens                                                            */
+/*                                                                          */
+/* Two dimensions of variation:                                             */
+/*   - data-theme:   light | dark   (explicit) or system (media query)      */
+/*   - data-palette: hehku | meri | metsa | yo | aamu | mono                */
+/*                                                                          */
+/* Neutral tokens (text, bg, border, hex cells) vary only by theme.         */
+/* Accent tokens (accent / accent-faded / on-accent) vary by both.          */
+/* ------------------------------------------------------------------------ */
+
+/* Light neutrals (default) */
 :root {
-  --color-bg-primary: #faf8f5;
-  --color-bg-surface: #ffffff;
-  --color-text-primary: #1c1917;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #4a4a4a;
+  --color-text-tertiary: #8a8a8a;
   --color-text-muted: #57534e;
-  --color-accent: #eab308;
-  --color-border: #e7e5e4;
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-bg-surface: #ffffff;
+  --color-border: #e0e0e0;
+  --color-hex-hi: #fbfbfb;
+  --color-hex-lo: #ececec;
+  --color-hex-stroke: #e0e0e0;
+  --color-button-shadow: #1a1a1a26;
+  --color-on-accent: #ffffff;
+  --color-error: #dc2626;
+
+  /* Default accent = hehku, light */
+  --color-accent: #ff643e;
+  --color-accent-faded: #ffb2a0;
+
+  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
+  --font-sans:
+    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-game: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Dark neutrals via system preference (unless overridden) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-text-primary: #f0f0f0;
+    --color-text-secondary: #b0b0b0;
+    --color-text-tertiary: #707070;
+    --color-text-muted: #a8a29e;
+    --color-bg-primary: #1a1a1a;
+    --color-bg-secondary: #252525;
+    --color-bg-surface: #252525;
+    --color-border: #3a3a3a;
+    --color-hex-hi: #343434;
+    --color-hex-lo: #252525;
+    --color-hex-stroke: #3e3e3e;
+    --color-button-shadow: #0000005c;
+    --color-error: #f87171;
+    /* Default accent = hehku, dark */
+    --color-accent: #e05030;
+    --color-accent-faded: #7d3525;
+  }
+}
+
+/* Dark neutrals via explicit attribute */
+[data-theme='dark'] {
+  --color-text-primary: #f0f0f0;
+  --color-text-secondary: #b0b0b0;
+  --color-text-tertiary: #707070;
+  --color-text-muted: #a8a29e;
+  --color-bg-primary: #1a1a1a;
+  --color-bg-secondary: #252525;
+  --color-bg-surface: #252525;
+  --color-border: #3a3a3a;
+  --color-hex-hi: #343434;
+  --color-hex-lo: #252525;
+  --color-hex-stroke: #3e3e3e;
+  --color-button-shadow: #0000005c;
+  --color-error: #f87171;
+  --color-accent: #e05030;
+  --color-accent-faded: #7d3525;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Palette overrides — accent only; neutrals are palette-agnostic.          */
+/* Ordering matters: palette rules must come AFTER the default accent so    */
+/* they win when both apply.                                                */
+/* ------------------------------------------------------------------------ */
+
+/* hehku — warm ember (default) */
+[data-palette='hehku'] {
+  --color-accent: #ff643e;
+  --color-accent-faded: #ffb2a0;
+  --color-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  [data-palette='hehku']:not([data-theme='light']) {
+    --color-accent: #e05030;
+    --color-accent-faded: #7d3525;
+    --color-on-accent: #ffffff;
+  }
+}
+[data-theme='dark'][data-palette='hehku'] {
+  --color-accent: #e05030;
+  --color-accent-faded: #7d3525;
+  --color-on-accent: #ffffff;
+}
+
+/* meri — teal (sea: blue + green harmony) */
+[data-palette='meri'] {
+  --color-accent: #0d9488;
+  --color-accent-faded: #99e3d9;
+  --color-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  [data-palette='meri']:not([data-theme='light']) {
+    --color-accent: #2dd4bf;
+    --color-accent-faded: #115e57;
+    --color-on-accent: #ffffff;
+  }
+}
+[data-theme='dark'][data-palette='meri'] {
+  --color-accent: #2dd4bf;
+  --color-accent-faded: #115e57;
+  --color-on-accent: #ffffff;
+}
+
+/* metsa — forest green */
+[data-palette='metsa'] {
+  --color-accent: #15803d;
+  --color-accent-faded: #a7dcba;
+  --color-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  [data-palette='metsa']:not([data-theme='light']) {
+    --color-accent: #22c55e;
+    --color-accent-faded: #14452a;
+    --color-on-accent: #ffffff;
+  }
+}
+[data-theme='dark'][data-palette='metsa'] {
+  --color-accent: #22c55e;
+  --color-accent-faded: #14452a;
+  --color-on-accent: #ffffff;
+}
+
+/* yo — indigo night */
+[data-palette='yo'] {
+  --color-accent: #6366f1;
+  --color-accent-faded: #c7c8f7;
+  --color-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  [data-palette='yo']:not([data-theme='light']) {
+    --color-accent: #818cf8;
+    --color-accent-faded: #353680;
+    --color-on-accent: #ffffff;
+  }
+}
+[data-theme='dark'][data-palette='yo'] {
+  --color-accent: #818cf8;
+  --color-accent-faded: #353680;
+  --color-on-accent: #ffffff;
+}
+
+/* aamu — amber sunrise */
+[data-palette='aamu'] {
+  --color-accent: #d97706;
+  --color-accent-faded: #fad591;
+  --color-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  [data-palette='aamu']:not([data-theme='light']) {
+    --color-accent: #f59e0b;
+    --color-accent-faded: #78350f;
+    --color-on-accent: #ffffff;
+  }
+}
+[data-theme='dark'][data-palette='aamu'] {
+  --color-accent: #f59e0b;
+  --color-accent-faded: #78350f;
+  --color-on-accent: #ffffff;
+}
+
+/* mono — black/white; inverts on-accent because a white accent needs dark text */
+[data-palette='mono'] {
+  --color-accent: #111827;
+  --color-accent-faded: #9ca3af;
+  --color-on-accent: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  [data-palette='mono']:not([data-theme='light']) {
+    --color-accent: #f3f4f6;
+    --color-accent-faded: #4b5563;
+    --color-on-accent: #000000;
+  }
+}
+[data-theme='dark'][data-palette='mono'] {
+  --color-accent: #f3f4f6;
+  --color-accent-faded: #4b5563;
+  --color-on-accent: #000000;
 }
 
 body {
@@ -15,4 +204,153 @@ body {
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   margin: 0;
+  padding: 0;
+  -webkit-text-size-adjust: 100%;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior-y: none;
+}
+
+button,
+input,
+a {
+  touch-action: manipulation;
+}
+
+html {
+  background-color: var(--color-bg-primary);
+}
+
+.game-scroll-surface {
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes word-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+.word-shake {
+  animation: word-shake 0.4s ease-in-out;
+}
+
+@keyframes celebration-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(255, 100, 62, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 100, 62, 0.6);
+  }
+}
+
+.celebration-card {
+  border: 2px solid var(--color-accent);
+  animation: celebration-glow 2s ease-in-out infinite;
+}
+
+@keyframes celebration-glow-intense {
+  0%,
+  100% {
+    box-shadow:
+      0 0 12px rgba(255, 100, 62, 0.4),
+      0 0 24px rgba(255, 180, 60, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(255, 100, 62, 0.7),
+      0 0 48px rgba(255, 180, 60, 0.4);
+  }
+}
+
+.celebration-card-intense {
+  position: relative;
+  border: 3px solid var(--color-accent);
+  animation: celebration-glow-intense 2s ease-in-out infinite;
+}
+
+.celebration-card-intense::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  padding: 3px;
+  background: linear-gradient(135deg, var(--color-accent), #ffb43c, var(--color-accent));
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+@keyframes idle-character-flash {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+.idle-character {
+  animation: idle-character-flash 1.5s steps(1, start) infinite;
+}
+
+@keyframes rank-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.rank-pulse {
+  animation: rank-pulse 0.4s ease-out;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes pill-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-pill-slide-in {
+  animation: pill-slide-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }

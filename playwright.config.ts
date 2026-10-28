@@ -23,13 +23,13 @@ export default defineConfig({
       command: 'PORT=3002 DB_PATH=:memory: SEED_ON_BOOT=true pnpm --filter @sanakenno/server start',
       url: 'http://localhost:3002/api/health',
       reuseExistingServer: false,
-      timeout: 15000,
+      timeout: 30000,
     },
     {
-      command: 'API_PORT=3002 pnpm --filter @sanakenno/web dev -- --port 5174 --strictPort',
+      command: 'API_PORT=3002 WEB_PORT=5174 pnpm --filter @sanakenno/web dev',
       url: 'http://localhost:5174',
       reuseExistingServer: false,
-      timeout: 15000,
+      timeout: 30000,
     },
   ],
 });

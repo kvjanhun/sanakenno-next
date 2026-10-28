@@ -1,6 +1,6 @@
 # Spec 03: Core Gameplay UI & Hybrid State Slice
 
-Status: approved
+Status: shipped
 Branch: spec/03-core-gameplay-ui-and-state
 Reference (1.0):
 
@@ -35,6 +35,6 @@ Port the core Finnish word-puzzle gameplay UI and decompose 1.0's 726-line `useG
 
 ## 4. Acceptance Criteria (Test Catalog)
 
-- [ ] Unit/Integration tests in `tests/unit/gameplay-store.test.ts` verify word validation via SHA-256 hashes, pangram bonus scoring, `scoreBeforeHints` capture on first hint unlock, `localStorage` persistence under `sanakenno_state_<slot>`, and stats freeze when `revealed_<slot>` is set.
-- [ ] Component tests (`*.test.tsx`) verify `Honeycomb` letter interaction, `RankProgress` threshold display, and `HintPanels` progressive unlock.
-- [ ] Playwright E2E test in `tests/e2e/gameplay.spec.ts` loads the daily puzzle, types and submits a valid Finnish word, verifies score/rank updates, and confirms state survives a page reload.
+- [x] Unit/Integration tests in `tests/unit/gameplay-store.test.ts` verify word validation via SHA-256 hashes, pangram bonus scoring, `scoreBeforeHints` capture on first hint unlock, `localStorage` persistence under `sanakenno_state_<slot>`, and stats freeze when `revealed_<slot>` is set.
+- [x] Component tests (`*.test.tsx`) verify `Honeycomb` letter interaction, `RankProgress` threshold display, and `HintPanels` progressive unlock.
+- [x] Playwright E2E test in `tests/e2e/gameplay.spec.ts` loads the daily puzzle, types and submits a valid Finnish word, verifies score/rank updates, and confirms state survives a page reload.

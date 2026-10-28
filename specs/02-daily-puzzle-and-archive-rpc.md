@@ -1,6 +1,6 @@
 # Spec 02: Daily Puzzle, Wordlist Engine & Archive RPC
 
-Status: approved
+Status: shipped
 Branch: spec/02-daily-puzzle-and-archive-rpc
 Reference (1.0):
 
@@ -34,6 +34,6 @@ Implement the server-side Finnish wordlist & puzzle rotation engine and expose t
 
 ## 4. Acceptance Criteria (Test Catalog)
 
-- [ ] Unit tests in `tests/unit/wordlist.test.ts` verify Finnish word filtering, hyphen stripping, 7-letter pangram detection, SHA-256 word hashing, and cache invalidation.
-- [ ] Integration tests in `tests/integration/puzzle-archive.test.ts` verify `slot` vs `display_number` across soft-deleted (`is_active = 0`) gaps, `Europe/Helsinki` date rotation, `403` spoiler block on today's `/words`, `404` on inactive slots, and `?all=true` cycle archive.
-- [ ] `pnpm run check:agent` passes with zero warnings or boundary violations.
+- [x] Unit tests in `tests/unit/wordlist.test.ts` verify Finnish word filtering, hyphen stripping, 7-letter pangram detection, SHA-256 word hashing, and cache invalidation.
+- [x] Integration tests in `tests/integration/puzzle-archive.test.ts` verify `slot` vs `display_number` across soft-deleted (`is_active = 0`) gaps, `Europe/Helsinki` date rotation, `403` spoiler block on today's `/words`, `404` on inactive slots, and `?all=true` cycle archive.
+- [x] `pnpm run check:agent` passes with zero warnings or boundary violations.

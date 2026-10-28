@@ -1,6 +1,6 @@
 # Spec 05: Player Auth, Cross-Device Sync & Telemetry
 
-Status: approved
+Status: shipped
 Branch: spec/05-player-auth-sync-and-telemetry
 Reference (1.0):
 

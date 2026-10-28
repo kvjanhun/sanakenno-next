@@ -103,6 +103,7 @@ export interface WordFindsTable {
 export interface PlayersTable {
   id: Generated<number>;
   player_key_hash: string;
+  email?: string | null;
   preferences: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;

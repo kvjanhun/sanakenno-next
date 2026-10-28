@@ -1,4 +1,11 @@
+import argon2 from 'argon2';
 import type { Kysely } from 'kysely';
+import {
+  DEFAULT_SEED_WORDS,
+  getWordlist,
+  invalidatePuzzleCache,
+  setWordlist,
+} from '../features/puzzle/wordlist.js';
 import { createDb } from './connection.js';
 import type { Database } from './schema.js';
 
@@ -7,6 +14,27 @@ import type { Database } from './schema.js';
  * combinations, config, and player stats.
  */
 export async function seedDatabase(db: Kysely<Database>): Promise<void> {
+  if (getWordlist().size === 0) {
+    setWordlist(DEFAULT_SEED_WORDS);
+  }
+  invalidatePuzzleCache();
+
+  const adminCount = await db
+    .selectFrom('admins')
+    .select((eb) => eb.fn.countAll<number>().as('count'))
+    .executeTakeFirstOrThrow();
+
+  if (Number(adminCount.count) === 0) {
+    const hash = await argon2.hash('adminpassword123');
+    await db
+      .insertInto('admins')
+      .values({
+        username: 'admin',
+        password_hash: hash,
+      })
+      .execute();
+  }
+
   const existing = await db
     .selectFrom('puzzles')
     .select((eb) => eb.fn.countAll<number>().as('count'))

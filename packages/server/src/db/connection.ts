@@ -1,3 +1,4 @@
+import path from 'node:path';
 import SQLite from 'better-sqlite3';
 import {
   CompiledQuery,
@@ -43,7 +44,10 @@ class ImmediateSqliteDialect extends SqliteDialect {
 /**
  * Create a typed Kysely SQLite database instance, apply baseline schema, and run migrations.
  */
-export function createDb(dbPath = process.env.DB_PATH ?? './sanakenno.dev.db'): Kysely<Database> {
+export function createDb(
+  dbPath = process.env.DB_PATH ??
+    (process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'sanakenno.db') : './sanakenno.dev.db'),
+): Kysely<Database> {
   const sqlite = new SQLite(dbPath);
   if (dbPath !== ':memory:') {
     sqlite.pragma('journal_mode = WAL');
