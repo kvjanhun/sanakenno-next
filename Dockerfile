@@ -23,7 +23,7 @@ RUN pnpm --filter @sanakenno/web build
 FROM node:22-alpine AS runtime
 
 # Install Litestream binary from official image
-COPY --from=litestream/litestream:0.3.13 /usr/local/bin/litestream /usr/local/bin/litestream
+COPY --from=litestream/litestream:0.5 /usr/local/bin/litestream /usr/local/bin/litestream
 
 RUN apk add --no-cache python3 make g++ tzdata ca-certificates
 RUN corepack enable && corepack prepare pnpm@latest --activate
