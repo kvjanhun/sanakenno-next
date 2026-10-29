@@ -25,7 +25,7 @@ FROM node:22-alpine AS runtime
 # Install Litestream binary from official image
 COPY --from=litestream/litestream:0.5 /usr/local/bin/litestream /usr/local/bin/litestream
 
-RUN apk add --no-cache python3 make g++ tzdata ca-certificates
+RUN apk add --no-cache python3 make g++ curl tzdata ca-certificates
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 RUN addgroup -S sanakenno && adduser -S sanakenno -G sanakenno
