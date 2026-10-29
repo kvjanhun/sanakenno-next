@@ -16,7 +16,7 @@
     "test:unit": "vitest run --exclude tests/architecture.test.ts",
     "test:e2e": "playwright test",
     "db:seed": "pnpm --filter @sanakenno/server db:seed",
-    "check:agent": "pnpm run typecheck && pnpm run lint && pnpm run test:arch && pnpm run test:unit && pnpm run build"
+    "check:agent": "pnpm run format && pnpm run typecheck && pnpm run lint && pnpm run test:arch && pnpm run test:unit && pnpm run build"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
