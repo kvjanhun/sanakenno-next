@@ -60,88 +60,82 @@ export function RankProgress({
         >
           {score} pistettä
         </span>
-        <button
-          key={rank}
-          type="button"
-          onClick={onToggleRanks}
-          data-testid="rank-button"
-          className="flex items-center gap-1 pl-4.5 pr-3 py-1 text-sm rounded-full cursor-pointer border-none rank-pulse"
-          style={{
-            backgroundColor: 'var(--color-accent)',
-            color: 'var(--color-on-accent)',
-            fontWeight: 600,
-            flexShrink: 0,
-          }}
-          aria-expanded={showRanks}
-        >
-          <span>{rank}</span>
-          <span
-            aria-hidden="true"
-            className="inline-flex h-3.5 w-3.5 items-center justify-center transition-transform duration-150"
-            style={{
-              transform: showRanks ? 'rotate(180deg)' : 'rotate(0deg)',
-            }}
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex items-center gap-1 transition-opacity duration-200 ${
+              hasUnlockedHints ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}
+            title="Saavutukset ilman apuja (25%, 50%, 70%)"
+            aria-label="Saavutukset ilman apuja"
           >
-            <ChevronDownIcon size={14} strokeWidth={2.5} />
-          </span>
-        </button>
+            {noHintAchievements.map((ach) => {
+              const isReached = ach.unlocked;
+              return (
+                <span
+                  key={ach.name}
+                  data-testid={`milestone-pip-${ach.pct}`}
+                  title={`${ach.name} (${ach.pct}% pisteistä): ${
+                    isReached ? 'Saavutettu' : 'Tavoite ilman apuja'
+                  }`}
+                  className="flex items-center justify-center transition-all duration-200"
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    color: isReached ? 'var(--color-accent)' : 'var(--color-border)',
+                  }}
+                >
+                  {isReached ? (
+                    <CircleStarIcon size={13} strokeWidth={2.4} />
+                  ) : (
+                    <CircleIcon size={12} strokeWidth={2} />
+                  )}
+                </span>
+              );
+            })}
+          </div>
+          <button
+            key={rank}
+            type="button"
+            onClick={onToggleRanks}
+            data-testid="rank-button"
+            className="flex items-center gap-1 pl-4.5 pr-3 py-1 text-sm rounded-full cursor-pointer border-none rank-pulse"
+            style={{
+              backgroundColor: 'var(--color-accent)',
+              color: 'var(--color-on-accent)',
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+            aria-expanded={showRanks}
+          >
+            <span>{rank}</span>
+            <span
+              aria-hidden="true"
+              className="inline-flex h-3.5 w-3.5 items-center justify-center transition-transform duration-150"
+              style={{
+                transform: showRanks ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}
+            >
+              <ChevronDownIcon size={14} strokeWidth={2.5} />
+            </span>
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2.5">
+      <div
+        className="h-2 w-full rounded-full overflow-hidden"
+        style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+        role="progressbar"
+        aria-valuenow={score}
+        aria-valuemin={0}
+        aria-valuemax={maxScore}
+      >
         <div
-          className="relative h-2 flex-1 rounded-full overflow-hidden"
-          style={{ backgroundColor: 'var(--color-bg-secondary)' }}
-          role="progressbar"
-          aria-valuenow={score}
-          aria-valuemin={0}
-          aria-valuemax={maxScore}
-        >
-          <div
-            className="h-full rounded-full transition-[width] duration-200 ease-out"
-            style={{
-              width: `${Math.round(progress)}%`,
-              backgroundColor: 'var(--color-accent)',
-            }}
-          />
-        </div>
-
-        <div
-          className="flex items-center gap-1 shrink-0"
-          title="Saavutukset ilman apuja (25%, 50%, 70%)"
-          aria-label="Saavutukset ilman apuja"
-        >
-          {noHintAchievements.map((ach) => {
-            const isReached = ach.unlocked;
-            const isInactive = hasUnlockedHints && !isReached;
-            return (
-              <span
-                key={ach.name}
-                data-testid={`milestone-pip-${ach.pct}`}
-                title={`${ach.name} (${ach.pct}% pisteistä): ${
-                  isReached ? 'Saavutettu' : isInactive ? 'Menetetty (vihjeet käytössä)' : 'Tavoite'
-                }`}
-                className="flex items-center justify-center transition-all duration-200"
-                style={{
-                  width: '14px',
-                  height: '14px',
-                  color: isReached
-                    ? 'var(--color-accent)'
-                    : isInactive
-                      ? 'color-mix(in srgb, var(--color-text-tertiary) 40%, var(--color-bg-secondary))'
-                      : 'var(--color-border)',
-                }}
-              >
-                {isReached ? (
-                  <CircleStarIcon size={13} strokeWidth={2.4} />
-                ) : isInactive ? (
-                  <CircleOffIcon size={13} strokeWidth={2} />
-                ) : (
-                  <CircleIcon size={12} strokeWidth={2} />
-                )}
-              </span>
-            );
-          })}
-        </div>
+          className="h-full rounded-full transition-[width] duration-200 ease-out"
+          style={{
+            width: `${Math.round(progress)}%`,
+            backgroundColor: 'var(--color-accent)',
+          }}
+        />
       </div>
 
       {showRanks && (
