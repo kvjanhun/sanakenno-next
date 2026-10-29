@@ -19,7 +19,7 @@ export const AdminChangePasswordPayloadSchema = z.object({
 export type AdminChangePasswordPayload = z.infer<typeof AdminChangePasswordPayloadSchema>;
 
 export const AdminPuzzleSavePayloadSchema = z.object({
-  slot: z.number().int().positive().optional(),
+  slot: z.number().int().nonnegative().optional(),
   letters: z.string().trim().min(7),
   center: z.string().trim().length(1),
   force: z.boolean().optional(),
@@ -27,13 +27,13 @@ export const AdminPuzzleSavePayloadSchema = z.object({
 export type AdminPuzzleSavePayload = z.infer<typeof AdminPuzzleSavePayloadSchema>;
 
 export const AdminPuzzleSwapPayloadSchema = z.object({
-  slotA: z.number().int().positive(),
-  slotB: z.number().int().positive(),
+  slotA: z.number().int().nonnegative(),
+  slotB: z.number().int().nonnegative(),
 });
 export type AdminPuzzleSwapPayload = z.infer<typeof AdminPuzzleSwapPayloadSchema>;
 
 export const AdminPuzzleCenterPayloadSchema = z.object({
-  slot: z.number().int().positive(),
+  slot: z.number().int().nonnegative(),
   center: z.string().trim().length(1),
 });
 export type AdminPuzzleCenterPayload = z.infer<typeof AdminPuzzleCenterPayloadSchema>;
@@ -82,6 +82,15 @@ export const AdminCombinationVariationSchema = z.object({
   pangrams: z.number(),
 });
 export type AdminCombinationVariation = z.infer<typeof AdminCombinationVariationSchema>;
+
+export const VariationDataSchema = z.object({
+  center: z.string(),
+  word_count: z.number(),
+  max_score: z.number(),
+  pangram_count: z.number(),
+  is_active: z.boolean().optional(),
+});
+export type VariationData = z.infer<typeof VariationDataSchema>;
 
 export const AdminCombinationItemSchema = z.object({
   letters: z.string(),

@@ -14,6 +14,7 @@ import type {
   SyncPuzzleState,
   TransferUseResponse,
   WordFindPayload,
+  VariationData,
 } from '@sanakenno/shared';
 
 /**
@@ -23,9 +24,7 @@ import type {
 export const apiClient = hc<AppType>('/');
 
 function authHeaders(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-  };
+  return { Authorization: `Bearer ${token}` };
 }
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
@@ -173,9 +172,7 @@ export function postWordFind(payload: WordFindPayload): void {
 }
 
 function csrfHeaders(token: string): Record<string, string> {
-  return {
-    'X-CSRF-Token': token,
-  };
+  return { 'X-CSRF-Token': token };
 }
 
 export async function adminCheckSession(): Promise<{ username: string; csrfToken: string } | null> {
@@ -202,14 +199,12 @@ export async function adminLogout(): Promise<void> {
 
 export async function adminSavePuzzle(
   csrfToken: string,
-  payload: { slot?: number; letters: string; center: string; force?: boolean },
+  payload: { slot?: number; letters: string | string[]; center: string; force?: boolean },
 ) {
   const res = await fetch('/api/admin/puzzle', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...csrfHeaders(csrfToken),
-    },
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders(csrfToken) },
+    credentials: 'same-origin',
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -228,52 +223,92 @@ export async function adminDeletePuzzle(csrfToken: string, slot: number) {
   const res = await fetch(`/api/admin/puzzle/${slot}`, {
     method: 'DELETE',
     headers: csrfHeaders(csrfToken),
+    credentials: 'same-origin',
   });
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Poisto epäonnistui'));
-  }
+  if (!res.ok) throw new Error(await readErrorMessage(res, 'Poisto epäonnistui'));
   return res.json();
 }
 
 export async function adminSwapPuzzles(csrfToken: string, slotA: number, slotB: number) {
   const res = await fetch('/api/admin/puzzle/swap', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...csrfHeaders(csrfToken),
-    },
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders(csrfToken) },
+    credentials: 'same-origin',
     body: JSON.stringify({ slotA, slotB }),
   });
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Vaihto epäonnistui'));
-  }
+  if (!res.ok) throw new Error(await readErrorMessage(res, 'Vaihto epäonnistui'));
   return res.json();
 }
 
 export async function adminGetSlots(csrfToken: string) {
   const res = await fetch('/api/admin/puzzle/slots', {
     headers: csrfHeaders(csrfToken),
+    credentials: 'same-origin',
   });
-  if (!res.ok) return { slots: [] };
-  return (await res.json()) as { slots: Array<{ slot: number; display_number: number }> };
+  if (!res.ok) return { slots: [], active_slots: [] as number[], total_puzzles: 0 };
+  return (await res.json()) as {
+    slots: Array<{ slot: number; display_number: number }>;
+    active_slots?: number[];
+    total_puzzles: number;
+  };
+}
+
+export async function adminGetPuzzleVariations(
+  csrfToken: string,
+  params: { slot?: number; display_number?: number; letters?: string },
+) {
+  const sp = new URLSearchParams();
+  if (params.slot !== undefined) sp.set('slot', String(params.slot));
+  if (params.display_number !== undefined) sp.set('display_number', String(params.display_number));
+  if (params.letters !== undefined) sp.set('letters', params.letters);
+  const res = await fetch(`/api/admin/puzzle/variations?${sp.toString()}`, {
+    headers: csrfHeaders(csrfToken),
+    credentials: 'same-origin',
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, 'Pelin lataus epäonnistui'));
+  return (await res.json()) as {
+    slot: number;
+    display_number: number | null;
+    total_puzzles: number;
+    prev_slot: number | null;
+    next_slot: number | null;
+    letters: string[];
+    center: string;
+    variations: VariationData[];
+    is_active: boolean;
+  };
+}
+
+export async function adminChangeCenter(csrfToken: string, slot: number, center: string) {
+  const res = await fetch('/api/admin/puzzle/center', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders(csrfToken) },
+    credentials: 'same-origin',
+    body: JSON.stringify({ slot, center }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res, 'Keskuksen vaihto epäonnistui'));
+  return res.json();
 }
 
 export async function adminPreview(
   csrfToken: string,
-  payload: { letters: string; center: string },
+  payload: { letters: string | string[]; center: string },
 ) {
   const res = await fetch('/api/admin/preview', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...csrfHeaders(csrfToken),
-    },
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders(csrfToken) },
+    credentials: 'same-origin',
     body: JSON.stringify(payload),
   });
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Esikatselu epäonnistui'));
-  }
-  return res.json();
+  if (!res.ok) throw new Error(await readErrorMessage(res, 'Esikatselu epäonnistui'));
+  return (await res.json()) as {
+    words: string[];
+    max_score: number;
+    word_count: number;
+    pangram_count: number;
+    hint_data: { word_count: number; pangram_count: number };
+    variations: VariationData[];
+  };
 }
 
 export async function adminGetBlocked(csrfToken: string) {

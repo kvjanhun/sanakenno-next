@@ -32,6 +32,28 @@ export async function getPuzzleBySlot(db: Kysely<Database>, slot: number) {
     .executeTakeFirst();
 }
 
+export async function getNeighbourSlots(
+  db: Kysely<Database>,
+  slot: number,
+): Promise<{ prev_slot: number | null; next_slot: number | null }> {
+  const prevRow = await db
+    .selectFrom('puzzles')
+    .select((eb) => eb.fn.max<number | null>('slot').as('prev_slot'))
+    .where('slot', '<', slot)
+    .executeTakeFirst();
+
+  const nextRow = await db
+    .selectFrom('puzzles')
+    .select((eb) => eb.fn.min<number | null>('slot').as('next_slot'))
+    .where('slot', '>', slot)
+    .executeTakeFirst();
+
+  return {
+    prev_slot: prevRow?.prev_slot != null ? Number(prevRow.prev_slot) : null,
+    next_slot: nextRow?.next_slot != null ? Number(nextRow.next_slot) : null,
+  };
+}
+
 export async function findDuplicateConflicts(
   db: Kysely<Database>,
   lettersKey: string,

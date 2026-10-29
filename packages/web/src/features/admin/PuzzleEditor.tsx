@@ -1,24 +1,49 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
+import type { VariationData } from '@sanakenno/shared';
 import {
+  adminBlockWord,
   adminDeletePuzzle,
+  adminGetPuzzleVariations,
   adminGetSlots,
   adminPreview,
   adminSavePuzzle,
   adminSwapPuzzles,
 } from '../../api/client.js';
+import { AdminWordListPanel } from './AdminWordListPanel.js';
+import { PuzzleSlotControls } from './PuzzleSlotControls.js';
 import { SuggestionPanel } from './SuggestionPanel.js';
 import { useAdminStore } from './useAdminStore.js';
 
 export function PuzzleEditor(): React.JSX.Element {
   const csrfToken = useAdminStore((s) => s.csrfToken);
 
-  const [slot, setSlot] = useState<number | ''>('');
-  const [letters, setLetters] = useState('');
-  const [center, setCenter] = useState('');
-  const [force, setForce] = useState(false);
-  const [slotsList, setSlotsList] = useState<Array<{ slot: number; display_number: number }>>([]);
-  const [swapSlotA, setSwapSlotA] = useState<number | ''>('');
-  const [swapSlotB, setSwapSlotB] = useState<number | ''>('');
+  const [currentSlot, setCurrentSlot] = useState<number | null>(null);
+  const [currentDisplayNumber, setCurrentDisplayNumber] = useState<number | null>(null);
+  const [prevSlot, setPrevSlot] = useState<number | null>(null);
+  const [nextSlot, setNextSlot] = useState<number | null>(null);
+  const [totalPuzzles, setTotalPuzzles] = useState(0);
+  const [activeSlots, setActiveSlots] = useState<number[]>([]);
+  const [savedLetters, setSavedLetters] = useState('');
+  const [savedCenter, setSavedCenter] = useState('');
+  const [activeLetters, setActiveLetters] = useState('');
+  const [activeCenter, setActiveCenter] = useState('');
+  const [variations, setVariations] = useState<VariationData[]>([]);
+  const [isActive, setIsActive] = useState(true);
+  const [words, setWords] = useState<string[]>([]);
+  const [wordsLoading, setWordsLoading] = useState(false);
+
+  const [jumpTarget, setJumpTarget] = useState('');
+  const [swapTarget, setSwapTarget] = useState('');
+  const [newLetters, setNewLetters] = useState('');
+  const [newCenter, setNewCenter] = useState('');
+  const [newSlot, setNewSlot] = useState<number | ''>('');
+
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusType, setStatusType] = useState<'success' | 'error' | 'warning' | null>(null);
+  const [forceRequired, setForceRequired] = useState(false);
 
   const [preview, setPreview] = useState<{
     words: string[];
@@ -26,384 +51,388 @@ export function PuzzleEditor(): React.JSX.Element {
     hint_data: { word_count: number; pangram_count: number };
   } | null>(null);
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [forceRequired, setForceRequired] = useState(false);
+  const isDirty = activeLetters !== savedLetters || activeCenter !== savedCenter;
 
-  const loadSlots = useCallback(async () => {
+  const loadWordsFor = useCallback(
+    async (letters: string | string[], center: string) => {
+      if (!csrfToken || !letters || !center) return;
+      setWordsLoading(true);
+      try {
+        const res = await adminPreview(csrfToken, { letters, center });
+        setWords(res.words);
+        setPreview({
+          words: res.words,
+          max_score: res.max_score,
+          hint_data: res.hint_data,
+        });
+      } catch {
+        setWords([]);
+      } finally {
+        setWordsLoading(false);
+      }
+    },
+    [csrfToken],
+  );
+
+  const loadPuzzle = useCallback(
+    async (params: { slot?: number; display_number?: number }) => {
+      if (!csrfToken) return;
+      setLoading(true);
+      try {
+        const data = await adminGetPuzzleVariations(csrfToken, params);
+        setCurrentSlot(data.slot);
+        setCurrentDisplayNumber(data.display_number);
+        setPrevSlot(data.prev_slot);
+        setNextSlot(data.next_slot);
+        setTotalPuzzles(data.total_puzzles);
+        const lStr = data.letters.join(',');
+        setSavedLetters(lStr);
+        setSavedCenter(data.center);
+        setActiveLetters(lStr);
+        setActiveCenter(data.center);
+        setVariations(data.variations);
+        setIsActive(data.is_active);
+
+        setJumpTarget(data.display_number !== null ? String(data.display_number) : '');
+
+        void loadWordsFor(data.letters, data.center);
+      } catch (err: unknown) {
+        setStatusMessage(err instanceof Error ? err.message : 'Pelin lataus epäonnistui');
+        setStatusType('error');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [csrfToken, loadWordsFor],
+  );
+
+  const refreshSlotsList = useCallback(async () => {
     if (!csrfToken) return;
     try {
       const res = await adminGetSlots(csrfToken);
-      setSlotsList(res.slots);
+      const slots = res.active_slots ?? res.slots.map((s) => s.slot);
+      setActiveSlots(slots);
+      setTotalPuzzles(res.total_puzzles);
+      return slots;
     } catch {
-      // ignore
+      return [];
     }
   }, [csrfToken]);
 
   useEffect(() => {
-    void loadSlots();
-  }, [loadSlots]);
+    void refreshSlotsList().then((slots) => {
+      if (slots && slots.length > 0 && currentSlot === null) {
+        void loadPuzzle({ slot: slots[0] });
+      }
+    });
+  }, [refreshSlotsList, loadPuzzle, currentSlot]);
 
-  const handlePreview = async () => {
-    if (!csrfToken || !letters || !center) return;
-    setLoading(true);
-    setError(null);
+  const handleCenterSelect = (center: string) => {
+    setActiveCenter(center);
+    setNewCenter(center);
+    void loadWordsFor(activeLetters, center);
+  };
+
+  const handleRestore = () => {
+    setActiveLetters(savedLetters);
+    setActiveCenter(savedCenter);
+    setNewLetters(savedLetters);
+    setNewCenter(savedCenter);
+    void loadWordsFor(savedLetters, savedCenter);
+  };
+
+  const handleSaveCurrent = async (force = false) => {
+    if (!csrfToken || currentSlot === null) return;
+    setSaving(true);
+    setStatusMessage(null);
     try {
-      const res = await adminPreview(csrfToken, { letters, center });
-      setPreview(res as typeof preview);
+      await adminSavePuzzle(csrfToken, {
+        slot: currentSlot,
+        letters: activeLetters,
+        center: activeCenter,
+        force,
+      });
+      setStatusMessage('Peli tallennettu onnistuneesti!');
+      setStatusType('success');
+      setForceRequired(false);
+      await refreshSlotsList();
+      await loadPuzzle({ slot: currentSlot });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Esikatselu epäonnistui');
-      setPreview(null);
+      const reqForce = (err as { requires_force?: boolean }).requires_force;
+      if (reqForce) setForceRequired(true);
+      setStatusMessage(err instanceof Error ? err.message : 'Tallennus epäonnistui');
+      setStatusType('error');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleSave = async (overrideForce = false) => {
-    if (!csrfToken || !letters || !center) return;
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-    const useForce = overrideForce || force;
+  const handlePrev = () => {
+    if (prevSlot !== null) void loadPuzzle({ slot: prevSlot });
+  };
 
+  const handleNext = () => {
+    if (nextSlot !== null) void loadPuzzle({ slot: nextSlot });
+  };
+
+  const handleJump = (e: FormEvent) => {
+    e.preventDefault();
+    const target = parseInt(jumpTarget, 10);
+    if (!Number.isInteger(target) || target < 1 || target > totalPuzzles) {
+      setStatusMessage(`Anna pelinumero 1-${totalPuzzles}`);
+      setStatusType('warning');
+      return;
+    }
+    void loadPuzzle({ display_number: target });
+  };
+
+  const handleSwap = async () => {
+    if (!csrfToken || currentSlot === null) return;
+    const targetDisp = parseInt(swapTarget, 10);
+    if (
+      !Number.isInteger(targetDisp) ||
+      targetDisp < 1 ||
+      targetDisp > totalPuzzles ||
+      targetDisp === currentDisplayNumber
+    ) {
+      setStatusMessage(`Anna vaihtopelin numero 1-${totalPuzzles} (ei nykyinen)`);
+      setStatusType('warning');
+      return;
+    }
+    const targetSlot = activeSlots[targetDisp - 1];
+    if (targetSlot === undefined || targetSlot === currentSlot) return;
+
+    setSaving(true);
     try {
-      const payload: { slot?: number; letters: string; center: string; force?: boolean } = {
-        letters,
-        center,
-        force: useForce,
-      };
-      if (typeof slot === 'number' && slot > 0) {
-        payload.slot = slot;
-      }
-      await adminSavePuzzle(csrfToken, payload);
-      setMessage('Peli tallennettu onnistuneesti!');
-      setForceRequired(false);
-      setForce(false);
-      void loadSlots();
+      await adminSwapPuzzles(csrfToken, currentSlot, targetSlot);
+      setStatusMessage('Pelit vaihdettu keskenään onnistuneesti!');
+      setStatusType('success');
+      setSwapTarget('');
+      await refreshSlotsList();
+      await loadPuzzle({ slot: targetSlot });
     } catch (err: unknown) {
-      const requiresForce = (err as { requires_force?: boolean }).requires_force;
-      if (requiresForce) {
-        setForceRequired(true);
-      }
-      setError(err instanceof Error ? err.message : 'Tallennus epäonnistui');
+      setStatusMessage(err instanceof Error ? err.message : 'Vaihto epäonnistui');
+      setStatusType('error');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!csrfToken || typeof slot !== 'number' || slot <= 0) return;
-    if (!window.confirm(`Haluatko varmasti poistaa slotin ${slot}?`)) return;
-    setLoading(true);
-    setError(null);
+    if (!csrfToken) return;
+    const target = typeof newSlot === 'number' && newSlot >= 0 ? newSlot : currentSlot;
+    if (target === null) return;
+    if (!window.confirm(`Haluatko varmasti poistaa slotin ${target}?`)) return;
+
+    setSaving(true);
+    setStatusMessage(null);
     try {
-      await adminDeletePuzzle(csrfToken, slot);
-      setMessage(`Slotti ${slot} poistettu.`);
-      setSlot('');
-      setLetters('');
-      setCenter('');
-      setPreview(null);
-      void loadSlots();
+      await adminDeletePuzzle(csrfToken, target);
+      setStatusMessage(`Slotti ${target} poistettu.`);
+      setStatusType('success');
+      const slots = await refreshSlotsList();
+      if (slots && slots.length > 0) {
+        await loadPuzzle({ slot: slots[0] });
+      } else {
+        setCurrentSlot(null);
+        setCurrentDisplayNumber(null);
+        setWords([]);
+        setVariations([]);
+      }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Poisto epäonnistui');
+      setStatusMessage(err instanceof Error ? err.message : 'Poisto epäonnistui');
+      setStatusType('error');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleSwap = async () => {
-    if (!csrfToken || typeof swapSlotA !== 'number' || typeof swapSlotB !== 'number') return;
-    setLoading(true);
-    setError(null);
+  const handleReactivate = async () => {
+    if (!csrfToken || currentSlot === null) return;
+    setSaving(true);
     try {
-      await adminSwapPuzzles(csrfToken, swapSlotA, swapSlotB);
-      setMessage(`Slotit ${swapSlotA} ja ${swapSlotB} vaihdettu keskenään!`);
-      void loadSlots();
+      await adminSavePuzzle(csrfToken, {
+        slot: currentSlot,
+        letters: activeLetters,
+        center: activeCenter,
+        force: true,
+      });
+      setStatusMessage('Peli palautettu onnistuneesti kiertoon!');
+      setStatusType('success');
+      await refreshSlotsList();
+      await loadPuzzle({ slot: currentSlot });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Vaihto epäonnistui');
+      setStatusMessage(err instanceof Error ? err.message : 'Palautus epäonnistui');
+      setStatusType('error');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const letterArray = Array.from(new Set(letters.toLowerCase().replace(/[^a-zåäö]/g, '')));
+  const handlePreviewForm = async () => {
+    if (!csrfToken || !newLetters || !newCenter) return;
+    setSaving(true);
+    try {
+      const res = await adminPreview(csrfToken, { letters: newLetters, center: newCenter });
+      setPreview({
+        words: res.words,
+        max_score: res.max_score,
+        hint_data: res.hint_data,
+      });
+      setWords(res.words);
+    } catch (err: unknown) {
+      setStatusMessage(err instanceof Error ? err.message : 'Esikatselu epäonnistui');
+      setStatusType('error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveForm = async (overrideForce = false) => {
+    if (!csrfToken || !newLetters || !newCenter) return;
+    setSaving(true);
+    setStatusMessage(null);
+    try {
+      const payload: { slot?: number; letters: string; center: string; force?: boolean } = {
+        letters: newLetters,
+        center: newCenter,
+        force: overrideForce || forceRequired,
+      };
+      if (typeof newSlot === 'number' && newSlot >= 0) {
+        payload.slot = newSlot;
+      }
+      const res = (await adminSavePuzzle(csrfToken, payload)) as { slot: number };
+      setStatusMessage('Peli tallennettu onnistuneesti!');
+      setStatusType('success');
+      setForceRequired(false);
+      await refreshSlotsList();
+      await loadPuzzle({ slot: res.slot });
+    } catch (err: unknown) {
+      const reqForce = (err as { requires_force?: boolean }).requires_force;
+      if (reqForce) setForceRequired(true);
+      setStatusMessage(err instanceof Error ? err.message : 'Tallennus epäonnistui');
+      setStatusType('error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBlockWord = async (word: string) => {
+    if (!csrfToken) return;
+    if (!window.confirm(`Estä sana "${word}" pysyvästi?`)) return;
+    try {
+      await adminBlockWord(csrfToken, word);
+      setStatusMessage(`Sana "${word}" estetty.`);
+      setStatusType('success');
+      if (currentSlot !== null) {
+        await loadPuzzle({ slot: currentSlot });
+      }
+    } catch (err: unknown) {
+      setStatusMessage(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
+      setStatusType('error');
+    }
+  };
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold">Pelin luominen ja muokkaus</h2>
-        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-          Aktiivisia pelejä: {slotsList.length}
-        </span>
-      </div>
-
-      {message && (
+      {statusMessage && (
         <div
-          className="p-3 rounded-lg text-xs font-medium"
+          role="alert"
+          className="p-3 rounded-lg text-xs font-semibold flex items-center justify-between border"
           style={{
             backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-accent)',
             borderColor: 'var(--color-border)',
+            color:
+              statusType === 'error'
+                ? 'var(--color-error)'
+                : statusType === 'warning'
+                  ? 'var(--color-accent)'
+                  : 'var(--color-accent)',
           }}
         >
-          {message}
+          <span>{statusMessage}</span>
         </div>
       )}
-
-      <SuggestionPanel
-        csrfToken={csrfToken}
-        onSelectSuggestion={(sLetters, sCenter) => {
-          setLetters(sLetters);
-          setCenter(sCenter);
-          setSlot('');
-          setError(null);
-          setMessage(null);
-          setForceRequired(false);
-        }}
-      />
-
-      {error && (
-        <div
-          className="p-3 rounded-lg text-xs font-medium space-y-2"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-error)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          <p>{error}</p>
-          {forceRequired && (
-            <button
-              type="button"
-              onClick={() => handleSave(true)}
-              className="px-3 py-1 rounded text-xs font-semibold cursor-pointer"
-              style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-bg-primary)' }}
-            >
-              Luo silti (Ohita varoitus)
-            </button>
-          )}
-        </div>
-      )}
-
-      <div
-        className="p-4 rounded-xl space-y-4 border"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label
-              htmlFor="puzzle-slot"
-              className="block text-xs font-semibold uppercase mb-1"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Slotti (Valinnainen)
-            </label>
-            <input
-              id="puzzle-slot"
-              type="number"
-              placeholder="Uusi slotti"
-              value={slot}
-              onChange={(e) => setSlot(e.target.value ? Number(e.target.value) : '')}
-              className="w-full px-3 py-1.5 rounded border text-sm"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="puzzle-letters"
-              className="block text-xs font-semibold uppercase mb-1"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Kirjaimet (7 kpl)
-            </label>
-            <input
-              id="puzzle-letters"
-              type="text"
-              placeholder="esim. a,e,i,k,l,n,s"
-              value={letters}
-              onChange={(e) => {
-                setLetters(e.target.value);
-                setForceRequired(false);
-              }}
-              className="w-full px-3 py-1.5 rounded border text-sm font-mono"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="puzzle-center"
-              className="block text-xs font-semibold uppercase mb-1"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Keskuskirjain
-            </label>
-            <input
-              id="puzzle-center"
-              type="text"
-              maxLength={1}
-              placeholder="esim. a"
-              value={center}
-              onChange={(e) => setCenter(e.target.value.toLowerCase())}
-              className="w-full px-3 py-1.5 rounded border text-sm font-mono text-center"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
-            />
-          </div>
-        </div>
-
-        {letterArray.length === 7 && (
-          <div className="space-y-1">
-            <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              Valitse keskuskirjain nopeasti:
-            </span>
-            <div className="flex gap-2">
-              {letterArray.map((ch) => (
-                <button
-                  key={ch}
-                  type="button"
-                  onClick={() => setCenter(ch)}
-                  className="w-8 h-8 rounded text-sm font-bold uppercase cursor-pointer border"
-                  style={{
-                    backgroundColor:
-                      center === ch ? 'var(--color-accent)' : 'var(--color-bg-primary)',
-                    color: center === ch ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                    borderColor: 'var(--color-border)',
-                  }}
-                >
-                  {ch}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2 pt-2">
-          <button
-            type="button"
-            onClick={handlePreview}
-            disabled={loading || letterArray.length !== 7 || !center}
-            className="px-4 py-2 rounded text-xs font-medium cursor-pointer disabled:opacity-50 border"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            Esikatsele
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave(false)}
-            disabled={loading || letterArray.length !== 7 || !center}
-            className="px-4 py-2 rounded text-xs font-semibold cursor-pointer disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-bg-primary)' }}
-          >
-            Tallenna peli
-          </button>
-          {typeof slot === 'number' && slot > 0 && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={loading}
-              className="px-4 py-2 rounded text-xs font-medium cursor-pointer disabled:opacity-50 ml-auto"
-              style={{ backgroundColor: 'var(--color-error)', color: 'var(--color-bg-primary)' }}
-            >
-              Poista peli
-            </button>
-          )}
-        </div>
-      </div>
 
       {preview && (
         <div
-          className="p-4 rounded-xl space-y-3 border"
+          className="p-3 rounded-xl border flex flex-wrap gap-4 text-xs font-semibold"
           style={{
             backgroundColor: 'var(--color-bg-secondary)',
             borderColor: 'var(--color-border)',
           }}
         >
-          <div className="flex justify-between items-center text-xs font-semibold">
-            <span>Sanoja: {preview.hint_data.word_count}</span>
-            <span>Maksimipisteet: {preview.max_score}</span>
-            <span>Pangrammeja: {preview.hint_data.pangram_count}</span>
-          </div>
-          <div
-            className="max-h-48 overflow-y-auto p-2 rounded text-xs flex flex-wrap gap-1.5"
-            style={{ backgroundColor: 'var(--color-bg-primary)' }}
-          >
-            {preview.words.map((w) => (
-              <span
-                key={w}
-                className="px-2 py-0.5 rounded border"
-                style={{ borderColor: 'var(--color-border)' }}
-              >
-                {w}
-              </span>
-            ))}
-          </div>
+          <span>Sanoja: {preview.hint_data.word_count}</span>
+          <span>Maksimipisteet: {preview.max_score}</span>
+          <span>Pangrammeja: {preview.hint_data.pangram_count}</span>
         </div>
       )}
 
-      <div
-        className="p-4 rounded-xl space-y-3 border"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        <h3 className="text-sm font-bold">Vaihda kahden pelin paikkaa (Swap)</h3>
-        <div className="flex gap-3 items-center">
-          <input
-            type="number"
-            placeholder="Slotti A"
-            value={swapSlotA}
-            onChange={(e) => setSwapSlotA(e.target.value ? Number(e.target.value) : '')}
-            className="w-28 px-3 py-1.5 rounded border text-sm"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="lg:col-span-7 space-y-6">
+          <PuzzleSlotControls
+            currentSlot={currentSlot}
+            currentDisplayNumber={currentDisplayNumber}
+            canGoPrev={prevSlot !== null}
+            canGoNext={nextSlot !== null}
+            totalPuzzles={totalPuzzles}
+            variations={variations}
+            activeCenter={activeCenter}
+            isActive={isActive}
+            isDirty={isDirty}
+            saving={saving}
+            loading={loading}
+            jumpTarget={jumpTarget}
+            swapTarget={swapTarget}
+            newLetters={newLetters}
+            newCenter={newCenter}
+            newSlot={newSlot}
+            forceRequired={forceRequired}
+            onJumpTargetChange={setJumpTarget}
+            onSwapTargetChange={setSwapTarget}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            onJump={handleJump}
+            onSwap={handleSwap}
+            onCenterSelect={handleCenterSelect}
+            onSave={() => handleSaveCurrent(false)}
+            onRestore={handleRestore}
+            onDelete={handleDelete}
+            onReactivate={handleReactivate}
+            onToggleCreateMode={() => {
+              setNewLetters('');
+              setNewCenter('');
+              setNewSlot('');
+              setForceRequired(false);
+              setStatusMessage(null);
+            }}
+            onNewLettersChange={setNewLetters}
+            onNewCenterChange={setNewCenter}
+            onNewSlotChange={setNewSlot}
+            onPreviewForm={handlePreviewForm}
+            onCreateForm={handleSaveForm}
+          />
+
+          <SuggestionPanel
+            csrfToken={csrfToken}
+            onSelectSuggestion={(sLetters, sCenter) => {
+              setNewLetters(sLetters);
+              setNewCenter(sCenter);
+              setNewSlot('');
+              setForceRequired(false);
+              setStatusMessage(null);
+              void loadWordsFor(sLetters, sCenter);
             }}
           />
-          <span style={{ color: 'var(--color-text-secondary)' }}>↔</span>
-          <input
-            type="number"
-            placeholder="Slotti B"
-            value={swapSlotB}
-            onChange={(e) => setSwapSlotB(e.target.value ? Number(e.target.value) : '')}
-            className="w-28 px-3 py-1.5 rounded border text-sm"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
+        </div>
+
+        <div className="lg:col-span-5 flex flex-col">
+          <AdminWordListPanel
+            words={words}
+            letters={activeLetters || newLetters}
+            loading={wordsLoading}
+            onBlock={handleBlockWord}
           />
-          <button
-            type="button"
-            onClick={handleSwap}
-            disabled={loading || !swapSlotA || !swapSlotB}
-            className="px-4 py-1.5 rounded text-xs font-medium cursor-pointer disabled:opacity-50"
-            style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-bg-primary)' }}
-          >
-            Vaihda
-          </button>
         </div>
       </div>
     </div>

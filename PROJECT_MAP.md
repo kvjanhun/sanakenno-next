@@ -37,7 +37,7 @@ sanakenno-next/
           modals/            # ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal
           player-sync/       # Player auth store, monotonic sync reconciliation, SyncModal, ConnectBanner
           theme/             # 6-palette CSS custom property theme system (usePaletteStore, useThemePreferenceStore, ThemeSelector, ThemeToggle)
-          admin/             # Code-split admin panel (AdminLayout, LoginPage, PuzzleEditor, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
+          admin/             # Code-split admin panel (AdminLayout, LoginPage, PuzzleEditor, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
         styles/              # CSS custom property design tokens (--color-*, --font-*)
   tests/
     architecture.test.ts     # Mechanical boundary & monolith guardrails

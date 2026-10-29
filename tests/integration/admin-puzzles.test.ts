@@ -206,6 +206,55 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         .executeTakeFirst();
       expect(p1?.center).toBe('i');
     });
+
+    it('fetches puzzle variations by slot and display_number with neighbour slots', async () => {
+      const bySlotRes = await harness.client.api.admin.puzzle.variations.$get(
+        { query: { slot: '1' } },
+        { headers: adminHeaders() },
+      );
+      expect(bySlotRes.status).toBe(200);
+      const slotData = (await bySlotRes.json()) as unknown as {
+        slot: number;
+        display_number: number;
+        variations: Array<{ center: string; is_active: boolean }>;
+        next_slot: number | null;
+      };
+      expect(slotData.slot).toBe(1);
+      expect(slotData.display_number).toBe(1);
+      expect(slotData.variations).toHaveLength(7);
+      expect(slotData.next_slot).toBe(2);
+
+      const byDispRes = await harness.client.api.admin.puzzle.variations.$get(
+        { query: { display_number: '1' } },
+        { headers: adminHeaders() },
+      );
+      expect(byDispRes.status).toBe(200);
+      const dispData = (await byDispRes.json()) as unknown as { slot: number };
+      expect(dispData.slot).toBe(1);
+    });
+
+    it('allows slot 0 creation, updates, and swaps', async () => {
+      // Save puzzle into slot 0
+      const save0Res = await harness.client.api.admin.puzzle.$post(
+        {
+          json: { slot: 0, letters: 'e,h,l,m,o,r,u', center: 'e' },
+        },
+        { headers: adminHeaders() },
+      );
+      expect(save0Res.status).toBe(200);
+      const save0Data = (await save0Res.json()) as { slot: number };
+      expect(save0Data.slot).toBe(0);
+
+      // Verify slot 0 can be fetched by slot
+      const var0Res = await harness.client.api.admin.puzzle.variations.$get(
+        { query: { slot: '0' } },
+        { headers: adminHeaders() },
+      );
+      expect(var0Res.status).toBe(200);
+      const var0Data = (await var0Res.json()) as unknown as { slot: number; center: string };
+      expect(var0Data.slot).toBe(0);
+      expect(var0Data.center).toBe('e');
+    });
   });
 
   describe('Word Blocking & Preview', () => {

@@ -15,6 +15,7 @@ import {
   getBlockedWords,
   getDisplayNumber,
   getPuzzleSlotForDate,
+  getSlotByDisplayNumber,
   nextFreeSlot,
   totalPuzzles,
 } from '../puzzle/puzzle.queries.js';
@@ -28,6 +29,7 @@ import {
   deleteBlockedWord,
   findDuplicateConflicts,
   getBlockedWordsList,
+  getNeighbourSlots,
   getPuzzleBySlot,
   insertBlockedWord,
   insertOrUpdatePuzzle,
@@ -39,15 +41,20 @@ import {
 
 function parseLetters(raw: unknown): string[] | null {
   if (Array.isArray(raw)) {
-    const list = raw.map((l) => String(l).trim().toLowerCase()).filter(Boolean);
+    const list = raw.map((l) => String(l).trim().toLowerCase()).filter((l) => l.length === 1);
     return list.length === 7 && new Set(list).size === 7 ? list : null;
   }
   if (typeof raw === 'string') {
-    const sep = raw.includes(',') ? ',' : '';
-    const list = raw
-      .split(sep)
-      .map((l) => l.trim().toLowerCase())
-      .filter(Boolean);
+    const cleaned = raw.toLowerCase().trim();
+    let list: string[];
+    if (cleaned.includes(',') || cleaned.includes(' ')) {
+      list = cleaned
+        .split(/[,\s]+/)
+        .map((l) => l.trim())
+        .filter(Boolean);
+    } else {
+      list = Array.from(cleaned);
+    }
     return list.length === 7 && new Set(list).size === 7 ? list : null;
   }
   return null;
@@ -71,7 +78,9 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
       const center = typeof body['center'] === 'string' ? body['center'].trim().toLowerCase() : '';
       const force = Boolean(body['force']);
       const requestedSlot =
-        typeof body['slot'] === 'number' && body['slot'] > 0 ? body['slot'] : undefined;
+        typeof body['slot'] === 'number' && Number.isInteger(body['slot']) && body['slot'] >= 0
+          ? body['slot']
+          : undefined;
 
       if (!letters || !center) {
         return c.json({ error: 'Seitsemän uniikkia kirjainta ja keskuskirjain vaaditaan' }, 400);
@@ -121,19 +130,24 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         await insertAdminLog(
           trx,
           admin.adminId,
-          requestedSlot ? 'update_puzzle' : 'create_puzzle',
+          requestedSlot !== undefined ? 'update_puzzle' : 'create_puzzle',
           `slot=${targetSlot},letters=${lettersString},center=${center}`,
         );
       });
 
       bumpPuzzleCacheGeneration();
-      const displayNumber = (await getDisplayNumber(db, targetSlot)) ?? targetSlot;
+      const displayNumber = (await getDisplayNumber(db, targetSlot)) ?? targetSlot + 1;
+      const total = await totalPuzzles(db);
 
       return c.json(
         {
           status: 'saved' as const,
           slot: targetSlot,
           display_number: displayNumber,
+          total_puzzles: total,
+          letters,
+          center,
+          is_new: requestedSlot === undefined,
         },
         200,
       );
@@ -141,7 +155,7 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
     .delete('/puzzle/:slot', async (c) => {
       const admin = c.get('admin');
       const slot = Number(c.req.param('slot'));
-      if (!Number.isInteger(slot) || slot <= 0) {
+      if (!Number.isInteger(slot) || slot < 0) {
         return c.json({ error: 'Virheellinen slotti' }, 400);
       }
 
@@ -156,7 +170,8 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
       });
 
       bumpPuzzleCacheGeneration();
-      return c.json({ status: 'deleted' as const, slot }, 200);
+      const total = await totalPuzzles(db);
+      return c.json({ status: 'deleted' as const, slot, total_puzzles: total }, 200);
     })
     .post('/puzzle/swap', async (c) => {
       const admin = c.get('admin');
@@ -167,10 +182,21 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Virheellinen pyyntö' }, 400);
       }
 
-      const slotA = Number(body['slotA']);
-      const slotB = Number(body['slotB']);
-      if (!Number.isInteger(slotA) || !Number.isInteger(slotB) || slotA <= 0 || slotB <= 0) {
-        return c.json({ error: 'Molemmat slotit vaaditaan positiivisina lukuina' }, 400);
+      const rawSlotA = body['slotA'] ?? body['slot_a'];
+      const rawSlotB = body['slotB'] ?? body['slot_b'];
+      const slotA = Number(rawSlotA);
+      const slotB = Number(rawSlotB);
+      if (
+        !Number.isInteger(slotA) ||
+        !Number.isInteger(slotB) ||
+        slotA < 0 ||
+        slotB < 0 ||
+        slotA === slotB
+      ) {
+        return c.json(
+          { error: 'Molemmat slotit vaaditaan eri ei-negatiivisina kokonaislukuina' },
+          400,
+        );
       }
 
       await runImmediateTransactionWithRetry(db, async (trx) => {
@@ -193,7 +219,7 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
       const slot = Number(body['slot']);
       const center = typeof body['center'] === 'string' ? body['center'].trim().toLowerCase() : '';
 
-      if (!Number.isInteger(slot) || slot <= 0 || !center || center.length !== 1) {
+      if (!Number.isInteger(slot) || slot < 0 || !center || center.length !== 1) {
         return c.json({ error: 'Slotti ja yksittäinen keskuskirjain vaaditaan' }, 400);
       }
 
@@ -217,22 +243,84 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
     })
     .get('/puzzle/slots', async (c) => {
       const slots = await getActiveSlots(db);
+      const total = await totalPuzzles(db);
       const mapped = slots.map((slot, index) => ({
         slot,
         display_number: index + 1,
       }));
-      return c.json({ slots: mapped }, 200);
+      return c.json({ slots: mapped, active_slots: slots, total_puzzles: total }, 200);
     })
     .get('/puzzle/variations', async (c) => {
+      const slotStr = c.req.query('slot');
+      const displayStr = c.req.query('display_number');
       const lettersParam = c.req.query('letters');
-      const letters = parseLetters(lettersParam);
-      if (!letters) {
-        return c.json({ error: 'Seitsemän kirjainta vaaditaan' }, 400);
-      }
 
       const blocked = await getBlockedWords(db);
-      const variations = computeVariations(letters, blocked);
-      return c.json({ variations }, 200);
+
+      let slot: number | null = null;
+      if (displayStr !== undefined && displayStr !== '') {
+        const displayNumber = parseInt(displayStr, 10);
+        if (isNaN(displayNumber) || displayNumber < 1) {
+          return c.json({ error: 'Virheellinen pelinumero' }, 400);
+        }
+        slot = await getSlotByDisplayNumber(db, displayNumber);
+        if (slot === null) {
+          return c.json({ error: 'Peliä ei löydy' }, 404);
+        }
+      } else if (slotStr !== undefined && slotStr !== '') {
+        const parsed = parseInt(slotStr, 10);
+        if (isNaN(parsed) || parsed < 0) {
+          return c.json({ error: 'Virheellinen slotti' }, 400);
+        }
+        slot = parsed;
+      }
+
+      if (slot !== null) {
+        const puzzle = await getPuzzleBySlot(db, slot);
+        if (!puzzle) {
+          return c.json({ error: 'Peliä ei löydy' }, 404);
+        }
+
+        const letters = parseLetters(puzzle.letters);
+        if (!letters) {
+          return c.json({ error: 'Pelin kirjaimet ovat virheelliset' }, 500);
+        }
+
+        const variations = computeVariations(letters, blocked).map((v) => ({
+          ...v,
+          is_active: v.center === puzzle.center,
+        }));
+
+        const neighbours = await getNeighbourSlots(db, slot);
+        const displayNumber = await getDisplayNumber(db, slot);
+        const total = await totalPuzzles(db);
+
+        return c.json(
+          {
+            slot,
+            display_number: displayNumber,
+            total_puzzles: total,
+            prev_slot: neighbours.prev_slot,
+            next_slot: neighbours.next_slot,
+            letters,
+            center: puzzle.center,
+            variations,
+            is_active: puzzle.is_active === 1,
+          },
+          200,
+        );
+      }
+
+      if (lettersParam) {
+        const letters = parseLetters(lettersParam);
+        if (!letters) {
+          return c.json({ error: 'Seitsemän kirjainta vaaditaan' }, 400);
+        }
+        const variations = computeVariations(letters, blocked);
+        return c.json({ variations }, 200);
+      }
+
+      return c.json({ error: 'Slotti, pelinumero tai kirjaimet vaaditaan' }, 400);
     })
     .post('/preview', async (c) => {
       let body: Record<string, unknown> = {};
@@ -251,7 +339,24 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
 
       const blocked = await getBlockedWords(db);
       const preview = computePuzzle(letters, center, blocked);
-      return c.json(preview, 200);
+      const variations = computeVariations(letters, blocked).map((v) => ({
+        ...v,
+        is_active: v.center === center,
+      }));
+
+      return c.json(
+        {
+          letters,
+          center,
+          words: preview.words,
+          max_score: preview.max_score,
+          word_count: preview.hint_data.word_count,
+          pangram_count: preview.hint_data.pangram_count,
+          hint_data: preview.hint_data,
+          variations,
+        },
+        200,
+      );
     })
     .get('/blocked', async (c) => {
       const blocked = await getBlockedWordsList(db);
