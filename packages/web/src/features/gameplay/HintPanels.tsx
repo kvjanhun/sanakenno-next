@@ -192,55 +192,29 @@ export function HintPanels({
           {/* Active Detail Zone — fits the remaining space without scrolling */}
           <div className="flex-1 flex flex-col justify-center overflow-hidden px-0.5 pt-0.5">
             {activeTier === 1 && (
-              /* Tier 1: Starting letters & length distribution */
+              /* Tier 1: Starting letters only (Alkukirjaimet) */
               <div
                 data-testid="hint-content-tier1"
-                className="flex flex-col justify-center gap-1.5"
+                className="flex flex-col justify-center items-center h-full px-0.5"
               >
-                <div className="flex items-center justify-between gap-1 overflow-x-auto scrollbar-none py-0.5">
+                <div className="flex items-center justify-between w-full py-1">
                   {data.letterMap.map((item) => (
                     <div
                       key={item.letter}
                       className="flex items-baseline gap-1"
                       style={{
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-sans)',
                         color: item.isComplete
                           ? 'var(--color-text-tertiary)'
                           : 'var(--color-text-primary)',
                       }}
                     >
-                      <span className="font-bold text-xs">{item.letter.toUpperCase()}</span>
-                      <span className="text-[11px]">{item.isComplete ? '✓' : item.remaining}</span>
+                      <span className="font-bold text-sm">{item.letter.toUpperCase()}</span>
+                      <span className="text-xs font-semibold tabular-nums">
+                        {item.isComplete ? '✓' : item.remaining}
+                      </span>
                     </div>
                   ))}
-                </div>
-                <div
-                  className="flex items-center gap-2 overflow-x-auto scrollbar-none text-[10.5px]"
-                  style={{ color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}
-                >
-                  <span
-                    className="font-sans text-[10px] uppercase font-semibold"
-                    style={{ color: 'var(--color-text-tertiary)' }}
-                  >
-                    Pituudet:
-                  </span>
-                  {data.lengthDistribution
-                    .filter((l) => l.total > 0)
-                    .map((l) => (
-                      <span key={l.len}>
-                        {l.len}k:{' '}
-                        <strong
-                          style={{
-                            color:
-                              l.remaining === 0
-                                ? 'var(--color-text-tertiary)'
-                                : 'var(--color-text-primary)',
-                          }}
-                        >
-                          {l.remaining === 0 ? '✓' : l.remaining}
-                        </strong>
-                      </span>
-                    ))}
                 </div>
               </div>
             )}
@@ -249,27 +223,29 @@ export function HintPanels({
               /* Tier 2: Pangram Detail + Starting Letters */
               <div
                 data-testid="hint-content-tier2"
-                className="flex flex-col justify-center gap-1.5"
+                className="flex flex-col justify-center gap-1.5 px-0.5"
               >
-                <div className="flex items-center justify-between gap-1 overflow-x-auto scrollbar-none py-0.5">
+                <div className="flex items-center justify-between w-full py-0.5">
                   {data.letterMap.map((item) => (
                     <div
                       key={item.letter}
                       className="flex items-baseline gap-1"
                       style={{
-                        fontFamily: 'var(--font-mono)',
+                        fontFamily: 'var(--font-sans)',
                         color: item.isComplete
                           ? 'var(--color-text-tertiary)'
                           : 'var(--color-text-primary)',
                       }}
                     >
                       <span className="font-bold text-xs">{item.letter.toUpperCase()}</span>
-                      <span className="text-[11px]">{item.isComplete ? '✓' : item.remaining}</span>
+                      <span className="text-[11px] font-semibold tabular-nums">
+                        {item.isComplete ? '✓' : item.remaining}
+                      </span>
                     </div>
                   ))}
                 </div>
                 <div
-                  className="text-[11px] font-semibold py-0.5"
+                  className="text-[11.5px] font-semibold py-0.5 text-center"
                   style={{ color: 'var(--color-accent)' }}
                 >
                   {unfoundPangramClue}
@@ -278,27 +254,28 @@ export function HintPanels({
             )}
 
             {activeTier === 3 && (
-              /* Tier 3: Compact 2D Matrix (Letter x Length) — STRICTLY ZERO SCROLL */
+              /* Tier 3: Invisible Grid Matrix (Letter x Length) with clean typography */
               <div
                 data-testid="hint-content-tier3"
                 className="w-full h-full flex flex-col justify-center overflow-hidden"
               >
                 <table
-                  className="w-full text-center text-[10px] leading-tight"
+                  className="w-full text-center text-[10.5px] leading-tight"
                   style={{
-                    fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-sans)',
+                    fontVariantNumeric: 'tabular-nums',
                     borderCollapse: 'collapse',
                   }}
                 >
                   <thead>
                     <tr style={{ color: 'var(--color-text-tertiary)' }}>
-                      <th className="text-left font-normal pb-0.5">Kirj.</th>
+                      <th className="text-left font-medium pb-0.5">Kirj.</th>
                       {activeLengths.map((len) => (
-                        <th key={len} className="font-normal pb-0.5">
+                        <th key={len} className="font-medium pb-0.5">
                           {len}
                         </th>
                       ))}
-                      <th className="text-right font-normal pb-0.5">Yht.</th>
+                      <th className="text-right font-medium pb-0.5">Yht.</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -314,16 +291,26 @@ export function HintPanels({
                                 : 'var(--color-text-primary)',
                           }}
                         >
-                          <td className="text-left font-bold py-[1px]">{letter.toUpperCase()}</td>
+                          <td className="text-left font-bold py-[1.5px]">{letter.toUpperCase()}</td>
                           {activeLengths.map((len) => {
                             const rem = data.matrix.cells[letter]?.[len]?.remaining ?? 0;
                             return (
-                              <td key={len} className="py-[1px]">
-                                {rem > 0 ? rem : '–'}
+                              <td
+                                key={len}
+                                className="py-[1.5px]"
+                                style={{
+                                  color:
+                                    rem > 0
+                                      ? 'var(--color-text-primary)'
+                                      : 'color-mix(in srgb, var(--color-text-tertiary) 35%, transparent)',
+                                  fontWeight: rem > 0 ? 600 : 400,
+                                }}
+                              >
+                                {rem > 0 ? rem : '·'}
                               </td>
                             );
                           })}
-                          <td className="text-right font-semibold py-[1px]">
+                          <td className="text-right font-semibold py-[1.5px]">
                             {totalLeft > 0 ? totalLeft : '✓'}
                           </td>
                         </tr>
@@ -335,7 +322,7 @@ export function HintPanels({
             )}
 
             {activeTier === 4 && (
-              /* Tier 4: Comprehensive Suffixes & Endings — Accounts for 100% of puzzle words */
+              /* Tier 4: Comprehensive Suffixes & Endings */
               <div
                 data-testid="hint-content-tier4"
                 className="flex flex-col justify-center gap-1 overflow-hidden"
@@ -351,14 +338,15 @@ export function HintPanels({
                     {data.suffixMap.filter((s) => s.remaining > 0).length} eri päätettä jäljellä
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden max-h-[52px] py-0.5">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 overflow-hidden max-h-[64px] py-0.5">
                   {data.suffixMap.length > 0 ? (
                     data.suffixMap.map((entry) => (
                       <span
                         key={entry.suffix}
                         className="text-[11px]"
                         style={{
-                          fontFamily: 'var(--font-mono)',
+                          fontFamily: 'var(--font-sans)',
+                          fontVariantNumeric: 'tabular-nums',
                           color:
                             entry.remaining === 0
                               ? 'var(--color-text-tertiary)'
