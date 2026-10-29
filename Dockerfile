@@ -63,7 +63,7 @@ VOLUME /data
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV STATIC_DIR=/app/dist
-ENV SEED_ON_BOOT=true
+ENV SEED_ON_BOOT=false
 ENV DATA_DIR=/data
 ENV DB_PATH=/data/sanakenno.db
 ENV TZ=Europe/Helsinki
