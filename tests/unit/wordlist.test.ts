@@ -145,7 +145,13 @@ describe('wordlist engine (unit)', () => {
       s: { '4': 1 },
     });
     expect(result.hint_data.pangram_details).toEqual([{ length: 11, first_letter: 'k' }]);
-    expect(result.hint_data.suffixes).toEqual({ llinen: 1 });
+    expect(result.hint_data.suffixes).toEqual({
+      llinen: 1,
+      na: 2,
+      ka: 1,
+      sa: 1,
+      si: 1,
+    });
   });
 
   it('computes stats for all 7 center variations via computeVariations()', () => {

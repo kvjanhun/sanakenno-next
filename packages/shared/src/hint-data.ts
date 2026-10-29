@@ -110,6 +110,10 @@ export const FINNISH_SUFFIX_CANDIDATES = [
   'llä',
   'tta',
   'ttä',
+  'kka',
+  'kkä',
+  'na',
+  'nä',
   'va',
   'vä',
   'nut',
@@ -119,6 +123,7 @@ export const FINNISH_SUFFIX_CANDIDATES = [
   'us',
   'ys',
   'os',
+  'nen',
 ] as const;
 
 export function normalizeFinnishText(value: string): string {
@@ -127,12 +132,16 @@ export function normalizeFinnishText(value: string): string {
 
 export function matchSuffix(word: string): string | null {
   const normalized = normalizeFinnishText(word);
+  if (normalized.length < 2) return null;
+
   for (const suffix of FINNISH_SUFFIX_CANDIDATES) {
     if (normalized.length >= suffix.length + 2 && normalized.endsWith(suffix)) {
       return suffix;
     }
   }
-  return null;
+
+  // Fallback to 2-letter ending so 100% of puzzle words are accounted for
+  return normalized.slice(-2);
 }
 
 function finnishSortWeight(char: string): number {

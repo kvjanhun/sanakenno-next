@@ -87,38 +87,61 @@ export function RankProgress({
         </button>
       </div>
 
-      <div
-        className="relative h-2 w-full rounded-full"
-        style={{ backgroundColor: 'var(--color-bg-secondary)' }}
-        role="progressbar"
-        aria-valuenow={score}
-        aria-valuemin={0}
-        aria-valuemax={maxScore}
-      >
+      <div className="flex items-center gap-2.5">
         <div
-          className="h-full rounded-full overflow-hidden transition-[width] duration-200 ease-out"
-          style={{
-            width: `${Math.round(progress)}%`,
-            backgroundColor: 'var(--color-accent)',
-          }}
-        />
-        {noHintAchievements.map((ach) => {
-          const isReached = ach.unlocked;
-          return (
-            <div
-              key={ach.name}
-              data-testid={`milestone-pip-${ach.pct}`}
-              title={`${ach.name} (${ach.pct}%)`}
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full pointer-events-none transition-all duration-200"
-              style={{
-                left: `${ach.pct}%`,
-                backgroundColor: isReached ? 'var(--color-accent)' : 'var(--color-bg-primary)',
-                border: `1.5px solid ${isReached ? 'var(--color-on-accent)' : 'var(--color-border)'}`,
-                boxShadow: isReached ? '0 0 0 1px var(--color-accent)' : 'none',
-              }}
-            />
-          );
-        })}
+          className="relative h-2 flex-1 rounded-full overflow-hidden"
+          style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+          role="progressbar"
+          aria-valuenow={score}
+          aria-valuemin={0}
+          aria-valuemax={maxScore}
+        >
+          <div
+            className="h-full rounded-full transition-[width] duration-200 ease-out"
+            style={{
+              width: `${Math.round(progress)}%`,
+              backgroundColor: 'var(--color-accent)',
+            }}
+          />
+        </div>
+
+        <div
+          className="flex items-center gap-1 shrink-0"
+          title="Saavutukset ilman apuja (25%, 50%, 70%)"
+          aria-label="Saavutukset ilman apuja"
+        >
+          {noHintAchievements.map((ach) => {
+            const isReached = ach.unlocked;
+            const isInactive = hasUnlockedHints && !isReached;
+            return (
+              <span
+                key={ach.name}
+                data-testid={`milestone-pip-${ach.pct}`}
+                title={`${ach.name} (${ach.pct}% pisteistä): ${
+                  isReached ? 'Saavutettu' : isInactive ? 'Menetetty (vihjeet käytössä)' : 'Tavoite'
+                }`}
+                className="flex items-center justify-center transition-all duration-200"
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  color: isReached
+                    ? 'var(--color-accent)'
+                    : isInactive
+                      ? 'color-mix(in srgb, var(--color-text-tertiary) 40%, var(--color-bg-secondary))'
+                      : 'var(--color-border)',
+                }}
+              >
+                {isReached ? (
+                  <CircleStarIcon size={13} strokeWidth={2.4} />
+                ) : isInactive ? (
+                  <CircleOffIcon size={13} strokeWidth={2} />
+                ) : (
+                  <CircleIcon size={12} strokeWidth={2} />
+                )}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {showRanks && (
