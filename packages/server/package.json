@@ -21,7 +21,6 @@
     "better-sqlite3": "^12.8.0",
     "hono": "^4.7.4",
     "kysely": "^0.27.6",
-    "tsx": "^4.21.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {

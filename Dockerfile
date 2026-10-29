@@ -22,7 +22,10 @@ RUN pnpm --filter @sanakenno/web build
 # --- Runtime stage ---
 FROM node:22-alpine AS runtime
 
-RUN apk add --no-cache python3 make g++ tzdata
+# Install Litestream binary from official image
+COPY --from=litestream/litestream:0.3.13 /usr/local/bin/litestream /usr/local/bin/litestream
+
+RUN apk add --no-cache python3 make g++ tzdata ca-certificates
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 RUN addgroup -S sanakenno && adduser -S sanakenno -G sanakenno
@@ -48,12 +51,19 @@ RUN echo "$GIT_COMMIT" > ./dist/commit.txt
 COPY packages/shared ./packages/shared
 COPY packages/server ./packages/server
 
+# Copy Litestream configuration and startup entrypoint
+COPY litestream.yml /etc/litestream.yml
+COPY scripts/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Data directory for SQLite (volume mount for Litestream / host persistence)
 RUN mkdir -p /data && chown sanakenno:sanakenno /data
 VOLUME /data
 
 ENV NODE_ENV=production
 ENV PORT=3001
+ENV STATIC_DIR=/app/dist
+ENV SEED_ON_BOOT=true
 ENV DATA_DIR=/data
 ENV DB_PATH=/data/sanakenno.db
 ENV TZ=Europe/Helsinki
@@ -63,6 +73,6 @@ USER sanakenno
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:3001/api/health || exit 1
+  CMD wget -qO- "http://localhost:${PORT:-3001}/api/health" || exit 1
 
-CMD ["pnpm", "--filter", "@sanakenno/server", "start"]
+CMD ["/app/entrypoint.sh"]

@@ -25,7 +25,8 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
     .executeTakeFirstOrThrow();
 
   if (Number(adminCount.count) === 0) {
-    const hash = await argon2.hash('adminpassword123');
+    const adminPassword = process.env.ADMIN_INITIAL_PASSWORD ?? 'adminpassword123';
+    const hash = await argon2.hash(adminPassword);
     await db
       .insertInto('admins')
       .values({
