@@ -42,16 +42,20 @@ const staticDir = findStaticDir();
 if (staticDir) {
   const relativeRoot = path.relative(process.cwd(), staticDir) || '.';
   app.use('/*', serveStatic({ root: relativeRoot }));
-  app.get('*', (c, next) => {
-    if (c.req.path.startsWith('/api')) {
-      return c.json({ error: 'Not found' }, 404);
-    }
-    return serveStatic({ root: relativeRoot, path: 'index.html' })(c, next);
-  });
+
+  const indexPath = path.join(staticDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    const indexHtml = fs.readFileSync(indexPath, 'utf-8');
+    app.get('*', (c) => {
+      if (c.req.path.startsWith('/api')) {
+        return c.json({ error: 'Not found' }, 404);
+      }
+      return c.html(indexHtml);
+    });
+  }
 }
 
 serve({
   fetch: app.fetch,
   port,
 });
-
