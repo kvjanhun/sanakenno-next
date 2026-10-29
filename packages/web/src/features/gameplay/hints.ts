@@ -4,8 +4,16 @@ import { useGameStore } from './useGameStore.js';
 
 export type { DerivedHintData };
 
-/** Visible web hint IDs. Hidden legacy IDs are intentionally excluded. */
-export const VISIBLE_HINT_IDS = ['summary', 'distribution', 'pairs'] as const;
+/** Visible web hint IDs including progressive tiers and legacy IDs. */
+export const VISIBLE_HINT_IDS = [
+  'tier1',
+  'tier2',
+  'tier3',
+  'tier4',
+  'summary',
+  'distribution',
+  'pairs',
+] as const;
 
 export type VisibleHintId = (typeof VISIBLE_HINT_IDS)[number];
 

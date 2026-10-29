@@ -1,9 +1,15 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { isPangram, scoreWord, type HintData } from '@sanakenno/shared';
+import {
+  isPangram,
+  scoreWord,
+  matchSuffix,
+  type HintData,
+  type HintPangramDetail,
+} from '@sanakenno/shared';
 
-export { isPangram, scoreWord, type HintData };
+export { isPangram, scoreWord, type HintData, type HintPangramDetail };
 
 /** Valid Finnish alphabet letters for puzzle validation (a–ö, including å). */
 export const FINNISH_LETTERS = new Set('abcdefghijklmnopqrstuvwxyzåäö'.split(''));
@@ -231,24 +237,40 @@ export function computePuzzle(
   const byLetter: Record<string, number> = {};
   const byLength: Record<string, number> = {};
   const byPair: Record<string, number> = {};
+  const matrix: Record<string, Record<string, number>> = {};
+  const pangramDetails: HintPangramDetail[] = [];
+  const bySuffix: Record<string, number> = {};
 
   for (const word of words) {
     maxScore += scoreWord(word, allLetterSet);
+    const firstLetter = word[0];
+    const lenKey = String(word.length);
+
     if (isPangram(word, allLetterSet)) {
       pangramCount += 1;
+      if (firstLetter) {
+        pangramDetails.push({ length: word.length, first_letter: firstLetter });
+      }
     }
 
-    const firstLetter = word[0];
     if (firstLetter) {
       byLetter[firstLetter] = (byLetter[firstLetter] ?? 0) + 1;
+      if (!matrix[firstLetter]) {
+        matrix[firstLetter] = {};
+      }
+      matrix[firstLetter][lenKey] = (matrix[firstLetter][lenKey] ?? 0) + 1;
     }
 
-    const lenKey = String(word.length);
     byLength[lenKey] = (byLength[lenKey] ?? 0) + 1;
 
     const pair = word.slice(0, 2);
     if (pair.length === 2) {
       byPair[pair] = (byPair[pair] ?? 0) + 1;
+    }
+
+    const s = matchSuffix(word);
+    if (s) {
+      bySuffix[s] = (bySuffix[s] ?? 0) + 1;
     }
   }
 
@@ -262,6 +284,9 @@ export function computePuzzle(
       by_letter: byLetter,
       by_length: byLength,
       by_pair: byPair,
+      matrix,
+      pangram_details: pangramDetails,
+      suffixes: bySuffix,
     },
   };
 }

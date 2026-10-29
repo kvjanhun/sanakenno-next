@@ -138,6 +138,14 @@ describe('wordlist engine (unit)', () => {
     expect(result.hint_data.by_letter).toEqual({ a: 1, k: 3, l: 1, s: 1 });
     expect(result.hint_data.by_length).toEqual({ '4': 4, '5': 1, '11': 1 });
     expect(result.hint_data.by_pair).toEqual({ ai: 1, ka: 3, la: 1, sa: 1 });
+    expect(result.hint_data.matrix).toEqual({
+      a: { '4': 1 },
+      k: { '4': 1, '5': 1, '11': 1 },
+      l: { '4': 1 },
+      s: { '4': 1 },
+    });
+    expect(result.hint_data.pangram_details).toEqual([{ length: 11, first_letter: 'k' }]);
+    expect(result.hint_data.suffixes).toEqual({ llinen: 1 });
   });
 
   it('computes stats for all 7 center variations via computeVariations()', () => {

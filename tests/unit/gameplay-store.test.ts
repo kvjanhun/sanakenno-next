@@ -107,6 +107,18 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useUiStore.getState().secondaryMessage).toBe('Pangrammi!');
     expect(useUiStore.getState().secondaryType).toBe('special');
     expect(useUiStore.getState().celebration).toBe('nohint-allistyttava');
+    expect(useUiStore.getState().pangramRipple).toBe(true);
+
+    // Submitting 'lakana' (the only 'l' word) clears letter L
+    for (const ch of 'lakana') {
+      useGameStore.getState().addLetter(ch);
+    }
+    await useGameStore.getState().submitWord();
+    expect(useUiStore.getState().secondaryMessage).toBe('Kaikki L-sanat löydetty! 🎯');
+
+    // Shuffling triggers shuffleSpin
+    useGameStore.getState().shuffleLetters();
+    expect(useUiStore.getState().shuffleSpin).toBe(true);
   });
 
   it('captures scoreBeforeHints on first hint unlock and preserves it across subsequent words and hints', async () => {

@@ -66,6 +66,7 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
     it('computes no-hint achievement unlock states, word colorization, and column chunking', () => {
       const states = noHintAchievementStates(50, 100);
       expect(states.map((s) => s.unlocked)).toEqual([true, true, false]);
+      expect(states[1]?.name).toBe('Avuitta taitava');
 
       const colored = colorizeWord('ka-z', 'a', letters);
       expect(colored).toEqual([
@@ -96,7 +97,47 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
       const derived = deriveHintData(hintData, new Set(['aika', 'kansallinen']), letters);
       expect(derived.letterMap.map((e) => e.letter)).toEqual(['a', 'ä', 'ö']);
       expect(derived.letterMap[0]?.remaining).toBe(0);
+      expect(derived.letterMap[0]?.isComplete).toBe(true);
       expect(derived.pangramStats).toEqual({ total: 1, found: 1, remaining: 0 });
+    });
+
+    it('derives 2D matrix, unfound pangram details, and active suffix breakdowns', () => {
+      const hintData: HintData = {
+        word_count: 3,
+        pangram_count: 2,
+        by_letter: { a: 1, k: 2 },
+        by_length: { '4': 1, '5': 1, '11': 1 },
+        matrix: {
+          a: { '4': 1 },
+          k: { '5': 1, '11': 1 },
+        },
+        pangram_details: [
+          { length: 5, first_letter: 'k' },
+          { length: 11, first_letter: 'k' },
+        ],
+        suffixes: {
+          llinen: 1,
+          inen: 1,
+        },
+      };
+
+      const found = new Set(['kansallinen']);
+      const derived = deriveHintData(hintData, found, letters);
+
+      expect(derived.matrix.letters).toEqual(['a', 'k']);
+      expect(derived.matrix.lengths).toEqual([4, 5, 11]);
+      expect(derived.matrix.cells['k']?.[11]?.remaining).toBe(0);
+      expect(derived.matrix.cells['k']?.[5]?.remaining).toBe(1);
+      expect(derived.matrix.totalsByLetter['k']).toBe(1);
+
+      // 1 pangram left (the 5-letter one)
+      expect(derived.unfoundPangrams).toEqual([{ length: 5, first_letter: 'k' }]);
+
+      // Suffixes derived accurately (sorted remaining desc)
+      expect(derived.suffixMap).toEqual([
+        { suffix: 'inen', total: 1, found: 0, remaining: 1 },
+        { suffix: 'llinen', total: 1, found: 1, remaining: 0 },
+      ]);
     });
   });
 

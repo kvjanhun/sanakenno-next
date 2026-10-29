@@ -1,12 +1,20 @@
 import { z } from 'zod';
 import { THEME_IDS } from '../auth-types.js';
 
+export const HintPangramDetailSchema = z.object({
+  length: z.number().int().nonnegative(),
+  first_letter: z.string().min(1).max(1),
+});
+
 export const HintDataSchema = z.object({
   word_count: z.number().int().nonnegative(),
   pangram_count: z.number().int().nonnegative(),
   by_letter: z.record(z.string(), z.number().int().nonnegative()),
   by_length: z.record(z.string(), z.number().int().nonnegative()),
-  by_pair: z.record(z.string(), z.number().int().nonnegative()),
+  by_pair: z.record(z.string(), z.number().int().nonnegative()).optional().default({}),
+  matrix: z.record(z.string(), z.record(z.string(), z.number().int().nonnegative())).optional(),
+  pangram_details: z.array(HintPangramDetailSchema).optional(),
+  suffixes: z.record(z.string(), z.number().int().nonnegative()).optional(),
 });
 
 export const StatsRecordSchema = z.object({

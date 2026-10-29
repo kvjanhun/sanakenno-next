@@ -55,7 +55,8 @@ export function WordInput({
       {chars ? (
         chars.map((c, i) => (
           <span
-            key={i}
+            key={`${i}-${c.char}`}
+            className="letter-pop"
             style={{
               color: COLOR_MAP[c.color],
               marginInline: '1px',

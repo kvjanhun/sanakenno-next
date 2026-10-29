@@ -1,7 +1,5 @@
-import { useCallback, useState } from 'react';
-import { toColumns } from '@sanakenno/shared';
+import { useState } from 'react';
 import { useHintData, type DerivedHintData } from './hints.js';
-import { CheckIcon, LockIcon } from './icons.js';
 
 export interface HintPanelsProps {
   hintsUnlocked: Set<string>;
@@ -9,468 +7,312 @@ export interface HintPanelsProps {
   hintData?: DerivedHintData | null;
 }
 
-type VisiblePanelId = 'summary' | 'distribution' | 'pairs';
+export type HintTierLevel = 0 | 1 | 2 | 3 | 4;
 
-interface PanelConfig {
-  id: VisiblePanelId;
-  label: string;
-  teaser: string;
-}
-
-const VISIBLE_PANELS: readonly PanelConfig[] = [
-  {
-    id: 'summary',
-    label: 'Yleiskuva',
-    teaser: 'Yhteenveto jäljellä olevista sanoista.',
-  },
-  {
-    id: 'distribution',
-    label: 'Pituudet',
-    teaser: 'Jäljellä olevien sanojen pituudet.',
-  },
-  {
-    id: 'pairs',
-    label: 'Alkuparit',
-    teaser: 'Jäljellä olevien sanojen alkukirjainparit.',
-  },
-];
-
-const CONTENT_HEIGHT_PX = 108;
-const RESERVED_PANEL_SPACE = `${CONTENT_HEIGHT_PX + 1}px`;
-const PANEL_INNER_HEIGHT_PX = CONTENT_HEIGHT_PX - 20;
-const BAR_HEIGHT_PX = 26;
-const PAIRS_PER_COLUMN = 4;
-const SOFT_PANEL_BORDER = 'color-mix(in srgb, var(--color-border) 72%, transparent)';
-
-function SummaryMetric({ label, value }: { label: string; value: string }): React.JSX.Element {
-  return (
-    <div
-      className="flex items-center gap-1.5"
-      style={{
-        background: 'var(--color-bg-primary)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '999px',
-        padding: '5px 8px',
-      }}
-    >
-      <span
-        style={{
-          color: 'var(--color-text-tertiary)',
-          fontSize: '10.5px',
-          fontWeight: 600,
-          lineHeight: '13px',
-        }}
-      >
-        {label}
-      </span>
-      <span
-        style={{
-          color: 'var(--color-text-primary)',
-          fontSize: '11.5px',
-          fontWeight: 700,
-          lineHeight: '14px',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function SummaryContent({ data }: { data: DerivedHintData }): React.JSX.Element {
-  const pct = data.wordCount > 0 ? Math.round((data.wordsFound / data.wordCount) * 100) : 0;
-  const { pangramStats } = data;
-  const pangramLabel = pangramStats.total === 1 ? 'Pangrammi' : 'Pangrammit';
-  const unfoundLengths = data.lengthDistribution.filter((e) => e.remaining > 0);
-  const uniqueCount = unfoundLengths.length;
-  const longest = unfoundLengths.length > 0 ? Math.max(...unfoundLengths.map((e) => e.len)) : 0;
-  const allFound = data.wordsRemaining === 0;
-  const primaryColor = allFound ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)';
-  const secondaryColor = allFound ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)';
-
-  return (
-    <div className="flex flex-col gap-2 w-full" data-testid="hint-panel-summary">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <div
-          style={{
-            color: primaryColor,
-            fontSize: '16px',
-            fontWeight: 700,
-            lineHeight: '20px',
-          }}
-        >
-          {data.wordsRemaining}/{data.wordCount}
-        </div>
-        <div
-          style={{
-            color: primaryColor,
-            fontSize: '12.5px',
-            fontWeight: 600,
-            lineHeight: '16px',
-          }}
-        >
-          sanaa löytämättä
-        </div>
-        <div
-          style={{
-            background: 'var(--color-bg-primary)',
-            border: '1px solid var(--color-border)',
-            borderRadius: '999px',
-            color: secondaryColor,
-            fontSize: '11px',
-            fontWeight: 700,
-            lineHeight: '14px',
-            padding: '3px 7px',
-          }}
-        >
-          {pct}%
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        <SummaryMetric
-          label={pangramLabel}
-          value={`${pangramStats.remaining}/${pangramStats.total}`}
-        />
-        <SummaryMetric label="Pituuksia" value={`${uniqueCount} eri`} />
-        <SummaryMetric label="Pisin" value={`${longest} kirj.`} />
-      </div>
-    </div>
-  );
-}
-
-function DistributionContent({ data }: { data: DerivedHintData }): React.JSX.Element {
-  return (
-    <div
-      className="flex flex-col items-center w-full"
-      style={{ gap: '4px' }}
-      data-testid="hint-panel-distribution"
-    >
-      <span
-        style={{
-          fontSize: '10px',
-          lineHeight: '12px',
-          color: 'var(--color-text-tertiary)',
-          textAlign: 'center',
-        }}
-      >
-        Sanoja jäljellä
-      </span>
-      <div className="flex items-end gap-1 w-full">
-        {data.lengthDistribution.map((item) => {
-          const done = item.remaining === 0;
-          const fillHeight =
-            item.total > 0 ? Math.round(BAR_HEIGHT_PX * (item.found / item.total)) : 0;
-
-          return (
-            <div
-              key={item.len}
-              className="flex flex-col items-center"
-              style={{ flex: 1, fontFamily: 'var(--font-mono)' }}
-            >
-              <span
-                style={{
-                  fontSize: '9px',
-                  lineHeight: '11px',
-                  marginBottom: '1px',
-                  color: done ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
-                }}
-              >
-                {item.remaining}
-              </span>
-              <div
-                style={{
-                  width: '100%',
-                  height: `${BAR_HEIGHT_PX}px`,
-                  background: 'var(--color-bg-primary)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'flex-end',
-                }}
-              >
-                <div
-                  style={{
-                    width: '100%',
-                    height: `${fillHeight}px`,
-                    background: done ? 'var(--color-text-tertiary)' : 'var(--color-accent)',
-                  }}
-                />
-              </div>
-              <span
-                style={{
-                  fontSize: '9px',
-                  lineHeight: '11px',
-                  marginTop: '1px',
-                  color: done ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)',
-                }}
-              >
-                {item.len}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <span
-        style={{
-          fontSize: '10px',
-          lineHeight: '12px',
-          color: 'var(--color-text-tertiary)',
-          textAlign: 'center',
-        }}
-      >
-        Pituus, kirjainta
-      </span>
-    </div>
-  );
-}
-
-function PairsContent({ data }: { data: DerivedHintData }): React.JSX.Element {
-  const columns = toColumns(data.pairMap, PAIRS_PER_COLUMN);
-
-  return (
-    <div
-      className="flex flex-wrap w-full"
-      style={{ columnGap: '10px', rowGap: '4px' }}
-      data-testid="hint-panel-pairs"
-    >
-      {columns.map((column, index) => (
-        <div key={`pairs-col-${index}`} className="flex flex-col gap-1">
-          {column.map((item) => (
-            <span
-              key={item.pair}
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color:
-                  item.remaining === 0 ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
-                fontSize: '13px',
-                lineHeight: '17px',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 700 }}>
-                {item.pair.toUpperCase()}:{' '}
-              </span>
-              {item.remaining}
-            </span>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const PANEL_CONTENT: Record<
-  VisiblePanelId,
-  (props: { data: DerivedHintData }) => React.JSX.Element
-> = {
-  summary: SummaryContent,
-  distribution: DistributionContent,
-  pairs: PairsContent,
+const TIER_NAMES: Record<1 | 2 | 3 | 4, string> = {
+  1: 'Alkukirjaimet',
+  2: 'Pangrammi',
+  3: 'Matriisi',
+  4: 'Päätteet',
 };
 
-function LockedHintState({
-  panel,
-  onUnlock,
-}: {
-  panel: PanelConfig;
-  onUnlock: () => void;
-}): React.JSX.Element {
-  return (
-    <div
-      className="flex flex-col justify-center gap-2 w-full"
-      style={{ minHeight: `${PANEL_INNER_HEIGHT_PX}px` }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-        <div
-          style={{
-            color: 'var(--color-accent)',
-            fontSize: '10px',
-            fontWeight: 700,
-            letterSpacing: '0.06em',
-            lineHeight: '13px',
-            textTransform: 'uppercase',
-          }}
-        >
-          {panel.label}
-        </div>
-        <div
-          style={{
-            color: 'var(--color-text-secondary)',
-            fontSize: '13px',
-            lineHeight: '17px',
-          }}
-        >
-          {panel.teaser}
-        </div>
-      </div>
-
-      <button
-        type="button"
-        style={{
-          alignSelf: 'stretch',
-          background: 'var(--color-accent)',
-          border: '1px solid var(--color-accent-faded)',
-          borderRadius: '10px',
-          color: 'var(--color-on-accent)',
-          cursor: 'pointer',
-          fontSize: '13px',
-          fontWeight: 700,
-          padding: '8px 14px',
-        }}
-        onClick={onUnlock}
-      >
-        Aktivoi apu
-      </button>
-    </div>
-  );
+function resolveUnlockedTier(hintsUnlocked: Set<string>): HintTierLevel {
+  if (hintsUnlocked.has('tier4')) return 4;
+  if (
+    hintsUnlocked.has('tier3') ||
+    hintsUnlocked.has('pairs') ||
+    hintsUnlocked.has('distribution')
+  ) {
+    return 3;
+  }
+  if (hintsUnlocked.has('tier2')) return 2;
+  if (hintsUnlocked.has('tier1') || hintsUnlocked.has('summary')) return 1;
+  return 0;
 }
 
 export function HintPanels({
   hintsUnlocked,
   onUnlock,
-  hintData: hintDataProp,
+  hintData: propHintData,
 }: HintPanelsProps): React.JSX.Element | null {
   const storeHintData = useHintData();
-  const hintData = hintDataProp !== undefined ? hintDataProp : storeHintData;
-  const [activeTab, setActiveTab] = useState<VisiblePanelId | null>(null);
+  const data = propHintData ?? storeHintData;
 
-  const handleTabClick = useCallback((id: VisiblePanelId) => {
-    setActiveTab((prev) => (prev === id ? null : id));
-  }, []);
+  const maxUnlockedTier = resolveUnlockedTier(hintsUnlocked);
+  const [selectedTier, setSelectedTier] = useState<HintTierLevel | null>(null);
 
-  if (!hintData) return null;
+  // If currently selected tier is not unlocked or null, default to highest unlocked tier
+  const activeTier =
+    selectedTier !== null && selectedTier <= maxUnlockedTier && selectedTier >= 1
+      ? selectedTier
+      : maxUnlockedTier >= 1
+        ? maxUnlockedTier
+        : 1;
 
-  const activePanel =
-    activeTab !== null ? (VISIBLE_PANELS.find((panel) => panel.id === activeTab) ?? null) : null;
-  const ActiveContent = activeTab !== null ? PANEL_CONTENT[activeTab] : null;
-  const activeIsUnlocked = activeTab !== null ? hintsUnlocked.has(activeTab) : false;
+  if (!data) return null;
 
   return (
-    <div style={{ marginBottom: '1rem' }}>
-      <div className="relative flex items-center gap-2" style={{ padding: '6px 0' }}>
-        <span
-          style={{
-            color: 'var(--color-text-primary)',
-            fontSize: '13px',
-            fontWeight: 700,
-            flexShrink: 0,
-          }}
-        >
-          Avut
-        </span>
-
+    <div
+      data-testid="hint-deck"
+      className="w-full flex flex-col justify-between select-none"
+      style={{
+        height: '96px',
+        minHeight: '96px',
+        maxHeight: '96px',
+        overflow: 'hidden',
+        fontFamily: 'var(--font-sans)',
+        marginBottom: '0.5rem',
+      }}
+    >
+      {maxUnlockedTier === 0 ? (
+        /* Tier 0 — Clean "Omin avuin" state */
         <div
-          className="flex"
-          style={{
-            flex: 1,
-            background: 'var(--color-bg-secondary)',
-            borderRadius: '10px',
-            padding: '2px',
-          }}
+          data-testid="hint-tier-0"
+          className="h-full flex flex-col items-center justify-center text-center px-2"
         >
-          {VISIBLE_PANELS.map((panel) => {
-            const isActive = activeTab === panel.id;
-            const isUnlocked = hintsUnlocked.has(panel.id);
-
-            return (
-              <button
-                key={panel.id}
-                type="button"
-                onClick={() => handleTabClick(panel.id)}
-                aria-pressed={isActive}
-                data-hint-tab={panel.id}
-                data-hint-state={isUnlocked ? 'unlocked' : 'locked'}
-                style={{
-                  flex: 1,
-                  minHeight: '30px',
-                  padding: '4px 14px',
-                  borderRadius: '7px',
-                  border: 'none',
-                  background: isActive ? 'var(--color-bg-primary)' : 'transparent',
-                  boxShadow: isActive ? '0 1px 2px -1px var(--color-button-shadow)' : 'none',
-                  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  position: 'relative',
-                }}
-              >
-                <span className="flex min-w-0 items-center justify-center">
-                  <span className="min-w-0 truncate max-w-[calc(100%-18px)]">{panel.label}</span>
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex shrink-0"
-                  style={{
-                    color: isUnlocked ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                  }}
-                >
-                  {isUnlocked ? (
-                    <CheckIcon size={11} strokeWidth={3} />
-                  ) : (
-                    <LockIcon size={10} strokeWidth={2.5} />
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div
-        aria-hidden={!activeTab}
-        className="relative overflow-hidden text-sm"
-        style={{
-          boxSizing: 'border-box',
-          fontFamily: 'var(--font-sans)',
-          height: RESERVED_PANEL_SPACE,
-        }}
-      >
-        {activeTab && (
-          <div
-            className="absolute inset-0 overflow-hidden transition-opacity duration-150"
-            style={{
-              background: 'var(--color-bg-primary)',
-              borderTop: `1px solid ${SOFT_PANEL_BORDER}`,
-            }}
+          <span
+            className="text-[11px] font-semibold tracking-wider uppercase"
+            style={{ color: 'var(--color-text-tertiary)' }}
           >
-            <div
-              className="relative z-10"
-              style={{
-                height: '100%',
-                overflowY: 'auto',
-                padding: '10px 10px',
-              }}
-            >
-              <div
-                style={{
-                  minHeight: `${PANEL_INNER_HEIGHT_PX}px`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  width: '100%',
-                }}
+            Avut · Pelaat omin avuin
+          </span>
+          <span className="text-[12px] mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+            Avaa vihjeet nähdäksesi puuttuvat kirjaimet
+          </span>
+          <button
+            type="button"
+            data-testid="activate-hints-button"
+            onClick={() => onUnlock('tier1')}
+            className="mt-1.5 text-[12px] font-bold cursor-pointer bg-transparent border-none p-0"
+            style={{ color: 'var(--color-accent)' }}
+          >
+            Ota vihjeet käyttöön (Taso 1) →
+          </button>
+        </div>
+      ) : (
+        /* Tier 1–4 Active Hint Deck */
+        <div className="h-full flex flex-col justify-between py-1">
+          {/* Header row: understated tier navigation + next upgrade CTA */}
+          <div className="flex items-center justify-between text-[11px] px-0.5">
+            <div className="flex items-center gap-2">
+              <span
+                className="font-bold tracking-wide uppercase"
+                style={{ color: 'var(--color-text-tertiary)' }}
               >
-                {activeIsUnlocked && ActiveContent ? (
-                  <div style={{ width: '100%' }}>
-                    <ActiveContent data={hintData} />
-                  </div>
-                ) : (
-                  activePanel && (
-                    <LockedHintState
-                      panel={activePanel}
-                      onUnlock={() => onUnlock(activePanel.id)}
-                    />
-                  )
-                )}
+                Avut
+              </span>
+              <div className="flex items-center gap-1.5">
+                {([1, 2, 3, 4] as const).map((tier) => {
+                  const isUnlocked = tier <= maxUnlockedTier;
+                  if (!isUnlocked) return null;
+                  const isCurrent = tier === activeTier;
+                  return (
+                    <button
+                      key={tier}
+                      type="button"
+                      data-testid={`tier-tab-${tier}`}
+                      onClick={() => setSelectedTier(tier)}
+                      className="cursor-pointer bg-transparent border-none p-0 transition-colors"
+                      style={{
+                        color: isCurrent ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                        fontWeight: isCurrent ? 700 : 500,
+                        textDecoration: isCurrent ? 'underline' : 'none',
+                        textUnderlineOffset: '2px',
+                      }}
+                    >
+                      {TIER_NAMES[tier]}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+
+            {maxUnlockedTier < 4 && (
+              <button
+                type="button"
+                data-testid="upgrade-tier-button"
+                onClick={() => {
+                  const nextTier = (maxUnlockedTier + 1) as 1 | 2 | 3 | 4;
+                  onUnlock(`tier${nextTier}`);
+                  setSelectedTier(nextTier);
+                }}
+                className="cursor-pointer bg-transparent border-none p-0 font-semibold"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                Avaa Taso {maxUnlockedTier + 1} →
+              </button>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Content zone (fixed height, raw typography) */}
+          <div className="flex-1 flex flex-col justify-center overflow-hidden px-0.5">
+            {activeTier === 1 && (
+              /* Tier 1: Starting letters */
+              <div data-testid="hint-content-tier1" className="flex flex-col justify-center gap-1">
+                <div className="flex items-center justify-between gap-1 overflow-x-auto scrollbar-none py-0.5">
+                  {data.letterMap.map((item) => (
+                    <div
+                      key={item.letter}
+                      className="flex items-baseline gap-1"
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        color: item.isComplete
+                          ? 'var(--color-text-tertiary)'
+                          : 'var(--color-text-primary)',
+                      }}
+                    >
+                      <span className="font-bold text-sm">{item.letter.toUpperCase()}</span>
+                      <span className="text-xs">{item.isComplete ? '✓' : item.remaining}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  {data.wordsRemaining} / {data.wordCount} sanaa jäljellä
+                </div>
+              </div>
+            )}
+
+            {activeTier === 2 && (
+              /* Tier 2: Pangram Clue + Letters */
+              <div data-testid="hint-content-tier2" className="flex flex-col justify-center gap-1">
+                <div className="flex items-center justify-between gap-1 overflow-x-auto scrollbar-none py-0.5">
+                  {data.letterMap.map((item) => (
+                    <div
+                      key={item.letter}
+                      className="flex items-baseline gap-1"
+                      style={{
+                        fontFamily: 'var(--font-mono)',
+                        color: item.isComplete
+                          ? 'var(--color-text-tertiary)'
+                          : 'var(--color-text-primary)',
+                      }}
+                    >
+                      <span className="font-bold text-sm">{item.letter.toUpperCase()}</span>
+                      <span className="text-xs">{item.isComplete ? '✓' : item.remaining}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-[11px] font-medium" style={{ color: 'var(--color-accent)' }}>
+                  {data.unfoundPangrams.length > 0 ? (
+                    <span>
+                      Pangrammi: {data.unfoundPangrams[0]?.first_letter.toUpperCase()}... (
+                      {data.unfoundPangrams[0]?.length} kirj.)
+                      {data.unfoundPangrams.length > 1 &&
+                        ` · +${data.unfoundPangrams.length - 1} muuta`}
+                    </span>
+                  ) : data.pangramStats.total === 0 ? (
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      Ei pangrammeja tässä tehtävässä
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--color-text-secondary)' }}>
+                      Kaikki {data.pangramStats.total} pangrammia löydetty! ✨
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTier === 3 && (
+              /* Tier 3: 2D Matrix (Letter x Length) */
+              <div
+                data-testid="hint-content-tier3"
+                className="h-full overflow-y-auto scrollbar-none py-0.5"
+              >
+                <table
+                  className="w-full text-center text-[10px]"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    borderCollapse: 'collapse',
+                  }}
+                >
+                  <thead>
+                    <tr style={{ color: 'var(--color-text-tertiary)' }}>
+                      <th className="text-left font-normal pb-0.5">Kirj.</th>
+                      {data.matrix.lengths.map((len) => (
+                        <th key={len} className="font-normal pb-0.5">
+                          {len}
+                        </th>
+                      ))}
+                      <th className="text-right font-normal pb-0.5">Yht.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.matrix.letters.map((letter) => {
+                      const totalLeft = data.matrix.totalsByLetter[letter] ?? 0;
+                      return (
+                        <tr
+                          key={letter}
+                          style={{
+                            color:
+                              totalLeft === 0
+                                ? 'var(--color-text-tertiary)'
+                                : 'var(--color-text-primary)',
+                          }}
+                        >
+                          <td className="text-left font-bold py-0.5">{letter.toUpperCase()}</td>
+                          {data.matrix.lengths.map((len) => {
+                            const rem = data.matrix.cells[letter]?.[len]?.remaining ?? 0;
+                            return (
+                              <td key={len} className="py-0.5">
+                                {rem > 0 ? rem : '–'}
+                              </td>
+                            );
+                          })}
+                          <td className="text-right font-semibold py-0.5">
+                            {totalLeft > 0 ? totalLeft : '✓'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {activeTier === 4 && (
+              /* Tier 4: Active Finnish Suffixes */
+              <div
+                data-testid="hint-content-tier4"
+                className="flex flex-col justify-center gap-1 overflow-hidden"
+              >
+                <div
+                  className="text-[11px] font-semibold uppercase tracking-wider"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                >
+                  Sananpäätteet
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 overflow-y-auto scrollbar-none max-h-[50px] py-0.5">
+                  {data.suffixMap.length > 0 ? (
+                    data.suffixMap.map((entry) => (
+                      <span
+                        key={entry.suffix}
+                        className="text-[12px]"
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          color:
+                            entry.remaining === 0
+                              ? 'var(--color-text-tertiary)'
+                              : 'var(--color-text-primary)',
+                        }}
+                      >
+                        <span className="font-semibold">-{entry.suffix}</span>:{' '}
+                        {entry.remaining === 0 ? '✓' : entry.remaining}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      Ei tunnettuja päätteitä jäljellä.
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export { HintPanels as HintDeck };

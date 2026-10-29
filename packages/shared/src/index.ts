@@ -59,6 +59,7 @@ export {
 } from './schemas/puzzle.js';
 export {
   HintDataSchema,
+  HintPangramDetailSchema,
   StatsRecordSchema,
   PlayerStatsSchema,
   PuzzleStateSchema,
@@ -114,11 +115,18 @@ export {
 export {
   deriveHintData,
   compareFinnishAlphabetically,
+  normalizeFinnishText,
+  matchSuffix,
+  FINNISH_SUFFIX_CANDIDATES,
   type HintData,
+  type HintPangramDetail,
   type LetterEntry,
   type LengthEntry,
   type PairEntry,
   type PangramStats,
+  type SuffixEntry,
+  type MatrixCell,
+  type HintMatrix,
   type DerivedHintData,
 } from './hint-data.js';
 

@@ -54,7 +54,7 @@ const LOWEST_RANK_NAME = 'Etsi sanoja!';
 
 export const NO_HINT_ACHIEVEMENTS: readonly NoHintAchievement[] = [
   { pct: 25, name: 'Omin avuin' },
-  { pct: 50, name: 'Apuitta taitava' },
+  { pct: 50, name: 'Avuitta taitava' },
   { pct: 70, name: 'Ällistyttävä ilman apuja' },
 ];
 

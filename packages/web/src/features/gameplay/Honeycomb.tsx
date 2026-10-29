@@ -5,6 +5,7 @@ import {
   getHoneycombCenterOverlayVariant,
   type ThemeId,
 } from '@sanakenno/shared';
+import { useUiStore } from './useUiStore.js';
 
 export interface HoneycombProps {
   center: string;
@@ -79,6 +80,9 @@ export function Honeycomb({
     [themeId, scheme],
   );
 
+  const pangramRipple = useUiStore((s) => s.pangramRipple);
+  const shuffleSpin = useUiStore((s) => s.shuffleSpin);
+
   const ariaLabel = `Kirjainkenno: kirjaimet ${hexes.map((h) => h.letter.toUpperCase()).join(', ')}, keskuskirjain ${center.toUpperCase()}`;
 
   const svgRef = useRef<SVGSVGElement>(null);
@@ -128,7 +132,12 @@ export function Honeycomb({
           data-testid={`hex-cell-${hex.letter}`}
           data-hex-center={hex.isCenter ? 'true' : 'false'}
           aria-hidden="true"
-          style={{ cursor: disabled ? 'default' : 'pointer' }}
+          style={{
+            cursor: disabled ? 'default' : 'pointer',
+            transform: !hex.isCenter && shuffleSpin ? 'rotate(60deg)' : 'rotate(0deg)',
+            transformOrigin: '150px 150px',
+            transition: shuffleSpin ? 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+          }}
           onPointerDown={
             disabled
               ? undefined
@@ -164,6 +173,11 @@ export function Honeycomb({
               transform: pressedHexIndex === i ? 'scale(0.92)' : 'scale(1)',
               transformOrigin: `${hex.x}px ${hex.y}px`,
               opacity: pressedHexIndex === i ? 0.78 : 1,
+              animation: pangramRipple
+                ? hex.isCenter
+                  ? 'pangram-pulse-center 0.5s ease-out'
+                  : 'pangram-pulse-outer 0.5s ease-out 0.08s'
+                : 'none',
               transition: 'transform 0.08s ease, opacity 0.08s ease',
             }}
           />

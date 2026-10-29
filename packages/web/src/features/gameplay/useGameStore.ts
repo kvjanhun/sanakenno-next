@@ -140,7 +140,10 @@ export const useGameStore = create<GameState>()((set, get) => ({
     set((s) => ({ currentWord: s.currentWord.slice(0, -1) }));
   },
 
-  shuffleLetters: () => set((s) => ({ outerLetters: fisherYatesShuffle(s.outerLetters) })),
+  shuffleLetters: () => {
+    useUiStore.getState().triggerShuffleSpin();
+    set((s) => ({ outerLetters: fisherYatesShuffle(s.outerLetters) }));
+  },
 
   submitWord: async () => {
     const state = get();
@@ -231,8 +234,35 @@ export const useGameStore = create<GameState>()((set, get) => ({
       best_no_hint_score: bestNoHintScore,
     });
 
+    const firstLetter = normalized[0];
+    let letterCleared = false;
+    if (firstLetter && puzzle.hint_data.by_letter[firstLetter]) {
+      const totalForLetter = puzzle.hint_data.by_letter[firstLetter];
+      let foundWithLetter = 0;
+      for (const w of foundWords) {
+        if (w[0] === firstLetter) foundWithLetter += 1;
+      }
+      if (foundWithLetter + 1 === totalForLetter) {
+        letterCleared = true;
+      }
+    }
+
     if (pangram) {
-      useUiStore.getState().showToast(`+${pts}`, 'ok', 2000, 'Pangrammi!', 'special');
+      useUiStore.getState().triggerPangramRipple();
+      const secondary = letterCleared
+        ? `Pangrammi! · Kaikki ${firstLetter?.toUpperCase()}-sanat!`
+        : 'Pangrammi!';
+      useUiStore.getState().showToast(`+${pts}`, 'ok', 2500, secondary, 'special');
+    } else if (letterCleared) {
+      useUiStore
+        .getState()
+        .showToast(
+          `+${pts}`,
+          'ok',
+          2500,
+          `Kaikki ${firstLetter?.toUpperCase()}-sanat löydetty! 🎯`,
+          'special',
+        );
     } else {
       useUiStore.getState().showToast(`+${pts}`, 'ok', 2000);
     }

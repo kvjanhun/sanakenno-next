@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { deriveHintData } from '../../packages/shared/src/index.js';
 import { FoundWords } from '../../packages/web/src/features/gameplay/FoundWords.js';
 import { HintPanels } from '../../packages/web/src/features/gameplay/HintPanels.js';
 import { Honeycomb } from '../../packages/web/src/features/gameplay/Honeycomb.js';
 import { RankProgress } from '../../packages/web/src/features/gameplay/RankProgress.js';
+import { useKeyboard } from '../../packages/web/src/features/gameplay/useKeyboard.js';
 
 describe('Gameplay UI Components', () => {
   it('renders Honeycomb center and outer letters and fires letter callbacks on interaction', () => {
@@ -52,6 +53,9 @@ describe('Gameplay UI Components', () => {
     );
 
     expect(screen.getByTestId('score-display')).toHaveTextContent('25 pistettä');
+    expect(screen.getByTestId('milestone-pip-25')).toBeInTheDocument();
+    expect(screen.getByTestId('milestone-pip-50')).toBeInTheDocument();
+    expect(screen.getByTestId('milestone-pip-70')).toBeInTheDocument();
     const rankBtn = screen.getByTestId('rank-button');
     expect(rankBtn).toHaveTextContent('Hyvä');
     expect(rankBtn).toHaveAttribute('aria-expanded', 'false');
@@ -78,7 +82,7 @@ describe('Gameplay UI Components', () => {
     expect(panel).toHaveTextContent('18 p.');
   });
 
-  it('supports HintPanels progressive tab selection, locked teaser, and hint unlocking', () => {
+  it('supports HintPanels progressive 4-tier deck and tier unlocking', () => {
     const onUnlock = vi.fn();
     const hintData = deriveHintData(
       {
@@ -86,7 +90,12 @@ describe('Gameplay UI Components', () => {
         pangram_count: 1,
         by_letter: { k: 3, l: 1 },
         by_length: { '4': 2, '6': 1, '11': 1 },
-        by_pair: { ka: 3, la: 1 },
+        matrix: {
+          k: { '4': 2, '11': 1 },
+          l: { '6': 1 },
+        },
+        pangram_details: [{ length: 11, first_letter: 'k' }],
+        suffixes: { inen: 1 },
       },
       new Set(['kana']),
       new Set(['a', 'e', 'i', 'k', 'l', 'n', 's']),
@@ -96,25 +105,56 @@ describe('Gameplay UI Components', () => {
       <HintPanels hintsUnlocked={new Set()} onUnlock={onUnlock} hintData={hintData} />,
     );
 
-    const summaryTab = screen.getByRole('button', { name: /Yleiskuva/i });
-    expect(summaryTab).toHaveAttribute('data-hint-state', 'locked');
+    // Tier 0 clean play state
+    expect(screen.getByTestId('hint-tier-0')).toHaveTextContent('Avut · Pelaat omin avuin');
+    const activateBtn = screen.getByTestId('activate-hints-button');
+    fireEvent.click(activateBtn);
+    expect(onUnlock).toHaveBeenCalledWith('tier1');
 
-    // Open locked summary tab -> shows teaser and "Aktivoi apu" button
-    fireEvent.click(summaryTab);
-    expect(screen.getByText('Yhteenveto jäljellä olevista sanoista.')).toBeInTheDocument();
-
-    const unlockButton = screen.getByRole('button', { name: 'Aktivoi apu' });
-    fireEvent.click(unlockButton);
-    expect(onUnlock).toHaveBeenCalledWith('summary');
-
-    // Rerender with 'summary' unlocked -> shows summary metrics
+    // Rerender with Tier 1 unlocked -> shows starting letters & upgrade CTA to Tier 2
     rerender(
-      <HintPanels hintsUnlocked={new Set(['summary'])} onUnlock={onUnlock} hintData={hintData} />,
+      <HintPanels hintsUnlocked={new Set(['tier1'])} onUnlock={onUnlock} hintData={hintData} />,
+    );
+    expect(screen.getByTestId('hint-content-tier1')).toBeInTheDocument();
+    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent('Avaa Taso 2 →');
+
+    // Upgrade to Tier 2
+    fireEvent.click(screen.getByTestId('upgrade-tier-button'));
+    expect(onUnlock).toHaveBeenCalledWith('tier2');
+
+    // Rerender with Tier 2 unlocked -> shows pangram clues
+    rerender(
+      <HintPanels
+        hintsUnlocked={new Set(['tier1', 'tier2'])}
+        onUnlock={onUnlock}
+        hintData={hintData}
+      />,
+    );
+    expect(screen.getByTestId('hint-content-tier2')).toHaveTextContent(
+      /Pangrammi: K... \(11 kirj.\)/,
     );
 
-    expect(summaryTab).toHaveAttribute('data-hint-state', 'unlocked');
-    expect(screen.getByTestId('hint-panel-summary')).toHaveTextContent('3/4');
-    expect(screen.getByTestId('hint-panel-summary')).toHaveTextContent('sanaa löytämättä');
+    // Rerender with Tier 3 unlocked and click its tab -> shows 2D matrix
+    rerender(
+      <HintPanels
+        hintsUnlocked={new Set(['tier1', 'tier2', 'tier3'])}
+        onUnlock={onUnlock}
+        hintData={hintData}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('tier-tab-3'));
+    expect(screen.getByTestId('hint-content-tier3')).toBeInTheDocument();
+
+    // Rerender with Tier 4 unlocked and click its tab -> shows active suffixes
+    rerender(
+      <HintPanels
+        hintsUnlocked={new Set(['tier1', 'tier2', 'tier3', 'tier4'])}
+        onUnlock={onUnlock}
+        hintData={hintData}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('tier-tab-4'));
+    expect(screen.getByTestId('hint-content-tier4')).toHaveTextContent('-inen');
   });
 
   it('renders FoundWords with Kotus dictionary links and pangram bolding', () => {
@@ -137,5 +177,31 @@ describe('Gameplay UI Components', () => {
       name: 'Avaa sanan "kansallinen" määritelmä Kotuksessa',
     });
     expect(link).toHaveAttribute('href', expect.stringContaining('kielitoimistonsanakirja.fi'));
+  });
+
+  it('triggers onShuffle when Space key is pressed and enabled', () => {
+    const onShuffle = vi.fn();
+    const onLetter = vi.fn();
+    const onBackspace = vi.fn();
+    const onEnter = vi.fn();
+    const onEscape = vi.fn();
+
+    renderHook(() =>
+      useKeyboard({
+        onShuffle,
+        onLetter,
+        onBackspace,
+        onEnter,
+        onEscape,
+        enabled: true,
+      }),
+    );
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    expect(onShuffle).toHaveBeenCalledTimes(1);
+    expect(onLetter).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }));
+    expect(onLetter).toHaveBeenCalledWith('k');
   });
 });

@@ -25,6 +25,8 @@ export interface UiState {
   showSettings: boolean;
   showAuth: boolean;
   viewingPuzzleDate: string | null;
+  pangramRipple: boolean;
+  shuffleSpin: boolean;
 
   showToast: (
     msg: string,
@@ -35,6 +37,8 @@ export interface UiState {
     onExpire?: () => void,
   ) => void;
   triggerWordShake: (resubmittedWord?: string | null) => void;
+  triggerPangramRipple: () => void;
+  triggerShuffleSpin: () => void;
   clearWordRejection: () => void;
   setCelebration: (celebration: CelebrationType) => void;
   setShareCopied: (copied: boolean) => void;
@@ -52,6 +56,8 @@ export interface UiState {
 
 let messageTimer: ReturnType<typeof setTimeout> | null = null;
 let shakeTimer: ReturnType<typeof setTimeout> | null = null;
+let rippleTimer: ReturnType<typeof setTimeout> | null = null;
+let shuffleTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useUiStore = create<UiState>()((set) => ({
   message: '',
@@ -72,6 +78,8 @@ export const useUiStore = create<UiState>()((set) => ({
   showSettings: false,
   showAuth: false,
   viewingPuzzleDate: null,
+  pangramRipple: false,
+  shuffleSpin: false,
 
   showToast: (
     msg,
@@ -118,6 +126,24 @@ export const useUiStore = create<UiState>()((set) => ({
       },
       isResubmit ? 1200 : 400,
     );
+  },
+
+  triggerPangramRipple: () => {
+    if (rippleTimer !== null) clearTimeout(rippleTimer);
+    set({ pangramRipple: true });
+    rippleTimer = setTimeout(() => {
+      set({ pangramRipple: false });
+      rippleTimer = null;
+    }, 600);
+  },
+
+  triggerShuffleSpin: () => {
+    if (shuffleTimer !== null) clearTimeout(shuffleTimer);
+    set({ shuffleSpin: true });
+    shuffleTimer = setTimeout(() => {
+      set({ shuffleSpin: false });
+      shuffleTimer = null;
+    }, 250);
   },
 
   clearWordRejection: () => {

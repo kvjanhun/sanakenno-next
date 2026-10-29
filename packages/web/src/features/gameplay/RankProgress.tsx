@@ -29,7 +29,7 @@ export function RankProgress({
   const currentNoHintText =
     currentNoHintAchievement?.name === 'Ällistyttävä ilman apuja'
       ? 'uskomatonta!'
-      : currentNoHintAchievement?.name === 'Apuitta taitava'
+      : currentNoHintAchievement?.name === 'Avuitta taitava'
         ? 'taidokasta!'
         : currentNoHintAchievement?.name === 'Omin avuin'
           ? 'hyvä!'
@@ -88,7 +88,7 @@ export function RankProgress({
       </div>
 
       <div
-        className="h-2 w-full rounded-full overflow-hidden"
+        className="relative h-2 w-full rounded-full"
         style={{ backgroundColor: 'var(--color-bg-secondary)' }}
         role="progressbar"
         aria-valuenow={score}
@@ -96,12 +96,29 @@ export function RankProgress({
         aria-valuemax={maxScore}
       >
         <div
-          className="h-full rounded-full transition-[width] duration-200 ease-out"
+          className="h-full rounded-full overflow-hidden transition-[width] duration-200 ease-out"
           style={{
             width: `${Math.round(progress)}%`,
             backgroundColor: 'var(--color-accent)',
           }}
         />
+        {noHintAchievements.map((ach) => {
+          const isReached = ach.unlocked;
+          return (
+            <div
+              key={ach.name}
+              data-testid={`milestone-pip-${ach.pct}`}
+              title={`${ach.name} (${ach.pct}%)`}
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full pointer-events-none transition-all duration-200"
+              style={{
+                left: `${ach.pct}%`,
+                backgroundColor: isReached ? 'var(--color-accent)' : 'var(--color-bg-primary)',
+                border: `1.5px solid ${isReached ? 'var(--color-on-accent)' : 'var(--color-border)'}`,
+                boxShadow: isReached ? '0 0 0 1px var(--color-accent)' : 'none',
+              }}
+            />
+          );
+        })}
       </div>
 
       {showRanks && (

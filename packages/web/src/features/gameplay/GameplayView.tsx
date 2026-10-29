@@ -116,6 +116,7 @@ export function GameplayView(): React.JSX.Element {
   useKeyboard({
     onLetter: (letter) => useGameStore.getState().addLetter(letter),
     onBackspace: () => useGameStore.getState().deleteLetter(),
+    onShuffle: () => useGameStore.getState().shuffleLetters(),
     onEnter: () => {
       void useGameStore.getState().submitWord();
     },

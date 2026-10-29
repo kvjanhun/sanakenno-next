@@ -7,6 +7,8 @@ export interface UseKeyboardOptions {
   onBackspace: () => void;
   /** Called when Enter is pressed. */
   onEnter: () => void;
+  /** Called when Space is pressed to shuffle outer letters. */
+  onShuffle?: () => void;
   /** Called when Escape is pressed. */
   onEscape: () => void;
   /** When false, all keyboard events except Escape are ignored. */
@@ -43,6 +45,9 @@ export function useKeyboard(options: UseKeyboardOptions): void {
       if (key === 'enter') {
         e.preventDefault();
         opts.onEnter();
+      } else if (key === ' ' || key === 'spacebar') {
+        e.preventDefault();
+        opts.onShuffle?.();
       } else if (key === 'backspace') {
         e.preventDefault();
         opts.onBackspace();
