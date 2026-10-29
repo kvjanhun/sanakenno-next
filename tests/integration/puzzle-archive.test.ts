@@ -12,7 +12,10 @@ import {
 import {
   bumpPuzzleCacheGeneration,
   DEFAULT_SEED_WORDS,
+  getCachedPuzzle,
+  getPuzzleCacheSize,
   invalidatePuzzleCache,
+  MAX_PUZZLE_CACHE_SIZE,
   setWordlist,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
@@ -238,6 +241,64 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
       const resCycleStart = await harness.app.request('/api/archive?all=true');
       const startEntries = (await resCycleStart.json()) as Array<{ puzzle_number: number }>;
       expect(startEntries.map((e) => e.puzzle_number)).toEqual([1, 4, 3]);
+    });
+
+    it('returns archive entries with max_score and does NOT populate _puzzleCache', async () => {
+      invalidatePuzzleCache();
+      expect(getPuzzleCacheSize()).toBe(0);
+
+      const res = await harness.app.request('/api/archive?all=true');
+      expect(res.status).toBe(200);
+      const entries = (await res.json()) as Array<{
+        puzzle_number: number;
+        max_score: number;
+      }>;
+
+      expect(entries.length).toBeGreaterThan(0);
+      for (const entry of entries) {
+        expect(entry.max_score).toBeGreaterThan(0);
+      }
+
+      // Archive batch querying must NOT populate or pollute _puzzleCache with historical games
+      expect(getPuzzleCacheSize()).toBe(0);
+    });
+
+    it('bounds _puzzleCache to MAX_PUZZLE_CACHE_SIZE using LRU eviction', async () => {
+      invalidatePuzzleCache();
+
+      // Seed 15 active puzzle slots
+      for (let s = 10; s <= 24; s++) {
+        await harness.db
+          .insertInto('puzzles')
+          .values({
+            slot: s,
+            letters: 'a,e,i,k,l,n,s',
+            center: 'a',
+            is_active: 1,
+            max_score: 100,
+          })
+          .execute();
+      }
+
+      // Request each puzzle from 10 to 24 sequentially to load them into cache
+      for (let s = 10; s <= 24; s++) {
+        const res = await harness.client.api.puzzle[':number'].$get({
+          param: { number: String(s) },
+        });
+        expect(res.status).toBe(200);
+      }
+
+      // Cache size must never exceed MAX_PUZZLE_CACHE_SIZE (10)
+      expect(getPuzzleCacheSize()).toBe(MAX_PUZZLE_CACHE_SIZE);
+
+      // Oldest slots (10..14) should have been evicted
+      expect(getCachedPuzzle(10)).toBeUndefined();
+      expect(getCachedPuzzle(11)).toBeUndefined();
+      expect(getCachedPuzzle(14)).toBeUndefined();
+
+      // Recent slots (15..24) must remain in cache
+      expect(getCachedPuzzle(24)).toBeDefined();
+      expect(getCachedPuzzle(20)).toBeDefined();
     });
   });
 });

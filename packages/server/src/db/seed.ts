@@ -1,6 +1,7 @@
 import argon2 from 'argon2';
 import type { Kysely } from 'kysely';
 import {
+  computePuzzle,
   DEFAULT_SEED_WORDS,
   getWordlist,
   invalidatePuzzleCache,
@@ -45,6 +46,9 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
     return;
   }
 
+  const p1 = computePuzzle('a,e,i,k,l,n,s', 'a', []);
+  const p2 = computePuzzle('e,h,i,k,n,o,s', 'n', []);
+
   await db
     .insertInto('puzzles')
     .values([
@@ -53,12 +57,14 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
         letters: 'a,e,i,k,l,n,s',
         center: 'a',
         is_active: 1,
+        max_score: p1.max_score,
       },
       {
         slot: 2,
         letters: 'e,h,i,k,n,o,s',
         center: 'n',
         is_active: 1,
+        max_score: p2.max_score,
       },
     ])
     .execute();

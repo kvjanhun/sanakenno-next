@@ -48,6 +48,7 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
     try {
       const appliedMigrations = await db.selectFrom('schema_migrations').selectAll().execute();
       expect(appliedMigrations.map((m) => m.version)).toContain('0001-baseline');
+      expect(appliedMigrations.map((m) => m.version)).toContain('0002-add-puzzle-max-score');
 
       await db
         .insertInto('puzzles')
@@ -210,11 +211,20 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
       CREATE TABLE player_transfer_tokens (
         token TEXT PRIMARY KEY
       );
+      INSERT INTO puzzles (slot, letters, center) VALUES (1, 'a,e,i,k,l,n,s', 'a');
     `);
     legacySqlite.close();
 
     const db = createDb(dbPath);
     try {
+      const migrated = await db
+        .selectFrom('puzzles')
+        .select(['slot', 'is_active', 'max_score'])
+        .where('slot', '=', 1)
+        .executeTakeFirstOrThrow();
+      expect(migrated.is_active).toBe(1);
+      expect(migrated.max_score).toBeGreaterThan(0);
+
       let attempts = 0;
       const insertedSlot = await runImmediateTransactionWithRetry(
         db,

@@ -5,6 +5,7 @@ export interface PuzzlesTable {
   letters: string;
   center: string;
   is_active: Generated<number>;
+  max_score: Generated<number | null>;
   created_at: Generated<string>;
   updated_at: Generated<string>;
 }

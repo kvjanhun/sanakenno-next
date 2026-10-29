@@ -1,11 +1,14 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
+import { getBlockedWords } from '../puzzle/puzzle.queries.js';
+import { computePuzzle } from '../puzzle/wordlist.js';
 
 export interface PuzzleRow {
   slot: number;
   letters: string;
   center: string;
   is_active: number;
+  max_score?: number | null;
 }
 
 export function normalizeLettersKey(letters: string | string[]): string {
@@ -27,7 +30,7 @@ export async function getAllActivePuzzles(db: Kysely<Database>) {
 export async function getPuzzleBySlot(db: Kysely<Database>, slot: number) {
   return db
     .selectFrom('puzzles')
-    .select(['slot', 'letters', 'center', 'is_active'])
+    .select(['slot', 'letters', 'center', 'is_active', 'max_score'])
     .where('slot', '=', slot)
     .executeTakeFirst();
 }
@@ -78,6 +81,10 @@ export async function insertOrUpdatePuzzle(
   letters: string,
   center: string,
 ) {
+  const blockedWords = await getBlockedWords(db);
+  const computed = computePuzzle(letters, center, blockedWords);
+  const maxScore = computed.max_score;
+
   const existing = await getPuzzleBySlot(db, slot);
   if (existing) {
     await db
@@ -85,6 +92,7 @@ export async function insertOrUpdatePuzzle(
       .set({
         letters,
         center,
+        max_score: maxScore,
         is_active: 1,
         updated_at: new Date().toISOString(),
       })
@@ -97,6 +105,7 @@ export async function insertOrUpdatePuzzle(
         slot,
         letters,
         center,
+        max_score: maxScore,
         is_active: 1,
       })
       .execute();
@@ -128,6 +137,7 @@ export async function swapPuzzles(db: Kysely<Database>, slotA: number, slotB: nu
     .set({
       letters: pB.letters,
       center: pB.center,
+      max_score: pB.max_score,
       is_active: pB.is_active,
       updated_at: now,
     })
@@ -139,6 +149,7 @@ export async function swapPuzzles(db: Kysely<Database>, slotA: number, slotB: nu
     .set({
       letters: pA.letters,
       center: pA.center,
+      max_score: pA.max_score,
       is_active: pA.is_active,
       updated_at: now,
     })
@@ -147,10 +158,18 @@ export async function swapPuzzles(db: Kysely<Database>, slotA: number, slotB: nu
 }
 
 export async function updatePuzzleCenter(db: Kysely<Database>, slot: number, center: string) {
+  const puzzle = await getPuzzleBySlot(db, slot);
+  if (!puzzle) {
+    throw new Error('Peliä ei löydy');
+  }
+  const blockedWords = await getBlockedWords(db);
+  const computed = computePuzzle(puzzle.letters, center, blockedWords);
+
   await db
     .updateTable('puzzles')
     .set({
       center,
+      max_score: computed.max_score,
       updated_at: new Date().toISOString(),
     })
     .where('slot', '=', slot)

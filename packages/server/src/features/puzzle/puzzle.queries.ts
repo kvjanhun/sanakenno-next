@@ -1,4 +1,4 @@
-import { getHelsinkiDateString } from '@sanakenno/shared';
+import { getHelsinkiDateString, type ArchiveEntry } from '@sanakenno/shared';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import {
@@ -13,6 +13,7 @@ export interface PuzzleRow {
   slot: number;
   letters: string;
   center: string;
+  max_score?: number | null;
 }
 
 let _lastDb: Kysely<Database> | null = null;
@@ -202,7 +203,7 @@ export async function getPuzzleRowBySlot(
 ): Promise<PuzzleRow | null> {
   const row = await db
     .selectFrom('puzzles')
-    .select(['slot', 'letters', 'center'])
+    .select(['slot', 'letters', 'center', 'max_score'])
     .where('slot', '=', slot)
     .where('is_active', '=', 1)
     .executeTakeFirst();
@@ -215,6 +216,7 @@ export async function getPuzzleRowBySlot(
     slot: Number(row.slot),
     letters: row.letters,
     center: row.center,
+    max_score: row.max_score !== null && row.max_score !== undefined ? Number(row.max_score) : null,
   };
 }
 
@@ -276,6 +278,14 @@ export async function getFullPuzzleBySlot(
     ...computed,
   };
 
+  if (row.max_score === null || row.max_score === undefined) {
+    await db
+      .updateTable('puzzles')
+      .set({ max_score: computed.max_score })
+      .where('slot', '=', slot)
+      .execute();
+  }
+
   setCachedPuzzle(slot, fullResult);
   return fullResult;
 }
@@ -292,4 +302,100 @@ export async function getFullPuzzleForDate(
     return null;
   }
   return getFullPuzzleBySlot(db, slot);
+}
+
+/**
+ * Add or subtract days from a YYYY-MM-DD ISO date string in UTC.
+ */
+export function addDaysToIsoDate(dateStr: string, deltaDays: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const utc = new Date(Date.UTC(y ?? 2026, (m ?? 1) - 1, (d ?? 1) + deltaDays));
+  const year = utc.getUTCFullYear();
+  const month = String(utc.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(utc.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Retrieve high-level archive metadata in a single fast query without wordlist scans or cache pollution.
+ */
+export async function getArchiveMetadata(
+  db: Kysely<Database>,
+  todayHelsinki: string,
+  days: number,
+): Promise<ArchiveEntry[]> {
+  const activeRows = await db
+    .selectFrom('puzzles')
+    .select(['slot', 'letters', 'center', 'max_score'])
+    .where('is_active', '=', 1)
+    .orderBy('slot', 'asc')
+    .execute();
+
+  if (activeRows.length === 0) {
+    return [];
+  }
+
+  const epochDateStr = await getEpochDate(db);
+  const activeSlots = activeRows.map((r) => Number(r.slot));
+  const slotToRow = new Map(activeRows.map((r) => [Number(r.slot), r]));
+
+  const startSlot = activeSlots.find((s) => s >= 1) ?? activeSlots[0]!;
+  const startIndex = activeSlots.indexOf(startSlot);
+  const totalActive = activeSlots.length;
+  const epochUtcMs = parseIsoDateUtcMs(epochDateStr);
+
+  const entries: ArchiveEntry[] = [];
+  const missingScoresToUpdate: Array<{ slot: number; max_score: number }> = [];
+  let blockedWords: string[] | null = null;
+
+  for (let daysAgo = 0; daysAgo < days; daysAgo++) {
+    const dateStr = addDaysToIsoDate(todayHelsinki, -daysAgo);
+    const daysDiff = Math.round((parseIsoDateUtcMs(dateStr) - epochUtcMs) / 86_400_000);
+    const activeIndex = (((startIndex + daysDiff) % totalActive) + totalActive) % totalActive;
+    const slot = activeSlots[activeIndex];
+    if (slot === undefined) continue;
+
+    const row = slotToRow.get(slot);
+    if (!row) continue;
+
+    let maxScore =
+      row.max_score !== null && row.max_score !== undefined ? Number(row.max_score) : null;
+    if (maxScore === null) {
+      if (blockedWords === null) {
+        blockedWords = await getBlockedWords(db);
+      }
+      const computed = computePuzzle(row.letters, row.center, blockedWords);
+      maxScore = computed.max_score;
+      missingScoresToUpdate.push({ slot, max_score: maxScore });
+      row.max_score = maxScore;
+    }
+
+    const centerNormalized = row.center.trim().toLowerCase();
+    const outerLetters = row.letters
+      .split(',')
+      .map((l) => l.trim().toLowerCase())
+      .filter((l) => l.length > 0 && l !== centerNormalized);
+
+    entries.push({
+      date: dateStr,
+      puzzle_number: slot,
+      display_number: activeIndex + 1,
+      letters: [centerNormalized, ...outerLetters],
+      center: centerNormalized,
+      is_today: daysAgo === 0,
+      max_score: maxScore,
+    });
+  }
+
+  if (missingScoresToUpdate.length > 0) {
+    for (const update of missingScoresToUpdate) {
+      await db
+        .updateTable('puzzles')
+        .set({ max_score: update.max_score })
+        .where('slot', '=', update.slot)
+        .execute();
+    }
+  }
+
+  return entries;
 }

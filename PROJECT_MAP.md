@@ -17,10 +17,10 @@ sanakenno-next/
     shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, sync-merge, kotus, share-text, honeycomb-theme, auth-types) & Zod schemas
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer
       src/
-        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-baseline migration runner, deterministic seed
+        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0002 migration runner, deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
-          puzzle/            # Finnish wordlist engine, daily/slot puzzle RPC (GET /api/puzzle, /:number, /:number/words) & cycle archive (GET /api/archive)
+          puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
           player-auth/       # Passwordless player Bearer auth, session TTL, pairing-code email delivery (POST /api/player/auth/*)
           player-sync/       # Monotonic cross-device progress sync (GET /api/player/sync, POST /api/player/sync/*)
           telemetry/         # Public gameplay telemetry (POST /api/achievement, /api/failed-guess, /api/word-find)

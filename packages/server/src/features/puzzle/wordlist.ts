@@ -285,18 +285,43 @@ export function computeVariations(
   });
 }
 
+/** Maximum active puzzles retained in Node memory heap. */
+export const MAX_PUZZLE_CACHE_SIZE = 10;
+
 /**
  * Read a cached full puzzle by slot if present in the current generation.
+ * Refreshes LRU recency when found.
  */
 export function getCachedPuzzle(slot: number): FullPuzzleData | undefined {
-  return _puzzleCache.get(slot);
+  const data = _puzzleCache.get(slot);
+  if (data !== undefined) {
+    _puzzleCache.delete(slot);
+    _puzzleCache.set(slot, data);
+  }
+  return data;
 }
 
 /**
- * Store a computed full puzzle in the slot cache.
+ * Store a computed full puzzle in the slot cache, evicting the least recently used
+ * when exceeding MAX_PUZZLE_CACHE_SIZE.
  */
 export function setCachedPuzzle(slot: number, data: FullPuzzleData): void {
+  if (_puzzleCache.has(slot)) {
+    _puzzleCache.delete(slot);
+  } else if (_puzzleCache.size >= MAX_PUZZLE_CACHE_SIZE) {
+    const oldestKey = _puzzleCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      _puzzleCache.delete(oldestKey);
+    }
+  }
   _puzzleCache.set(slot, data);
+}
+
+/**
+ * Return current number of cached puzzles in memory.
+ */
+export function getPuzzleCacheSize(): number {
+  return _puzzleCache.size;
 }
 
 /**

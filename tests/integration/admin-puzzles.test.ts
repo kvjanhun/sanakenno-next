@@ -205,6 +205,7 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         .where('slot', '=', 1)
         .executeTakeFirst();
       expect(p1?.center).toBe('i');
+      expect(p1?.max_score).toBeGreaterThan(0);
     });
 
     it('fetches puzzle variations by slot and display_number with neighbour slots', async () => {

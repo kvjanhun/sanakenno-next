@@ -1,4 +1,5 @@
 import type BetterSqlite3 from 'better-sqlite3';
+import { computePuzzle } from '../features/puzzle/wordlist.js';
 
 /**
  * Complete SQLite baseline schema matching Sanakenno 1.0 `server/db/schema.sql`.
@@ -9,6 +10,7 @@ CREATE TABLE IF NOT EXISTS puzzles (
     letters     TEXT NOT NULL,
     center      TEXT NOT NULL,
     is_active   INTEGER NOT NULL DEFAULT 1,
+    max_score   INTEGER,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -197,6 +199,38 @@ export const MIGRATIONS: readonly Migration[] = [
       ensureColumn(db, 'puzzles', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
       ensureColumn(db, 'player_stats', 'best_no_hint_score', 'INTEGER NOT NULL DEFAULT 0');
       db.exec('DROP TABLE IF EXISTS player_transfer_tokens');
+    },
+  },
+  {
+    version: '0002-add-puzzle-max-score',
+    description: 'Add max_score to puzzles table and backfill existing puzzles',
+    up(db) {
+      ensureColumn(db, 'puzzles', 'max_score', 'INTEGER');
+      const rows = db
+        .prepare('SELECT slot, letters, center FROM puzzles WHERE max_score IS NULL')
+        .all() as Array<{ slot: number; letters: string; center: string }>;
+      if (rows.length > 0) {
+        let blockedWords: string[] = [];
+        try {
+          const blockedRows = db.prepare('SELECT word FROM blocked_words').all() as Array<{
+            word: string;
+          }>;
+          blockedWords = blockedRows.map((r) => r.word);
+        } catch {
+          blockedWords = [];
+        }
+        const updateStmt = db.prepare('UPDATE puzzles SET max_score = ? WHERE slot = ?');
+        for (const row of rows) {
+          try {
+            const data = computePuzzle(row.letters, row.center, blockedWords);
+            if (data && typeof data.max_score === 'number') {
+              updateStmt.run(data.max_score, row.slot);
+            }
+          } catch {
+            // If words cannot be loaded during migration, opportunistic query backfill will handle it
+          }
+        }
+      }
     },
   },
 ];
