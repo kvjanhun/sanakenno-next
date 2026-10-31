@@ -76,6 +76,8 @@ describe('Gameplay UI Components', () => {
     );
 
     const panel = screen.getByTestId('rank-thresholds-panel');
+    // No-hint pips stay visible after hints are used; unreached ones turn "lost"
+    expect(screen.getByTestId('milestone-pip-25')).toHaveAttribute('data-state', 'lost');
     expect(panel).toBeInTheDocument();
     expect(panel).toHaveTextContent('Täysi kenno');
     expect(panel).toHaveTextContent('Ällistyttävä');
@@ -105,20 +107,19 @@ describe('Gameplay UI Components', () => {
       <HintPanels hintsUnlocked={new Set()} onUnlock={onUnlock} hintData={hintData} />,
     );
 
-    // Tier 0 clean play state
-    expect(screen.getByTestId('hint-tier-0')).toHaveTextContent('Avut · Pelaat omin avuin');
+    // Level 0: both tabs locked, matrix tab shows a single unlock button
+    expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
+    expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
     const activateBtn = screen.getByTestId('activate-hints-button');
     fireEvent.click(activateBtn);
     expect(onUnlock).toHaveBeenCalledWith('tier1');
 
-    // Rerender with Tier 1 unlocked -> shows starting letters & upgrade CTA to Step 2
+    // Rerender with Tier 1 unlocked -> shows starting letters & next-level CTA
     rerender(
       <HintPanels hintsUnlocked={new Set(['tier1'])} onUnlock={onUnlock} hintData={hintData} />,
     );
     expect(screen.getByTestId('hint-content-tier1')).toBeInTheDocument();
-    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent(
-      'Avaa Vaihe 2 (pituudet) →',
-    );
+    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent('Avaa seuraava taso');
 
     // Upgrade to Matrix Step 2 (tier3)
     fireEvent.click(screen.getByTestId('upgrade-tier-button'));
@@ -133,6 +134,8 @@ describe('Gameplay UI Components', () => {
       />,
     );
     expect(screen.getByTestId('hint-content-tier3')).toBeInTheDocument();
+    // Matrix fully open: no further CTA and no status text on this tab
+    expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
 
     // Switch to Vihjeet tab while it is still locked
     fireEvent.click(screen.getByTestId('tier-tab-2'));
@@ -149,12 +152,8 @@ describe('Gameplay UI Components', () => {
       />,
     );
     fireEvent.click(screen.getByTestId('tier-tab-2'));
-    expect(screen.getByTestId('hint-content-tier2')).toHaveTextContent(
-      /Pangrammi: K... \(11 kirj.\)/,
-    );
-    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent(
-      'Avaa Vaihe 2 (päätteet) →',
-    );
+    expect(screen.getByTestId('hint-content-tier2')).toHaveTextContent(/K\s*\(11\)/);
+    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent('Avaa seuraava taso');
 
     // Upgrade to Hints Step 2 (tier4)
     fireEvent.click(screen.getByTestId('upgrade-tier-button'));
@@ -170,6 +169,16 @@ describe('Gameplay UI Components', () => {
     );
     fireEvent.click(screen.getByTestId('tier-tab-4'));
     expect(screen.getByTestId('hint-content-tier4')).toHaveTextContent('-inen');
+    expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
+
+    // Hide toggle collapses the deck to one row and persists the preference
+    fireEvent.click(screen.getByTestId('hide-hints-button'));
+    expect(screen.queryByTestId('hint-content-tier4')).not.toBeInTheDocument();
+    expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
+    expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('1');
+    fireEvent.click(screen.getByTestId('show-hints-button'));
+    expect(screen.getByTestId('hint-content-tier4')).toBeInTheDocument();
+    expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('0');
   });
 
   it('renders FoundWords with Kotus dictionary links and pangram bolding', () => {

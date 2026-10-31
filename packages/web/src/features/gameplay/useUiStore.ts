@@ -1,5 +1,24 @@
 import { create } from 'zustand';
 
+/** localStorage key for the player's "hide hint deck" preference. */
+export const HINTS_HIDDEN_KEY = 'sanakenno_hints_hidden';
+
+function readHintsHidden(): boolean {
+  try {
+    return window.localStorage.getItem(HINTS_HIDDEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeHintsHidden(hidden: boolean): void {
+  try {
+    window.localStorage.setItem(HINTS_HIDDEN_KEY, hidden ? '1' : '0');
+  } catch {
+    // Storage unavailable (private mode / quota): keep the in-memory preference only.
+  }
+}
+
 /** Message severity used for toast display. */
 export type MessageType = 'ok' | 'error' | 'special';
 
@@ -27,7 +46,10 @@ export interface UiState {
   viewingPuzzleDate: string | null;
   pangramRipple: boolean;
   shuffleSpin: boolean;
+  /** Persisted player preference: collapse the hint deck to a single row. */
+  hintsHidden: boolean;
 
+  setHintsHidden: (hidden: boolean) => void;
   showToast: (
     msg: string,
     type?: MessageType,
@@ -80,6 +102,12 @@ export const useUiStore = create<UiState>()((set) => ({
   viewingPuzzleDate: null,
   pangramRipple: false,
   shuffleSpin: false,
+  hintsHidden: readHintsHidden(),
+
+  setHintsHidden: (hintsHidden) => {
+    writeHintsHidden(hintsHidden);
+    set({ hintsHidden });
+  },
 
   showToast: (
     msg,

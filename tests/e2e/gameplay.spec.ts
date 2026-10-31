@@ -60,23 +60,30 @@ test('mobile viewport has no vertical scroll and honeycomb remains stationary ac
   expect(initialBox).not.toBeNull();
   const initialY = initialBox!.y;
 
-  // Upgrade to Tier 1
+  // Matriisi: Unlock Step 1 (Totals)
   await page.getByTestId('activate-hints-button').click();
   await page.waitForTimeout(100);
-  const tier1Box = await honeycomb.boundingBox();
-  expect(tier1Box!.y).toBe(initialY);
+  const matriisiStep1Box = await honeycomb.boundingBox();
+  expect(matriisiStep1Box!.y).toBe(initialY);
 
-  // Upgrade to Tier 2
+  // Matriisi: Unlock Step 2 (Full matrix)
   await page.getByTestId('upgrade-tier-button').click();
   await page.waitForTimeout(100);
-  const tier2Box = await honeycomb.boundingBox();
-  expect(tier2Box!.y).toBe(initialY);
+  const matriisiStep2Box = await honeycomb.boundingBox();
+  expect(matriisiStep2Box!.y).toBe(initialY);
 
-  // Upgrade to Tier 3
+  // Vihjeet: Switch tab and unlock Step 1 (Pangrams)
+  await page.getByTestId('tier-tab-2').click();
+  await page.getByTestId('activate-hints-button').click();
+  await page.waitForTimeout(100);
+  const vihjeetStep1Box = await honeycomb.boundingBox();
+  expect(vihjeetStep1Box!.y).toBe(initialY);
+
+  // Vihjeet: Unlock Step 2 (Suffixes)
   await page.getByTestId('upgrade-tier-button').click();
   await page.waitForTimeout(100);
-  const tier3Box = await honeycomb.boundingBox();
-  expect(tier3Box!.y).toBe(initialY);
+  const vihjeetStep2Box = await honeycomb.boundingBox();
+  expect(vihjeetStep2Box!.y).toBe(initialY);
 
   // Space key shuffles letters without inserting characters in word input
   await page.keyboard.press('Space');

@@ -319,7 +319,7 @@ export function GameplayView(): React.JSX.Element {
               style={{
                 top: 0,
                 backgroundColor: 'var(--color-bg-primary)',
-                paddingTop: '0.5rem',
+                paddingTop: '0.25rem',
                 paddingBottom: '0.25rem',
               }}
             >
