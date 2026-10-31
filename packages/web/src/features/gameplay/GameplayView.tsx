@@ -143,9 +143,12 @@ export function GameplayView(): React.JSX.Element {
   }, []);
 
   return (
-    <div className="w-full" style={{ backgroundColor: 'var(--color-bg-primary)' }}>
+    <div
+      className="w-full min-h-dvh flex flex-col"
+      style={{ backgroundColor: 'var(--color-bg-primary)' }}
+    >
       <header
-        className="w-full border-b"
+        className="w-full border-b shrink-0"
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           borderColor: 'var(--color-border)',
@@ -286,7 +289,7 @@ export function GameplayView(): React.JSX.Element {
         shareCopied={shareCopied}
       />
 
-      <div className="max-w-sm mx-auto px-3 pt-2 pb-6">
+      <div className="flex-1 flex flex-col justify-between max-w-sm mx-auto px-3 pt-1 pb-3 w-full">
         {isLoading && !puzzle && (
           <div className="text-center py-16" style={{ color: 'var(--color-text-secondary)' }}>
             Ladataan...
@@ -314,89 +317,95 @@ export function GameplayView(): React.JSX.Element {
 
         {puzzle && (
           <>
-            <div
-              className="sticky z-20"
-              style={{
-                top: 0,
-                backgroundColor: 'var(--color-bg-primary)',
-                paddingTop: '0.25rem',
-                paddingBottom: '0.25rem',
-              }}
-            >
-              <RankProgress
-                score={score}
-                maxScore={puzzle.max_score}
-                rank={rank}
-                showRanks={showRanks}
-                onToggleRanks={() => useUiStore.getState().setShowRanks(!showRanks)}
-                scoreBeforeHints={displayScoreBeforeHints}
-                hasUnlockedHints={hintsUnlocked.size > 0}
+            <div className="shrink-0">
+              <div
+                className="sticky z-20"
+                style={{
+                  top: 0,
+                  backgroundColor: 'var(--color-bg-primary)',
+                  paddingTop: '0.25rem',
+                  paddingBottom: '0.25rem',
+                }}
+              >
+                <RankProgress
+                  score={score}
+                  maxScore={puzzle.max_score}
+                  rank={rank}
+                  showRanks={showRanks}
+                  onToggleRanks={() => useUiStore.getState().setShowRanks(!showRanks)}
+                  scoreBeforeHints={displayScoreBeforeHints}
+                  hasUnlockedHints={hintsUnlocked.size > 0}
+                />
+              </div>
+
+              <HintPanels
+                hintsUnlocked={hintsUnlocked}
+                onUnlock={(id) => useGameStore.getState().unlockHint(id)}
               />
             </div>
 
-            <HintPanels
-              hintsUnlocked={hintsUnlocked}
-              onUnlock={(id) => useGameStore.getState().unlockHint(id)}
-            />
-
-            <div className="mb-2">
-              <WordInput
-                currentWord={currentWord}
-                center={center}
-                allLetters={allLetters}
-                shake={wordShake}
-                allFound={allFound}
-                wordCount={puzzle.hint_data.word_count}
-              />
-            </div>
-
-            {!allFound && (
+            <div className="mt-auto flex flex-col justify-end shrink-0">
               <div className="mb-2">
-                <MessageBar
-                  message={message}
-                  type={messageType}
-                  secondaryMessage={secondaryMessage}
-                  secondaryType={secondaryType}
+                <WordInput
+                  currentWord={currentWord}
+                  center={center}
+                  allLetters={allLetters}
+                  shake={wordShake}
+                  allFound={allFound}
+                  wordCount={puzzle.hint_data.word_count}
                 />
               </div>
-            )}
 
-            <div className="flex justify-center mb-3" style={{ opacity: allFound ? 0.7 : 1 }}>
-              <Honeycomb
-                center={center}
-                outerLetters={outerLetters}
-                pressedHexIndex={pressedHexIndex}
-                disabled={allFound}
-                themeId={themeId}
-                scheme={scheme}
-                onLetterPress={(letter) => useGameStore.getState().addLetter(letter)}
-                onHexDown={(idx) => useUiStore.getState().setPressedHexIndex(idx)}
-                onHexUp={() => useUiStore.getState().setPressedHexIndex(null)}
+              {!allFound && (
+                <div className="mb-2">
+                  <MessageBar
+                    message={message}
+                    type={messageType}
+                    secondaryMessage={secondaryMessage}
+                    secondaryType={secondaryType}
+                  />
+                </div>
+              )}
+
+              <div className="flex justify-center mb-3" style={{ opacity: allFound ? 0.7 : 1 }}>
+                <Honeycomb
+                  center={center}
+                  outerLetters={outerLetters}
+                  pressedHexIndex={pressedHexIndex}
+                  disabled={allFound}
+                  themeId={themeId}
+                  scheme={scheme}
+                  onLetterPress={(letter) => useGameStore.getState().addLetter(letter)}
+                  onHexDown={(idx) => useUiStore.getState().setPressedHexIndex(idx)}
+                  onHexUp={() => useUiStore.getState().setPressedHexIndex(null)}
+                />
+              </div>
+
+              {!allFound && (
+                <div className="mb-3">
+                  <GameControls
+                    onDelete={() => useGameStore.getState().deleteLetter()}
+                    onShuffle={() => useGameStore.getState().shuffleLetters()}
+                    onShare={handleShare}
+                    shareCopied={shareCopied}
+                    onSubmit={() => {
+                      void useGameStore.getState().submitWord();
+                    }}
+                  />
+                </div>
+              )}
+
+              <FoundWords
+                foundWords={sortedFoundWords}
+                recentWords={recentFoundWords}
+                showAll={showAllFoundWords}
+                allLetters={allLetters}
+                onToggleShowAll={() =>
+                  useUiStore.getState().setShowAllFoundWords(!showAllFoundWords)
+                }
+                lastResubmittedWord={lastResubmittedWord}
               />
             </div>
-
-            {!allFound && (
-              <div className="mb-3">
-                <GameControls
-                  onDelete={() => useGameStore.getState().deleteLetter()}
-                  onShuffle={() => useGameStore.getState().shuffleLetters()}
-                  onShare={handleShare}
-                  shareCopied={shareCopied}
-                  onSubmit={() => {
-                    void useGameStore.getState().submitWord();
-                  }}
-                />
-              </div>
-            )}
-
-            <FoundWords
-              foundWords={sortedFoundWords}
-              recentWords={recentFoundWords}
-              showAll={showAllFoundWords}
-              allLetters={allLetters}
-              onToggleShowAll={() => useUiStore.getState().setShowAllFoundWords(!showAllFoundWords)}
-              lastResubmittedWord={lastResubmittedWord}
-            />
           </>
         )}
       </div>
