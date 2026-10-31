@@ -4,7 +4,7 @@
 
 This repository is operated **agent-first**. You (the agent) work autonomously inside mechanical guardrails and execute **all** `approved` specs in [`specs/00-backlog.md`](specs/00-backlog.md) back-to-back before returning to the human curator.
 
-### The 5 Laws
+### The 6 Laws
 
 1. **No Code Without an Approved Spec:**
    - Every non-trivial change starts as a spec file in [`specs/`](specs/00-backlog.md) with `Status: approved`.
@@ -14,7 +14,6 @@ This repository is operated **agent-first**. You (the agent) work autonomously i
    - Only stop when **every** `approved` spec in the backlog has reached `shipped`, or if an unresolvable product/UX contradiction forces a human decision.
 3. **Mechanical Gate Per Slice (`pnpm check:agent`):**
    - No slice may be merged to `main` until `pnpm run check:agent` passes 100% (TypeScript across Kysely + Hono RPC + React, ESLint/Prettier, `tests/architecture.test.ts`, Vitest unit/integration, and production build).
-   - When UI or routes change, also run `pnpm run test:e2e`.
 4. **Independent Critic Audit Per Slice (`critic-audit`):**
    - Before merging any slice to `main`, invoke a read-only subagent using the `critic-audit` skill to verify the diff against the spec, check for scope creep, and confirm test honesty. Self-heal any blocker findings before merging (`Status: shipped`) and advancing to the next `approved` spec.
 5. **The 1-Screen Curation Brief (<25 lines) at Queue Completion:**
@@ -24,6 +23,9 @@ This repository is operated **agent-first**. You (the agent) work autonomously i
      - **Blast Radius:** Shipped specs, feature slices, DB tables, and RPC endpoints.
      - **Proof:** Total test counts + key E2E/integration proofs.
      - **Curator Prompt:** Any final UX/product judgment call.
+6. **Mandatory Agent Visual Verification for UI Changes:**
+   - Whenever a slice touches `.tsx` files, CSS stylesheets, or Tailwind tokens, the agent MUST run `pnpm run screenshot` and visually inspect the output using `read_file`.
+   - The Curation Brief must include confirmation that mobile (390px) and desktop (1280px) screenshots were inspected.
 
 ---
 
@@ -48,7 +50,7 @@ Enforced mechanically by [`tests/architecture.test.ts`](tests/architecture.test.
 pnpm run check:agent     # Full mechanical gate: typecheck + lint + test:arch + test:unit + build
 pnpm run test:arch       # Run architectural fitness tests only
 pnpm run test:unit       # Run Vitest unit + in-memory SQLite integration tests
-pnpm run test:e2e        # Run self-contained Playwright E2E suite (auto-starts isolated server + web)
+pnpm run screenshot      # Capture desktop (1280px) & mobile (390px) screenshots to .screenshots/
 pnpm run db:seed         # Seed local development SQLite database
 pnpm run dev             # Start local Hono API (:3001) + Vite web (:5173)
 ```

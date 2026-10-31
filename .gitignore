@@ -6,8 +6,7 @@ coverage/
 *.db
 *.db-wal
 *.db-shm
-playwright-report/
-test-results/
+.screenshots/
 .turbo/
 .DS_Store
 .env

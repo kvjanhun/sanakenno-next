@@ -14,7 +14,7 @@
     "format": "prettier --write .",
     "test:arch": "vitest run tests/architecture.test.ts",
     "test:unit": "vitest run --exclude tests/architecture.test.ts",
-    "test:e2e": "playwright test",
+    "screenshot": "tsx scripts/screenshot.ts",
     "db:seed": "pnpm --filter @sanakenno/server db:seed",
     "check:agent": "pnpm run format && pnpm run typecheck && pnpm run lint && pnpm run test:arch && pnpm run test:unit && pnpm run build"
   },
@@ -27,7 +27,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
-    "@playwright/test": "^1.50.1",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^25.5.0",
@@ -36,7 +35,6 @@
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^29.0.1",
-    "playwright": "^1.50.1",
     "prettier": "^3.5.3",
     "tsx": "^4.21.0",
     "turbo": "^2.9.6",

@@ -10,7 +10,11 @@ sanakenno-next/
   PROJECT_MAP.md             # Current architecture & domain invariants
   Dockerfile                 # Multi-stage production container (Node 22 Alpine, commit.txt stamp)
   docker-compose.yml         # Dual-instance zero-downtime services (sanakenno-a & sanakenno-b)
-  scripts/deploy-sanakenno.sh# Server deployment & verification pipeline
+  scripts/
+    create-admin.ts          # Admin credential provisioning CLI
+    deploy-sanakenno.sh      # Server deployment & verification pipeline
+    entrypoint.sh            # Container init & Litestream restore
+    screenshot.ts            # Headless Chrome mobile & desktop screenshot capture utility
   .github/workflows/ci-web.yml# GitHub Actions CI & webhook deploy workflow
   specs/                     # Sequenced specs driving autonomous implementation
   packages/
@@ -42,7 +46,7 @@ sanakenno-next/
   tests/
     architecture.test.ts     # Mechanical boundary & monolith guardrails
     integration/             # In-memory Kysely SQLite + Hono testClient specs + production snapshot tests
-    e2e/                     # Ephemeral Playwright specs (gameplay, modals, admin, pwa)
+    unit/                    # Fast Vitest + React Testing Library component & gameplay flow specs
 ```
 
 ---
