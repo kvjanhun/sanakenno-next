@@ -77,23 +77,24 @@ export function HintPanels({
     return (
       <div
         data-testid="hint-deck"
-        className="w-full flex items-center justify-between select-none px-1"
-        style={{ height: '30px', marginTop: '4px', marginBottom: '0.25rem' }}
+        className="w-full flex items-center justify-between select-none px-0.5 mb-1.5"
+        style={{ height: '30px', marginTop: '4px', fontFamily: 'var(--font-sans)' }}
       >
+        <div className="flex items-center">{counter}</div>
         <button
           type="button"
           data-testid="show-hints-button"
+          aria-label="Näytä avut"
+          title="Näytä avut"
           onClick={() => setHidden(false)}
-          className="cursor-pointer border-none rounded-lg px-3 py-1 text-[12px] font-semibold inline-flex items-center gap-1"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-text-primary)',
-          }}
+          className="cursor-pointer border-none bg-transparent rounded-md pl-2 pr-1 h-7 -mr-1 inline-flex items-center gap-1 text-[12px] font-semibold transition-colors hover:bg-[var(--color-bg-secondary)]"
+          style={{ color: 'var(--color-text-secondary)' }}
         >
-          Näytä avut
-          <ChevronDownIcon size={13} strokeWidth={2.5} />
+          <span>Näytä avut</span>
+          <span className="w-5 h-7 inline-flex items-center justify-center">
+            <ChevronDownIcon size={16} strokeWidth={2.5} />
+          </span>
         </button>
-        {counter}
       </div>
     );
   }
