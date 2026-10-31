@@ -111,30 +111,36 @@ describe('Gameplay UI Components', () => {
     fireEvent.click(activateBtn);
     expect(onUnlock).toHaveBeenCalledWith('tier1');
 
-    // Rerender with Tier 1 unlocked -> shows starting letters & upgrade CTA to Tier 2
+    // Rerender with Tier 1 unlocked -> shows starting letters & upgrade CTA to Step 2
     rerender(
       <HintPanels hintsUnlocked={new Set(['tier1'])} onUnlock={onUnlock} hintData={hintData} />,
     );
     expect(screen.getByTestId('hint-content-tier1')).toBeInTheDocument();
-    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent('Avaa Taso 2 →');
+    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent(
+      'Avaa Vaihe 2 (pituudet) →',
+    );
 
-    // Upgrade to Tier 2
+    // Upgrade to Matrix Step 2 (tier3)
     fireEvent.click(screen.getByTestId('upgrade-tier-button'));
-    expect(onUnlock).toHaveBeenCalledWith('tier2');
+    expect(onUnlock).toHaveBeenCalledWith('tier3');
 
-    // Rerender with Tier 2 unlocked -> shows pangram clues
+    // Rerender with Tier 3 unlocked -> shows full 2D matrix
     rerender(
       <HintPanels
-        hintsUnlocked={new Set(['tier1', 'tier2'])}
+        hintsUnlocked={new Set(['tier1', 'tier3'])}
         onUnlock={onUnlock}
         hintData={hintData}
       />,
     );
-    expect(screen.getByTestId('hint-content-tier2')).toHaveTextContent(
-      /Pangrammi: K... \(11 kirj.\)/,
-    );
+    expect(screen.getByTestId('hint-content-tier3')).toBeInTheDocument();
 
-    // Rerender with Tier 3 unlocked and click its tab -> shows 2D matrix
+    // Switch to Vihjeet tab while it is still locked
+    fireEvent.click(screen.getByTestId('tier-tab-2'));
+    const activateHintsBtn = screen.getByTestId('activate-hints-button');
+    fireEvent.click(activateHintsBtn);
+    expect(onUnlock).toHaveBeenCalledWith('tier2');
+
+    // Rerender with Tier 2 unlocked -> shows pangram clues
     rerender(
       <HintPanels
         hintsUnlocked={new Set(['tier1', 'tier2', 'tier3'])}
@@ -142,10 +148,19 @@ describe('Gameplay UI Components', () => {
         hintData={hintData}
       />,
     );
-    fireEvent.click(screen.getByTestId('tier-tab-3'));
-    expect(screen.getByTestId('hint-content-tier3')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tier-tab-2'));
+    expect(screen.getByTestId('hint-content-tier2')).toHaveTextContent(
+      /Pangrammi: K... \(11 kirj.\)/,
+    );
+    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent(
+      'Avaa Vaihe 2 (päätteet) →',
+    );
 
-    // Rerender with Tier 4 unlocked and click its tab -> shows active suffixes
+    // Upgrade to Hints Step 2 (tier4)
+    fireEvent.click(screen.getByTestId('upgrade-tier-button'));
+    expect(onUnlock).toHaveBeenCalledWith('tier4');
+
+    // Rerender with Tier 4 unlocked -> shows active suffixes
     rerender(
       <HintPanels
         hintsUnlocked={new Set(['tier1', 'tier2', 'tier3', 'tier4'])}
