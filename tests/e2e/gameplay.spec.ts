@@ -85,18 +85,6 @@ test('mobile viewport has no vertical scroll and honeycomb remains stationary ac
   const vihjeetStep2Box = await honeycomb.boundingBox();
   expect(vihjeetStep2Box!.y).toBe(initialY);
 
-  // Collapse hints: play cluster remains anchored to bottom (honeycomb stationary)
-  await page.getByTestId('hide-hints-button').click();
-  await page.waitForTimeout(100);
-  const collapsedBox = await honeycomb.boundingBox();
-  expect(collapsedBox!.y).toBe(initialY);
-
-  // Expand hints: honeycomb still remains stationary
-  await page.getByTestId('show-hints-button').click();
-  await page.waitForTimeout(100);
-  const expandedBox = await honeycomb.boundingBox();
-  expect(expandedBox!.y).toBe(initialY);
-
   // Space key shuffles letters without inserting characters in word input
   await page.keyboard.press('Space');
   await expect(page.getByTestId('word-input')).toHaveText('|');

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArchiveModal } from '../modals/ArchiveModal.js';
 import { PuzzleWordsModal } from '../modals/PuzzleWordsModal.js';
 import { RulesModal } from '../modals/RulesModal.js';
@@ -22,6 +22,7 @@ import { useGameTimer } from './useGameTimer.js';
 import { useKeyboard } from './useKeyboard.js';
 import { useMidnightRollover } from './useMidnightRollover.js';
 import { usePuzzleQuery } from './usePuzzleQuery.js';
+import { useScrollBoundaryGuard } from './useScrollBoundaryGuard.js';
 import { useUiStore } from './useUiStore.js';
 import { WordInput } from './WordInput.js';
 
@@ -142,16 +143,20 @@ export function GameplayView(): React.JSX.Element {
     void useGameStore.getState().copyStatus();
   }, []);
 
+  const mainScrollRef = useRef<HTMLElement | null>(null);
+  useScrollBoundaryGuard(mainScrollRef);
+
   return (
     <div
-      className="w-full min-h-dvh flex flex-col"
+      className="fixed inset-0 overflow-hidden"
       style={{ backgroundColor: 'var(--color-bg-primary)' }}
     >
       <header
-        className="w-full border-b shrink-0"
+        className="fixed top-0 left-0 right-0 z-50 border-b"
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           borderColor: 'var(--color-border)',
+          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
         <div className="max-w-sm mx-auto h-12 px-2 flex items-center justify-between">
@@ -289,35 +294,49 @@ export function GameplayView(): React.JSX.Element {
         shareCopied={shareCopied}
       />
 
-      <div className="flex-1 flex flex-col justify-between max-w-sm mx-auto px-3 pt-1 pb-3 w-full">
-        {isLoading && !puzzle && (
-          <div className="text-center py-16" style={{ color: 'var(--color-text-secondary)' }}>
-            Ladataan...
-          </div>
-        )}
+      <main
+        ref={mainScrollRef}
+        data-game-scroll
+        className="absolute left-0 right-0 bottom-0 z-10 overflow-y-auto overscroll-contain game-scroll-surface"
+        style={{
+          top: 'calc(env(safe-area-inset-top) + 3rem)',
+          backgroundColor: 'var(--color-bg-primary)',
+        }}
+      >
+        <div
+          className="max-w-sm mx-auto px-3 pt-1"
+          style={{
+            touchAction: 'manipulation',
+            paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)',
+          }}
+        >
+          {isLoading && !puzzle && (
+            <div className="text-center py-16" style={{ color: 'var(--color-text-secondary)' }}>
+              Ladataan...
+            </div>
+          )}
 
-        {!isLoading && isError && !puzzle && (
-          <div className="text-center py-16" role="alert">
-            <p className="text-base mb-4" style={{ color: 'var(--color-error)' }}>
-              Lataus epäonnistui.
-            </p>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="px-4 py-2 rounded-lg font-semibold cursor-pointer border-none"
-              style={{
-                backgroundColor: 'var(--color-accent)',
-                color: 'var(--color-on-accent)',
-              }}
-            >
-              Yritä uudelleen
-            </button>
-          </div>
-        )}
+          {!isLoading && isError && !puzzle && (
+            <div className="text-center py-16" role="alert">
+              <p className="text-base mb-4" style={{ color: 'var(--color-error)' }}>
+                Lataus epäonnistui.
+              </p>
+              <button
+                type="button"
+                onClick={() => void refetch()}
+                className="px-4 py-2 rounded-lg font-semibold cursor-pointer border-none"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'var(--color-on-accent)',
+                }}
+              >
+                Yritä uudelleen
+              </button>
+            </div>
+          )}
 
-        {puzzle && (
-          <>
-            <div className="shrink-0">
+          {puzzle && (
+            <>
               <div
                 className="sticky z-20"
                 style={{
@@ -342,9 +361,7 @@ export function GameplayView(): React.JSX.Element {
                 hintsUnlocked={hintsUnlocked}
                 onUnlock={(id) => useGameStore.getState().unlockHint(id)}
               />
-            </div>
 
-            <div className="mt-auto flex flex-col justify-end shrink-0">
               <div className="mb-2">
                 <WordInput
                   currentWord={currentWord}
@@ -395,20 +412,22 @@ export function GameplayView(): React.JSX.Element {
                 </div>
               )}
 
-              <FoundWords
-                foundWords={sortedFoundWords}
-                recentWords={recentFoundWords}
-                showAll={showAllFoundWords}
-                allLetters={allLetters}
-                onToggleShowAll={() =>
-                  useUiStore.getState().setShowAllFoundWords(!showAllFoundWords)
-                }
-                lastResubmittedWord={lastResubmittedWord}
-              />
-            </div>
-          </>
-        )}
-      </div>
+              <div className="w-full min-h-[56px]">
+                <FoundWords
+                  foundWords={sortedFoundWords}
+                  recentWords={recentFoundWords}
+                  showAll={showAllFoundWords}
+                  allLetters={allLetters}
+                  onToggleShowAll={() =>
+                    useUiStore.getState().setShowAllFoundWords(!showAllFoundWords)
+                  }
+                  lastResubmittedWord={lastResubmittedWord}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </main>
 
       {puzzle && (
         <Celebration

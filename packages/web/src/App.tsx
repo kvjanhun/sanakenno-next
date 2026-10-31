@@ -31,15 +31,15 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <main className="min-h-dvh flex flex-col">
-        {isAdmin ? (
+      {isAdmin ? (
+        <main className="min-h-dvh flex flex-col">
           <Suspense fallback={<div className="p-8 text-center text-sm">Ladataan ylläpitoa...</div>}>
             <AdminLayout />
           </Suspense>
-        ) : (
-          <GameplayView />
-        )}
-      </main>
+        </main>
+      ) : (
+        <GameplayView />
+      )}
     </QueryClientProvider>
   );
 }
