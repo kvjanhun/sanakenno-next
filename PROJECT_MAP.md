@@ -14,14 +14,15 @@ sanakenno-next/
     create-admin.ts          # Admin credential provisioning CLI
     deploy-sanakenno.sh      # Server deployment & verification pipeline
     entrypoint.sh            # Container init & Litestream restore
+    filter-kotus-wordlist.ts # Kotus dictionary filtering & hyphenated lemma extractor
     screenshot.ts            # Headless Chrome mobile & desktop screenshot capture utility
   .github/workflows/ci-web.yml# GitHub Actions CI & webhook deploy workflow
   specs/                     # Sequenced specs driving autonomous implementation
   packages/
-    shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, sync-merge, kotus, share-text, honeycomb-theme, auth-types) & Zod schemas
+    shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, sync-merge, kotus lemma links, share-text, honeycomb-theme, auth-types) & Zod schemas
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer
       src/
-        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0002 migration runner, deterministic seed
+        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0003 migration runner, deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
           puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
@@ -74,3 +75,8 @@ Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 
 - All user-facing UI strings: **Finnish**.
 - All code, identifiers, comments, specs, and tests: **English**.
+
+### 5. Hyphen Normalization & Kotus Lemma Invariant
+
+- Both hyphenated and un-hyphenated forms (`aamu-uninen` and `aamuuninen`) resolve to the identical normalized SHA-256 hash in gameplay.
+- Kotus dictionary links and revealed word lists in `PuzzleWordsModal` always use canonical hyphenated lemmas.

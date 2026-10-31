@@ -10,6 +10,8 @@ import {
   DEFAULT_SEED_WORDS,
   FINNISH_LETTERS,
   getCachedPuzzle,
+  getCanonicalLemma,
+  getLemmaMap,
   getPuzzleCacheGeneration,
   getWordlist,
   hashWord,
@@ -67,6 +69,18 @@ describe('wordlist engine (unit)', () => {
     expect(loaded.has('lähiitä')).toBe(true);
     expect(loaded.has('123invalid')).toBe(false);
     expect(loaded.has('hello!')).toBe(false);
+
+    expect(getCanonicalLemma('lähiitä')).toBe('lähi-itä');
+    expect(getCanonicalLemma('lähi-itä')).toBe('lähi-itä');
+    expect(getCanonicalLemma('kana')).toBe('kana');
+    expect(getLemmaMap().get('lähiitä')).toBe('lähi-itä');
+  });
+
+  it('guarantees hyphen normalization invariant: both hyphenated and un-hyphenated forms yield identical hash', () => {
+    const rawHyphenated = 'aamu-uninen';
+    const rawUnhyphenated = 'aamuuninen';
+    expect(normalizeWord(rawHyphenated)).toBe(normalizeWord(rawUnhyphenated));
+    expect(hashWord(normalizeWord(rawHyphenated))).toBe(hashWord(normalizeWord(rawUnhyphenated)));
   });
 
   it('loads and normalizes a wordlist file from disk via loadWordlist()', () => {

@@ -189,6 +189,35 @@ function ensureColumn(
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
 }
 
+export const CURATED_BLOCKED_WORDS: readonly string[] = [
+  'hintti',
+  'hinttiys',
+  'horo',
+  'huora',
+  'huorahtava',
+  'huorata',
+  'huoruus',
+  'insesti',
+  'jutku',
+  'lutka',
+  'manne',
+  'natsilainen',
+  'natsitervehdys',
+  'neekeri',
+  'neekeriorja',
+  'neekeriorjuus',
+  'pederasti',
+  'pederastia',
+  'pederastinen',
+  'pedofiili',
+  'pedofiilinen',
+  'raiskaaja',
+  'raiskata',
+  'raiskaus',
+  'ryssä',
+  'ryssäviha',
+];
+
 export const MIGRATIONS: readonly Migration[] = [
   {
     version: '0001-baseline',
@@ -230,6 +259,16 @@ export const MIGRATIONS: readonly Migration[] = [
             // If words cannot be loaded during migration, opportunistic query backfill will handle it
           }
         }
+      }
+    },
+  },
+  {
+    version: '0003-seed-curated-blocked-words',
+    description: 'Seed curated slurs, hate speech, and explicit violence into blocked_words',
+    up(db) {
+      const stmt = db.prepare('INSERT OR IGNORE INTO blocked_words (word) VALUES (?)');
+      for (const word of CURATED_BLOCKED_WORDS) {
+        stmt.run(word);
       }
     },
   },

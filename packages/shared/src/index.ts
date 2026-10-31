@@ -149,7 +149,7 @@ export {
 } from './stats.js';
 
 export { buildShareText, type ShareTextInput } from './share-text.js';
-export { buildKotusUrl } from './kotus.js';
+export { buildKotusUrl, getCanonicalLemma } from './kotus.js';
 
 export {
   AUTH_TOKEN_STORAGE_KEY,

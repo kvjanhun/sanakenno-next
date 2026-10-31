@@ -64,7 +64,7 @@ const mockPuzzleWordsResponse: PuzzleWordsResponse = {
   display_number: 1,
   center: 'n',
   letters: ['e', 'h', 'i', 'k', 'n', 'o', 's'],
-  words: ['koko', 'nenä', 'keskihieno'],
+  words: ['koko', 'nenä', 'keskihieno', 'aamu-uninen'],
   max_score: 80,
 };
 
@@ -256,7 +256,7 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
 
   it('sets revealed_<slot> = true in PuzzleWordsModal and renders found/missed words with Kotus links', async () => {
     saveToStorage(puzzleStateKey(5), {
-      foundWords: ['keskihieno'],
+      foundWords: ['keskihieno', 'aamuuninen'],
       score: 17,
       hintsUnlocked: [],
       startedAt: 1000,
@@ -271,7 +271,7 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     });
 
     await waitFor(() => {
-      expect(screen.getByText('1/3 löydetty')).toBeInTheDocument();
+      expect(screen.getByText('2/4 löydetty')).toBeInTheDocument();
     });
 
     expect(getRawStorage(revealedKey(5))).toBe('true');
@@ -284,6 +284,15 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
       'https://www.kielitoimistonsanakirja.fi/#/keskihieno',
     );
     expect(foundLink.closest('li')).toHaveAttribute('data-word-found', 'true');
+
+    const hyphenatedFoundLink = screen.getByRole('link', {
+      name: 'Avaa sanan "aamu-uninen" määritelmä Kotuksessa',
+    });
+    expect(hyphenatedFoundLink).toHaveAttribute(
+      'href',
+      'https://www.kielitoimistonsanakirja.fi/#/aamu-uninen',
+    );
+    expect(hyphenatedFoundLink.closest('li')).toHaveAttribute('data-word-found', 'true');
 
     const missedLink = screen.getByRole('link', {
       name: 'Avaa sanan "nenä" määritelmä Kotuksessa',

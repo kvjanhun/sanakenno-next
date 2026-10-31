@@ -13,7 +13,7 @@ import {
   getFullPuzzleForDate,
   getPuzzleSlotForDate,
 } from './puzzle.queries.js';
-import { puzzleWords, type FullPuzzleData } from './wordlist.js';
+import { getCanonicalLemma, puzzleWords, type FullPuzzleData } from './wordlist.js';
 
 function isValidIsoCalendarDate(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -129,7 +129,7 @@ export function createPuzzleRoutes(db: Kysely<Database>) {
         display_number: data.display_number,
         center: data.center,
         letters: data.letters,
-        words,
+        words: words.map((w) => getCanonicalLemma(w)),
         max_score: data.max_score,
       });
 

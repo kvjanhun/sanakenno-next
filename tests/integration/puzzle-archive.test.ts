@@ -203,6 +203,20 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
       });
       expect(badParamRes.status).toBe(400);
     });
+
+    it('returns canonical hyphenated lemmas for compound words in GET /api/puzzle/:number/words', async () => {
+      setWordlist([...DEFAULT_SEED_WORDS, 'laina-aika']);
+      invalidatePuzzleCache();
+
+      const res = await harness.client.api.puzzle[':number'].words.$get({
+        param: { number: '1' },
+      });
+      expect(res.status).toBe(200);
+      if (res.status !== 200) throw new Error('Expected 200');
+      const body = await res.json();
+      expect(body.words).toContain('laina-aika');
+      expect(body.words).not.toContain('lainaaika');
+    });
   });
 
   describe('GET /api/archive (7-day window and ?all=true cycle walk)', () => {

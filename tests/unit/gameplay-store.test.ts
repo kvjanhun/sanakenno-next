@@ -211,4 +211,43 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(statsAfterReveal?.records[0]?.best_score).toBe(1);
     expect(statsAfterReveal?.records[0]?.words_found).toBe(1);
   });
+
+  it('accepts both hyphenated and un-hyphenated input for compound words seamlessly', async () => {
+    const hash = await hashWord('lainaaika');
+    const puzzle: PuzzleResponse = {
+      center: 'a',
+      letters: ['a', 'e', 'i', 'k', 'l', 'n', 's'],
+      word_hashes: [hash],
+      hint_data: {
+        word_count: 1,
+        pangram_count: 0,
+        by_letter: { l: 1 },
+        by_length: { '9': 1 },
+        by_pair: { la: 1 },
+      },
+      max_score: 9,
+      puzzle_number: 16,
+      display_number: 5,
+      total_puzzles: 10,
+    };
+
+    // Case 1: user types hyphenated 'laina-aika'
+    await useGameStore.getState().loadPuzzle(puzzle);
+    for (const ch of 'laina-aika') {
+      useGameStore.getState().addLetter(ch);
+    }
+    await useGameStore.getState().submitWord();
+    expect(useGameStore.getState().foundWords.has('lainaaika')).toBe(true);
+    expect(useGameStore.getState().score).toBe(9);
+
+    // Case 2: reset and user types un-hyphenated 'lainaaika'
+    useGameStore.getState().reset();
+    await useGameStore.getState().loadPuzzle(puzzle);
+    for (const ch of 'lainaaika') {
+      useGameStore.getState().addLetter(ch);
+    }
+    await useGameStore.getState().submitWord();
+    expect(useGameStore.getState().foundWords.has('lainaaika')).toBe(true);
+    expect(useGameStore.getState().score).toBe(9);
+  });
 });

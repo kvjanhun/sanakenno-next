@@ -49,6 +49,7 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
       const appliedMigrations = await db.selectFrom('schema_migrations').selectAll().execute();
       expect(appliedMigrations.map((m) => m.version)).toContain('0001-baseline');
       expect(appliedMigrations.map((m) => m.version)).toContain('0002-add-puzzle-max-score');
+      expect(appliedMigrations.map((m) => m.version)).toContain('0003-seed-curated-blocked-words');
 
       await db
         .insertInto('puzzles')

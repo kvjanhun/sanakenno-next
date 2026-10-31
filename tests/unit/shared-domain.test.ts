@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildKotusUrl,
+  getCanonicalLemma,
   buildShareText,
   colorizeWord,
   compareFinnishAlphabetically,
@@ -276,6 +277,15 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
   describe('kotus, share-text, honeycomb-theme & Zod schemas', () => {
     it('builds Kotus dictionary URLs, share text, overlay stops, and validates Zod schemas', () => {
       expect(buildKotusUrl('äiti')).toBe('https://www.kielitoimistonsanakirja.fi/#/%C3%A4iti');
+      expect(buildKotusUrl('aamuuninen')).toBe(
+        'https://www.kielitoimistonsanakirja.fi/#/aamu-uninen',
+      );
+      expect(buildKotusUrl('aamu-uninen')).toBe(
+        'https://www.kielitoimistonsanakirja.fi/#/aamu-uninen',
+      );
+      expect(getCanonicalLemma('aamuuninen')).toBe('aamu-uninen');
+      expect(getCanonicalLemma('aamu-uninen')).toBe('aamu-uninen');
+      expect(getCanonicalLemma('kana')).toBe('kana');
 
       const share = buildShareText({
         displayNumber: 42,

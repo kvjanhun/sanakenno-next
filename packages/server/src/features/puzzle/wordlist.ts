@@ -68,6 +68,7 @@ export interface VariationData {
 }
 
 let _allWords = new Set<string>();
+let _lemmaMap = new Map<string, string>();
 let _wordlistLoaded = false;
 
 const _puzzleCache = new Map<number, FullPuzzleData>();
@@ -114,6 +115,7 @@ export function loadWordlist(customPath?: string): Set<string> {
   const targetPath = customPath ?? resolveDefaultWordlistPath();
   if (!targetPath || !existsSync(targetPath)) {
     _allWords = new Set();
+    _lemmaMap = new Map();
     _wordlistLoaded = true;
     invalidatePuzzleCache();
     return _allWords;
@@ -121,14 +123,21 @@ export function loadWordlist(customPath?: string): Set<string> {
 
   const content = readFileSync(targetPath, 'utf8');
   const words = new Set<string>();
+  const lemmaMap = new Map<string, string>();
   for (const line of content.split(/\r?\n/)) {
-    const normalized = normalizeWord(line);
+    const raw = line.trim().toLowerCase().replaceAll('\u2011', '-');
+    if (!raw) continue;
+    const normalized = normalizeWord(raw);
     if (isFinnishAlphabetOnly(normalized)) {
       words.add(normalized);
+      if (raw.includes('-')) {
+        lemmaMap.set(normalized, raw);
+      }
     }
   }
 
   _allWords = words;
+  _lemmaMap = lemmaMap;
   _wordlistLoaded = true;
   invalidatePuzzleCache();
   return _allWords;
@@ -142,17 +151,41 @@ export function getWordlist(): Set<string> {
 }
 
 /**
+ * Return the canonical Kotus lemma for a normalized word if present, otherwise returns normalized word.
+ */
+export function getCanonicalLemma(word: string): string {
+  ensureWordlist();
+  const normalized = normalizeWord(word);
+  return _lemmaMap.get(normalized) ?? normalized;
+}
+
+/**
+ * Return the currently loaded in-memory lemma map.
+ */
+export function getLemmaMap(): Map<string, string> {
+  ensureWordlist();
+  return _lemmaMap;
+}
+
+/**
  * Replace the in-memory wordlist (for testing and deterministic seeding).
  */
 export function setWordlist(words: Iterable<string>): void {
   const normalized = new Set<string>();
+  const lemmaMap = new Map<string, string>();
   for (const raw of words) {
-    const word = normalizeWord(raw);
+    const rawClean = raw.trim().toLowerCase().replaceAll('\u2011', '-');
+    if (!rawClean) continue;
+    const word = normalizeWord(rawClean);
     if (isFinnishAlphabetOnly(word)) {
       normalized.add(word);
+      if (rawClean.includes('-')) {
+        lemmaMap.set(word, rawClean);
+      }
     }
   }
   _allWords = normalized;
+  _lemmaMap = lemmaMap;
   _wordlistLoaded = true;
   invalidatePuzzleCache();
 }

@@ -51,8 +51,13 @@ export function PuzzleWordsModal({
 
   if (!show || puzzleNumber === null) return null;
 
+  const isWordFound = (word: string): boolean => {
+    const normalized = word.toLowerCase().replace(/-/g, '');
+    return foundWords.has(word) || foundWords.has(normalized);
+  };
+
   const shownDisplayNumber = data?.display_number ?? displayNumber ?? puzzleNumber + 1;
-  const foundCount = sortedWords.filter((w) => foundWords.has(w)).length;
+  const foundCount = sortedWords.filter(isWordFound).length;
 
   return (
     <ModalShell
@@ -91,7 +96,7 @@ export function PuzzleWordsModal({
         <div className="flex-1 min-h-0 overflow-y-auto">
           <ul className="grid grid-cols-3 gap-x-3 gap-y-1.5 list-none p-0 m-0">
             {sortedWords.map((word) => {
-              const found = foundWords.has(word);
+              const found = isWordFound(word);
               return (
                 <li
                   key={word}
