@@ -202,6 +202,95 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('sends transfer link email for authenticated player with valid player_key', async () => {
+      const player = await createPlayer();
+      const headers = { Authorization: `Bearer ${player.token}` };
+
+      const res = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'test@example.com', player_key: player.player_key } },
+        { headers },
+      );
+      expect(res.status).toBe(200);
+      const data = (await res.json()) as { status: string };
+      expect(data.status).toBe('ok');
+
+      // Also works via /auth/transfer/create route
+      const resCreate = await harness.client.api.player.auth.transfer.create.$post(
+        { json: { email: 'test2@example.com', player_key: player.player_key } },
+        { headers },
+      );
+      expect(resCreate.status).toBe(200);
+    });
+
+    it('rejects transfer email with missing fields, invalid player_key, or unauthenticated', async () => {
+      const player = await createPlayer();
+      const headers = { Authorization: `Bearer ${player.token}` };
+
+      const missingKey = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'test@example.com', player_key: '' } },
+        { headers },
+      );
+      expect(missingKey.status).toBe(400);
+
+      const wrongKey = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'test@example.com', player_key: '0'.repeat(64) } },
+        { headers },
+      );
+      expect(wrongKey.status).toBe(400);
+
+      const missingEmail = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: '', player_key: player.player_key } },
+        { headers },
+      );
+      expect(missingEmail.status).toBe(400);
+
+      const unauth = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'test@example.com', player_key: player.player_key } },
+        { headers: {} },
+      );
+      expect(unauth.status).toBe(401);
+    });
+
+    it('enforces email cooldown and IP rate limits on transfer requests', async () => {
+      resetTransferCreateRateLimit();
+      resetEmailRateLimit();
+
+      const player = await createPlayer();
+      const headers = { Authorization: `Bearer ${player.token}` };
+
+      // 1. First call with email succeeds
+      const res1 = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'cooldown@example.com', player_key: player.player_key } },
+        { headers },
+      );
+      expect(res1.status).toBe(200);
+
+      // 2. Immediate second call with same email is blocked by 10-minute cooldown
+      const resCooldown = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'cooldown@example.com', player_key: player.player_key } },
+        { headers },
+      );
+      expect(resCooldown.status).toBe(429);
+      const cooldownData = (await resCooldown.json()) as { error: string };
+      expect(cooldownData.error).toContain('Odota');
+
+      // 3. Different email succeeds (IP request 3)
+      const res2 = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'user2@example.com', player_key: player.player_key } },
+        { headers },
+      );
+      expect(res2.status).toBe(200);
+
+      // 4. 4th request from same IP hits IP rate limit (limit = 3)
+      const resIpBlocked = await harness.client.api.player.auth.transfer.email.$post(
+        { json: { email: 'user3@example.com', player_key: player.player_key } },
+        { headers },
+      );
+      expect(resIpBlocked.status).toBe(429);
+      const ipData = (await resIpBlocked.json()) as { error: string };
+      expect(ipData.error).toContain('Liian monta');
+    });
   });
 
   describe('Cross-device monotonic sync endpoints', () => {

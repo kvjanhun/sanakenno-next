@@ -21,5 +21,19 @@ export default defineConfig({
     globals: true,
     include: ['tests/**/*.{test.ts,test.tsx}', 'packages/*/src/**/*.{test.ts,test.tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json-summary'],
+      include: ['packages/*/src/**/*.{ts,tsx}'],
+      exclude: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/*.d.ts',
+        'packages/server/src/db/baseline-sql.ts',
+        'packages/server/src/db/seed.ts',
+        'packages/web/src/main.tsx',
+        'packages/server/src/index.ts',
+      ],
+    },
   },
 });

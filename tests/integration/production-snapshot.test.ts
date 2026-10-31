@@ -5,6 +5,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../packages/server/src/app.js';
 import { createDb } from '../../packages/server/src/db/connection.js';
 
+// Production database is only live in the cloud (Cloud Run / Litestream / Backblaze)
+// and is neither stored in git, local dev, nor CI. This test suite executes only when an
+// operator explicitly provides a production backup via PROD_DB_SNAPSHOT=/path/to/backup.db.
 const PROD_DB_SOURCE = process.env.PROD_DB_SNAPSHOT;
 
 const hasProdDbSnapshot = Boolean(PROD_DB_SOURCE && fs.existsSync(PROD_DB_SOURCE));
