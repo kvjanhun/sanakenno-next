@@ -251,4 +251,58 @@ describe('Integrated Gameplay Flow (in-process)', () => {
       screen.getByRole('link', { name: 'Avaa sanan "kansallinen" määritelmä Kotuksessa' }),
     ).toBeInTheDocument();
   });
+
+  it('renders GameplayView with unified 440px container boundaries and edge-to-edge header border (Spec 14)', async () => {
+    mockPuzzleData = {
+      puzzle_number: 2,
+      display_number: 2,
+      total_puzzles: 10,
+      center: 'a',
+      letters: ['a', 'e', 'i', 'k', 'l', 'n', 's'],
+      word_hashes: [],
+      max_score: 50,
+      hint_data: {
+        word_count: 5,
+        pangram_count: 1,
+        by_letter: { a: 5 },
+        by_length: { '4': 2, '5': 3 },
+        by_pair: {},
+        matrix: { a: { '4': 2, '5': 3 } },
+      },
+    };
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <GameplayView />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('puzzle-header')).toBeInTheDocument();
+    });
+
+    // 1. Header has edge-to-edge bottom border line
+    const header = screen.getByRole('banner');
+    expect(header.className).toContain('border-b');
+    expect(header.className).toContain('fixed top-0 left-0 right-0 z-50');
+
+    // 2. Header inner container uses unified max-w-[440px] and edge padding
+    const headerInner = header.firstElementChild;
+    expect(headerInner?.className).toContain('max-w-[440px]');
+    expect(headerInner?.className).toContain('px-3.5');
+    expect(headerInner?.className).toContain('sm:px-4');
+
+    // 3. Header icon groups have margin offsets to align SVG icons with container bounds
+    const leftIconGroup = headerInner?.firstElementChild;
+    expect(leftIconGroup?.className).toContain('-ml-2.5');
+    const rightIconGroup = headerInner?.lastElementChild;
+    expect(rightIconGroup?.className).toContain('-mr-2.5');
+
+    // 4. Main content inner container shares exact same max-w-[440px] and px-3.5 bounds
+    const mainEl = screen.getByRole('main');
+    const mainInner = mainEl.firstElementChild;
+    expect(mainInner?.className).toContain('w-full max-w-[440px] mx-auto px-3.5 sm:px-4');
+  });
 });

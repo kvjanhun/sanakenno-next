@@ -43,6 +43,77 @@ async function waitForServer(url: string, maxAttempts = 30): Promise<void> {
   throw new Error(`Timed out waiting for dev server at ${url}`);
 }
 
+async function captureWithCdp(
+  chrome: string,
+  url: string,
+  target: { name: string; width: number; height: number; mobile?: boolean },
+  outPath: string,
+): Promise<void> {
+  const port = 9333;
+  const proc = spawn(chrome, [
+    '--headless=new',
+    `--remote-debugging-port=${port}`,
+    '--disable-gpu',
+    url,
+  ]);
+
+  try {
+    let targets: Array<{ type: string; webSocketDebuggerUrl: string }> = [];
+    for (let i = 0; i < 30; i++) {
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/json`);
+        targets = await res.json();
+        if (targets.length > 0) break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+
+    const page = targets.find((t) => t.type === 'page');
+    if (!page) throw new Error('No page target found on Chrome remote debugging port');
+
+    const ws = new WebSocket(page.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => {
+      ws.onopen = resolve;
+      ws.onerror = reject;
+    });
+
+    let msgId = 1;
+    const send = (method: string, params: Record<string, unknown> = {}) =>
+      new Promise<Record<string, unknown>>((resolve) => {
+        const id = msgId++;
+        const onMsg = (event: MessageEvent) => {
+          const msg = JSON.parse(String(event.data));
+          if (msg.id === id) {
+            ws.removeEventListener('message', onMsg);
+            resolve(msg.result as Record<string, unknown>);
+          }
+        };
+        ws.addEventListener('message', onMsg);
+        ws.send(JSON.stringify({ id, method, params }));
+      });
+
+    await send('Emulation.setDeviceMetricsOverride', {
+      width: target.width,
+      height: target.height,
+      deviceScaleFactor: 2,
+      mobile: target.mobile ?? false,
+    });
+
+    await new Promise((r) => setTimeout(r, 1200));
+
+    const result = (await send('Page.captureScreenshot', {
+      format: 'png',
+      clip: { x: 0, y: 0, width: target.width, height: target.height, scale: 1 },
+    })) as { data: string };
+
+    fs.writeFileSync(outPath, Buffer.from(result.data, 'base64'));
+    ws.close();
+  } finally {
+    proc.kill('SIGKILL');
+  }
+}
+
 async function main() {
   const chrome = findChrome();
   const url = process.env.APP_URL ?? DEFAULT_URL;
@@ -64,27 +135,31 @@ async function main() {
 
   try {
     const targets = [
-      { name: 'desktop', width: 1280, height: 800 },
-      { name: 'mobile', width: 390, height: 844 },
+      { name: 'desktop', width: 1280, height: 800, mobile: false },
+      { name: 'mobile', width: 390, height: 844, mobile: true },
     ];
 
     for (const target of targets) {
       const outPath = path.join(OUT_DIR, `${target.name}.png`);
       console.log(`Capturing ${target.name} (${target.width}x${target.height}) to ${outPath}...`);
 
-      execFileSync(
-        chrome,
-        [
-          '--headless=new',
-          '--hide-scrollbars',
-          '--disable-gpu',
-          `--window-size=${target.width},${target.height}`,
-          '--virtual-time-budget=2000',
-          `--screenshot=${outPath}`,
-          url,
-        ],
-        { stdio: 'ignore' },
-      );
+      if (target.mobile) {
+        await captureWithCdp(chrome, url, target, outPath);
+      } else {
+        execFileSync(
+          chrome,
+          [
+            '--headless=new',
+            '--hide-scrollbars',
+            '--disable-gpu',
+            `--window-size=${target.width},${target.height}`,
+            '--virtual-time-budget=2000',
+            `--screenshot=${outPath}`,
+            url,
+          ],
+          { stdio: 'ignore' },
+        );
+      }
 
       if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
         throw new Error(`Failed to generate screenshot at ${outPath}`);

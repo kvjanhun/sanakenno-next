@@ -2,6 +2,7 @@ import { act, fireEvent, render, renderHook, screen } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest';
 import { deriveHintData } from '../../packages/shared/src/index.js';
 import { FoundWords } from '../../packages/web/src/features/gameplay/FoundWords.js';
+import { GameControls } from '../../packages/web/src/features/gameplay/GameControls.js';
 import { HintMatrixTable } from '../../packages/web/src/features/gameplay/HintMatrixTable.js';
 import { HintPanels } from '../../packages/web/src/features/gameplay/HintPanels.js';
 import { Honeycomb } from '../../packages/web/src/features/gameplay/Honeycomb.js';
@@ -388,5 +389,53 @@ describe('Gameplay UI Components', () => {
     for (const letter of ['A', 'S', 'K', 'E', 'L', 'I', 'N']) {
       expect(screen.getByText(letter)).toBeInTheDocument();
     }
+  });
+
+  it('verifies responsive viewport alignment and spacing constraints (Spec 14)', () => {
+    // FoundWords count text must not have artificial left indent pl-2
+    const { container: fwContainer } = render(
+      <FoundWords
+        foundWords={['omena', 'ananas']}
+        recentWords={['ananas', 'omena']}
+        showAll={false}
+        allLetters={new Set(['a', 'e', 'm', 'n', 'o', 's'])}
+        onToggleShowAll={vi.fn()}
+        lastResubmittedWord={null}
+      />,
+    );
+    const countWrapper = fwContainer.querySelector(
+      '[data-testid="found-words-count"]',
+    )?.parentElement;
+    expect(countWrapper?.className).not.toContain('pl-2');
+    expect(countWrapper?.className).toContain('flex items-center gap-1.5');
+
+    // HintPanels deck container must not have inset px-0.5
+    const hintData = deriveHintData(
+      {
+        word_count: 2,
+        pangram_count: 0,
+        by_letter: { o: 1, a: 1 },
+        by_length: { '5': 1, '6': 1 },
+        matrix: { o: { '5': 1 }, a: { '6': 1 } },
+      },
+      new Set(['omena', 'ananas']),
+      new Set(),
+    );
+    render(<HintPanels hintsUnlocked={new Set()} onUnlock={vi.fn()} hintData={hintData} />);
+    const deck = screen.getByTestId('hint-deck');
+    expect(deck.className).not.toContain('px-0.5');
+
+    // GameControls has responsive gap for resilient small screens
+    const { container: gcContainer } = render(
+      <GameControls
+        onDelete={vi.fn()}
+        onShuffle={vi.fn()}
+        onShare={vi.fn()}
+        shareCopied={false}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const controlsRow = gcContainer.firstElementChild;
+    expect(controlsRow?.className).toContain('gap-2.5 sm:gap-3');
   });
 });

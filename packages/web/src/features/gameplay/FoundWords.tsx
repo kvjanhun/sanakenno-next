@@ -47,7 +47,7 @@ export function FoundWords({
     <section className="w-full" data-testid="found-words">
       <div className="flex items-center justify-between mb-2">
         <div
-          className={`flex items-center gap-1.5 text-sm font-medium ${showAll ? '' : 'pl-2'}`}
+          className="flex items-center gap-1.5 text-sm font-medium"
           style={{ color: 'var(--color-text-secondary)' }}
         >
           <span data-testid="found-words-count" style={{ color: 'var(--color-accent)' }}>

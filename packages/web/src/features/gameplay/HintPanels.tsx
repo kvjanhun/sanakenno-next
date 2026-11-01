@@ -67,7 +67,7 @@ export function HintPanels({
     return (
       <div
         data-testid="hint-deck"
-        className="w-full flex flex-col select-none px-0.5"
+        className="w-full flex flex-col select-none"
         style={{
           height: DECK_HEIGHT,
           minHeight: DECK_HEIGHT,
@@ -79,7 +79,7 @@ export function HintPanels({
         }}
       >
         <div
-          className="flex items-center justify-between shrink-0 mb-1.5 px-0.5"
+          className="flex items-center justify-between shrink-0 mb-1.5"
           style={{ height: '30px' }}
         >
           <div className="flex items-center">{counter}</div>
@@ -126,7 +126,7 @@ export function HintPanels({
   return (
     <div
       data-testid="hint-deck"
-      className="w-full flex flex-col select-none px-0.5"
+      className="w-full flex flex-col select-none"
       style={{
         height: DECK_HEIGHT,
         minHeight: DECK_HEIGHT,
@@ -138,10 +138,7 @@ export function HintPanels({
       }}
     >
       {/* Toolbar: words remaining on left · tab selector & collapse button on right */}
-      <div
-        className="flex items-center justify-between shrink-0 mb-1.5 px-0.5"
-        style={{ height: '30px' }}
-      >
+      <div className="flex items-center justify-between shrink-0 mb-1.5" style={{ height: '30px' }}>
         <div className="flex items-center">{counter}</div>
 
         <div className="flex items-center gap-1 shrink-0">
@@ -184,7 +181,7 @@ export function HintPanels({
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-0.5">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {activeTab === 'matrix' &&
           (matrixLevel === 0 ? (
             <LockedHintCard

@@ -133,7 +133,7 @@ export function GameControls({
   return (
     <div
       ref={ref}
-      className="flex items-center justify-center gap-3"
+      className="flex items-center justify-center gap-2.5 sm:gap-3"
       style={{ touchAction: 'none' }}
     >
       <ControlButton

@@ -159,8 +159,8 @@ export function GameplayView(): React.JSX.Element {
           paddingTop: 'env(safe-area-inset-top)',
         }}
       >
-        <div className="max-w-sm mx-auto h-12 px-2 flex items-center justify-between">
-          <div className="flex w-[80px] shrink-0 items-center">
+        <div className="w-full max-w-[440px] mx-auto h-12 px-3.5 sm:px-4 flex items-center justify-between">
+          <div className="flex w-[80px] shrink-0 items-center -ml-2.5">
             <button
               type="button"
               aria-label="Arkisto"
@@ -234,7 +234,7 @@ export function GameplayView(): React.JSX.Element {
             )}
           </div>
 
-          <div className="flex w-[80px] shrink-0 items-center justify-end">
+          <div className="flex w-[80px] shrink-0 items-center justify-end -mr-2.5">
             <button
               type="button"
               aria-label="Säännöt"
@@ -304,7 +304,7 @@ export function GameplayView(): React.JSX.Element {
         }}
       >
         <div
-          className="max-w-sm mx-auto px-3 pt-1"
+          className="w-full max-w-[440px] mx-auto px-3.5 sm:px-4 pt-1"
           style={{
             touchAction: 'manipulation',
             paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)',
