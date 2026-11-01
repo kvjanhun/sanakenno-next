@@ -1,11 +1,13 @@
-import { fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { deriveHintData } from '../../packages/shared/src/index.js';
 import { FoundWords } from '../../packages/web/src/features/gameplay/FoundWords.js';
+import { HintMatrixTable } from '../../packages/web/src/features/gameplay/HintMatrixTable.js';
 import { HintPanels } from '../../packages/web/src/features/gameplay/HintPanels.js';
 import { Honeycomb } from '../../packages/web/src/features/gameplay/Honeycomb.js';
 import { RankProgress } from '../../packages/web/src/features/gameplay/RankProgress.js';
 import { useKeyboard } from '../../packages/web/src/features/gameplay/useKeyboard.js';
+import { useUiStore } from '../../packages/web/src/features/gameplay/useUiStore.js';
 
 describe('Gameplay UI Components', () => {
   it('renders Honeycomb center and outer letters and fires letter callbacks on interaction', () => {
@@ -250,5 +252,141 @@ describe('Gameplay UI Components', () => {
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k' }));
     expect(onLetter).toHaveBeenCalledWith('k');
+  });
+
+  it('colors word length numbers with accent when words of that length remain, and tertiary when 0 remain or unrevealed', () => {
+    const hintData = deriveHintData(
+      {
+        word_count: 4,
+        pangram_count: 1,
+        by_letter: { k: 3, l: 1 },
+        by_length: { '4': 2, '6': 1, '11': 1 },
+        matrix: {
+          k: { '4': 2, '11': 1 },
+          l: { '6': 1 },
+        },
+        pangram_details: [{ length: 11, first_letter: 'k' }],
+        suffixes: { inen: 1 },
+      },
+      new Set(['kana', 'kala']), // 4-letter words found, 6 and 11 remain
+      new Set(['a', 'e', 'i', 'k', 'l', 'n', 's']),
+    );
+
+    // When isRevealed is false: all length numbers are tertiary colored
+    const { rerender } = render(
+      <HintMatrixTable
+        data={hintData}
+        activeLengths={[4, 6, 11]}
+        activeLetters={['k', 'l']}
+        isRevealed={false}
+      />,
+    );
+
+    const thLen4 = screen.getByText('4');
+    const thLen6 = screen.getByText('6');
+    const thLen11 = screen.getByText('11');
+    expect(thLen4).toHaveStyle({ color: 'var(--color-text-tertiary)' });
+    expect(thLen6).toHaveStyle({ color: 'var(--color-text-tertiary)' });
+    expect(thLen11).toHaveStyle({ color: 'var(--color-text-tertiary)' });
+
+    // When isRevealed is true: length 4 has 0 remaining -> tertiary; length 6 and 11 have words remaining -> accent
+    rerender(
+      <HintMatrixTable
+        data={hintData}
+        activeLengths={[4, 6, 11]}
+        activeLetters={['k', 'l']}
+        isRevealed={true}
+      />,
+    );
+
+    expect(screen.getByText('4')).toHaveStyle({ color: 'var(--color-text-tertiary)' });
+    expect(screen.getByText('6')).toHaveStyle({ color: 'var(--color-accent)' });
+    expect(screen.getByText('11')).toHaveStyle({ color: 'var(--color-accent)' });
+  });
+
+  it('rotates only hexagon polygons while letters remain upright, and triggers new rotation on each shuffle', () => {
+    act(() => {
+      useUiStore.getState().resetUi();
+    });
+
+    const { rerender } = render(
+      <Honeycomb
+        center="a"
+        outerLetters={['e', 'i', 'k', 'l', 'n', 's']}
+        pressedHexIndex={null}
+        onLetterPress={vi.fn()}
+        onHexDown={vi.fn()}
+        onHexUp={vi.fn()}
+      />,
+    );
+
+    // Initial state: letters upright, outer hex group has no animation
+    const outerGroupInitial = screen.getByTestId('outer-hex-group');
+    expect(outerGroupInitial).toHaveStyle({ animation: 'none' });
+    const letterTextK = screen.getByText('K');
+    expect(letterTextK).not.toHaveStyle({ transform: expect.stringContaining('rotate') });
+    // All 7 letters are visible
+    for (const letter of ['A', 'E', 'I', 'K', 'L', 'N', 'S']) {
+      expect(screen.getByText(letter)).toBeInTheDocument();
+    }
+
+    // First shuffle
+    act(() => {
+      useUiStore.getState().triggerShuffleSpin();
+    });
+    rerender(
+      <Honeycomb
+        center="a"
+        outerLetters={['k', 'e', 'i', 's', 'n', 'l']}
+        pressedHexIndex={null}
+        onLetterPress={vi.fn()}
+        onHexDown={vi.fn()}
+        onHexUp={vi.fn()}
+      />,
+    );
+
+    const outerGroup1 = screen.getByTestId('outer-hex-group');
+    expect(outerGroup1).toHaveStyle({
+      animation: 'hex-shuffle-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    });
+    // Outer letter moves with hex while counter-spinning to stay upright
+    expect(screen.getByText('K')).toHaveStyle({
+      animation: 'letter-counter-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    });
+    // Center letter does not animate
+    expect(screen.getByText('A')).not.toHaveStyle({
+      animation: expect.stringContaining('counter-spin'),
+    });
+    // All 7 letters remain visible
+    for (const letter of ['A', 'K', 'E', 'I', 'S', 'N', 'L']) {
+      expect(screen.getByText(letter)).toBeInTheDocument();
+    }
+
+    // Rapid second shuffle before previous timer would end
+    act(() => {
+      useUiStore.getState().triggerShuffleSpin();
+    });
+    rerender(
+      <Honeycomb
+        center="a"
+        outerLetters={['s', 'k', 'e', 'l', 'i', 'n']}
+        pressedHexIndex={null}
+        onLetterPress={vi.fn()}
+        onHexDown={vi.fn()}
+        onHexUp={vi.fn()}
+      />,
+    );
+
+    const outerGroup2 = screen.getByTestId('outer-hex-group');
+    expect(outerGroup2).toHaveStyle({
+      animation: 'hex-shuffle-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    });
+    expect(screen.getByText('S')).toHaveStyle({
+      animation: 'letter-counter-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+    });
+    // All letters remain visible after repeated rapid shuffle
+    for (const letter of ['A', 'S', 'K', 'E', 'L', 'I', 'N']) {
+      expect(screen.getByText(letter)).toBeInTheDocument();
+    }
   });
 });

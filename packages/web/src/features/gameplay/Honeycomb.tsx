@@ -81,7 +81,7 @@ export function Honeycomb({
   );
 
   const pangramRipple = useUiStore((s) => s.pangramRipple);
-  const shuffleSpin = useUiStore((s) => s.shuffleSpin);
+  const shuffleCount = useUiStore((s) => s.shuffleCount);
 
   const ariaLabel = `Kirjainkenno: kirjaimet ${hexes.map((h) => h.letter.toUpperCase()).join(', ')}, keskuskirjain ${center.toUpperCase()}`;
 
@@ -126,62 +126,142 @@ export function Honeycomb({
           ))}
         </linearGradient>
       </defs>
-      {hexes.map((hex, i) => (
-        <g
-          key={i}
-          data-testid={`hex-cell-${hex.letter}`}
-          data-hex-center={hex.isCenter ? 'true' : 'false'}
-          aria-hidden="true"
-          style={{
-            cursor: disabled ? 'default' : 'pointer',
-            transform: !hex.isCenter && shuffleSpin ? 'rotate(60deg)' : 'rotate(0deg)',
-            transformOrigin: '150px 150px',
-            transition: shuffleSpin ? 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
-          }}
-          onPointerDown={
-            disabled
-              ? undefined
-              : (e) => {
-                  handledByPointerRef.current = true;
-                  (e.target as Element).releasePointerCapture?.(e.pointerId);
-                  onHexDown(i);
-                  onLetterPress(hex.letter);
-                }
-          }
-          onClick={
-            disabled
-              ? undefined
-              : () => {
-                  if (handledByPointerRef.current) {
-                    handledByPointerRef.current = false;
-                    return;
-                  }
-                  onHexDown(i);
-                  onLetterPress(hex.letter);
-                  onHexUp();
-                }
-          }
-          onPointerUp={disabled ? undefined : onHexUp}
-          onPointerLeave={disabled ? undefined : onHexUp}
-        >
-          <polygon
-            points={hexPoints(hex.x, hex.y, 46)}
+      {/* Outer hexagon cells: rotate around center during shuffle */}
+      <g
+        key={shuffleCount}
+        data-testid="outer-hex-group"
+        style={{
+          transformOrigin: '150px 150px',
+          animation:
+            shuffleCount > 0 ? 'hex-shuffle-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
+        }}
+      >
+        {hexes.map((hex, i) => {
+          if (hex.isCenter) return null;
+          return (
+            <g
+              key={i}
+              data-testid={`hex-cell-${hex.letter}`}
+              data-hex-center="false"
+              aria-hidden="true"
+              style={{
+                cursor: disabled ? 'default' : 'pointer',
+              }}
+              onPointerDown={
+                disabled
+                  ? undefined
+                  : (e) => {
+                      handledByPointerRef.current = true;
+                      (e.target as Element).releasePointerCapture?.(e.pointerId);
+                      onHexDown(i);
+                      onLetterPress(hex.letter);
+                    }
+              }
+              onClick={
+                disabled
+                  ? undefined
+                  : () => {
+                      if (handledByPointerRef.current) {
+                        handledByPointerRef.current = false;
+                        return;
+                      }
+                      onHexDown(i);
+                      onLetterPress(hex.letter);
+                      onHexUp();
+                    }
+              }
+              onPointerUp={disabled ? undefined : onHexUp}
+              onPointerLeave={disabled ? undefined : onHexUp}
+            >
+              <polygon
+                points={hexPoints(hex.x, hex.y, 46)}
+                style={{
+                  fill: 'url(#hex-outer-grad)',
+                  stroke: 'var(--color-hex-stroke)',
+                  strokeWidth: '1.5',
+                  transform: pressedHexIndex === i ? 'scale(0.92)' : 'scale(1)',
+                  transformOrigin: `${hex.x}px ${hex.y}px`,
+                  opacity: pressedHexIndex === i ? 0.78 : 1,
+                  animation: pangramRipple ? 'pangram-pulse-outer 0.5s ease-out 0.08s' : 'none',
+                  transition: 'transform 0.08s ease, opacity 0.08s ease',
+                }}
+              />
+              <text
+                x={hex.x}
+                y={hex.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                style={{
+                  fill: 'var(--color-text-primary)',
+                  fontSize: '24px',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-sans)',
+                  pointerEvents: 'none',
+                  transformOrigin: `${hex.x}px ${hex.y}px`,
+                  animation:
+                    shuffleCount > 0
+                      ? 'letter-counter-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                      : 'none',
+                }}
+              >
+                {hex.letter.toUpperCase()}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Center hexagon cell: stationary, never rotates */}
+      {hexes.map((hex, i) => {
+        if (!hex.isCenter) return null;
+        return (
+          <g
+            key={i}
+            data-testid={`hex-cell-${hex.letter}`}
+            data-hex-center="true"
+            aria-hidden="true"
             style={{
-              fill: hex.isCenter ? 'var(--color-accent)' : 'url(#hex-outer-grad)',
-              stroke: hex.isCenter ? 'var(--color-accent)' : 'var(--color-hex-stroke)',
-              strokeWidth: '1.5',
-              transform: pressedHexIndex === i ? 'scale(0.92)' : 'scale(1)',
-              transformOrigin: `${hex.x}px ${hex.y}px`,
-              opacity: pressedHexIndex === i ? 0.78 : 1,
-              animation: pangramRipple
-                ? hex.isCenter
-                  ? 'pangram-pulse-center 0.5s ease-out'
-                  : 'pangram-pulse-outer 0.5s ease-out 0.08s'
-                : 'none',
-              transition: 'transform 0.08s ease, opacity 0.08s ease',
+              cursor: disabled ? 'default' : 'pointer',
             }}
-          />
-          {hex.isCenter && (
+            onPointerDown={
+              disabled
+                ? undefined
+                : (e) => {
+                    handledByPointerRef.current = true;
+                    (e.target as Element).releasePointerCapture?.(e.pointerId);
+                    onHexDown(i);
+                    onLetterPress(hex.letter);
+                  }
+            }
+            onClick={
+              disabled
+                ? undefined
+                : () => {
+                    if (handledByPointerRef.current) {
+                      handledByPointerRef.current = false;
+                      return;
+                    }
+                    onHexDown(i);
+                    onLetterPress(hex.letter);
+                    onHexUp();
+                  }
+            }
+            onPointerUp={disabled ? undefined : onHexUp}
+            onPointerLeave={disabled ? undefined : onHexUp}
+          >
+            <polygon
+              points={hexPoints(hex.x, hex.y, 46)}
+              style={{
+                fill: 'var(--color-accent)',
+                stroke: 'var(--color-accent)',
+                strokeWidth: '1.5',
+                transform: pressedHexIndex === i ? 'scale(0.92)' : 'scale(1)',
+                transformOrigin: `${hex.x}px ${hex.y}px`,
+                opacity: pressedHexIndex === i ? 0.78 : 1,
+                animation: pangramRipple ? 'pangram-pulse-center 0.5s ease-out' : 'none',
+                transition: 'transform 0.08s ease, opacity 0.08s ease',
+              }}
+            />
             <path
               d={hexPath(hex.x, hex.y, 46)}
               style={{
@@ -189,24 +269,24 @@ export function Honeycomb({
                 pointerEvents: 'none',
               }}
             />
-          )}
-          <text
-            x={hex.x}
-            y={hex.y}
-            textAnchor="middle"
-            dominantBaseline="central"
-            style={{
-              fill: hex.isCenter ? 'var(--color-on-accent)' : 'var(--color-text-primary)',
-              fontSize: '24px',
-              fontWeight: 600,
-              fontFamily: 'var(--font-sans)',
-              pointerEvents: 'none',
-            }}
-          >
-            {hex.letter.toUpperCase()}
-          </text>
-        </g>
-      ))}
+            <text
+              x={hex.x}
+              y={hex.y}
+              textAnchor="middle"
+              dominantBaseline="central"
+              style={{
+                fill: 'var(--color-on-accent)',
+                fontSize: '24px',
+                fontWeight: 600,
+                fontFamily: 'var(--font-sans)',
+                pointerEvents: 'none',
+              }}
+            >
+              {hex.letter.toUpperCase()}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }

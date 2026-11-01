@@ -46,6 +46,7 @@ export interface UiState {
   viewingPuzzleDate: string | null;
   pangramRipple: boolean;
   shuffleSpin: boolean;
+  shuffleCount: number;
   /** Persisted player preference: collapse the hint deck to a single row. */
   hintsHidden: boolean;
 
@@ -102,6 +103,7 @@ export const useUiStore = create<UiState>()((set) => ({
   viewingPuzzleDate: null,
   pangramRipple: false,
   shuffleSpin: false,
+  shuffleCount: 0,
   hintsHidden: readHintsHidden(),
 
   setHintsHidden: (hintsHidden) => {
@@ -167,7 +169,10 @@ export const useUiStore = create<UiState>()((set) => ({
 
   triggerShuffleSpin: () => {
     if (shuffleTimer !== null) clearTimeout(shuffleTimer);
-    set({ shuffleSpin: true });
+    set((state) => ({
+      shuffleSpin: true,
+      shuffleCount: state.shuffleCount + 1,
+    }));
     shuffleTimer = setTimeout(() => {
       set({ shuffleSpin: false });
       shuffleTimer = null;
@@ -199,6 +204,14 @@ export const useUiStore = create<UiState>()((set) => ({
       clearTimeout(shakeTimer);
       shakeTimer = null;
     }
+    if (rippleTimer !== null) {
+      clearTimeout(rippleTimer);
+      rippleTimer = null;
+    }
+    if (shuffleTimer !== null) {
+      clearTimeout(shuffleTimer);
+      shuffleTimer = null;
+    }
     set({
       message: '',
       messageType: 'ok',
@@ -218,6 +231,9 @@ export const useUiStore = create<UiState>()((set) => ({
       showSettings: false,
       showAuth: false,
       viewingPuzzleDate: null,
+      pangramRipple: false,
+      shuffleSpin: false,
+      shuffleCount: 0,
     });
   },
 }));

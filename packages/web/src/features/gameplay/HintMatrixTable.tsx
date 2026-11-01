@@ -42,17 +42,21 @@ export function HintMatrixTable({
             >
               Yht.
             </th>
-            {activeLengths.map((len) => (
-              <th
-                key={len}
-                className="font-semibold pb-1 text-right px-0.5 text-[11px]"
-                style={{
-                  color: isRevealed ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                }}
-              >
-                {len}
-              </th>
-            ))}
+            {activeLengths.map((len) => {
+              const lenDone = (data.matrix.totalsByLength[len] ?? 0) === 0;
+              return (
+                <th
+                  key={len}
+                  className="font-semibold pb-1 text-right px-0.5 text-[11px]"
+                  style={{
+                    color:
+                      isRevealed && !lenDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                  }}
+                >
+                  {len}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>

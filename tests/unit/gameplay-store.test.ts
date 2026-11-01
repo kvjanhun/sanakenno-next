@@ -114,7 +114,7 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
       useGameStore.getState().addLetter(ch);
     }
     await useGameStore.getState().submitWord();
-    expect(useUiStore.getState().secondaryMessage).toBe('Kaikki L-sanat löydetty! 🎯');
+    expect(useUiStore.getState().secondaryMessage).toBe('Kaikki L-alkuiset löydetty!');
 
     // Shuffling triggers shuffleSpin
     useGameStore.getState().shuffleLetters();
