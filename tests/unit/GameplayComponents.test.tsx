@@ -114,15 +114,19 @@ describe('Gameplay UI Components', () => {
     fireEvent.click(activateBtn);
     expect(onUnlock).toHaveBeenCalledWith('tier1');
 
-    // Rerender with Tier 1 unlocked -> shows starting letters & next-level CTA
+    // Rerender with Tier 1 unlocked -> shows starting letters & next-level CTA in matrix area
     rerender(
       <HintPanels hintsUnlocked={new Set(['tier1'])} onUnlock={onUnlock} hintData={hintData} />,
     );
-    expect(screen.getByTestId('hint-content-tier1')).toBeInTheDocument();
-    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent('Avaa seuraava taso');
+    expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
+    const matrixTier1Content = screen.getByTestId('hint-content-tier1');
+    expect(matrixTier1Content).toBeInTheDocument();
+    const matrixUpgradeBtn = screen.getByTestId('upgrade-tier-button');
+    expect(matrixUpgradeBtn).toHaveTextContent('Avaa seuraava taso');
+    expect(matrixTier1Content).toContainElement(matrixUpgradeBtn);
 
     // Upgrade to Matrix Step 2 (tier3)
-    fireEvent.click(screen.getByTestId('upgrade-tier-button'));
+    fireEvent.click(matrixUpgradeBtn);
     expect(onUnlock).toHaveBeenCalledWith('tier3');
 
     // Rerender with Tier 3 unlocked -> shows full 2D matrix
@@ -134,6 +138,7 @@ describe('Gameplay UI Components', () => {
       />,
     );
     expect(screen.getByTestId('hint-content-tier3')).toBeInTheDocument();
+    expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
     // Matrix fully open: no further CTA and no status text on this tab
     expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
 
@@ -143,7 +148,7 @@ describe('Gameplay UI Components', () => {
     fireEvent.click(activateHintsBtn);
     expect(onUnlock).toHaveBeenCalledWith('tier2');
 
-    // Rerender with Tier 2 unlocked -> shows pangram clues
+    // Rerender with Tier 2 unlocked -> shows pangram clues & upgrade button in bottom area
     rerender(
       <HintPanels
         hintsUnlocked={new Set(['tier1', 'tier2', 'tier3'])}
@@ -152,11 +157,15 @@ describe('Gameplay UI Components', () => {
       />,
     );
     fireEvent.click(screen.getByTestId('tier-tab-2'));
-    expect(screen.getByTestId('hint-content-tier2')).toHaveTextContent(/K\s*\(11\)/);
-    expect(screen.getByTestId('upgrade-tier-button')).toHaveTextContent('Avaa seuraava taso');
+    const vihjeetTier2Content = screen.getByTestId('hint-content-tier2');
+    expect(vihjeetTier2Content).toHaveTextContent(/K\s*\(11\)/);
+    expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
+    const hintsUpgradeBtn = screen.getByTestId('upgrade-tier-button');
+    expect(hintsUpgradeBtn).toHaveTextContent('Avaa seuraava taso');
+    expect(vihjeetTier2Content).toContainElement(hintsUpgradeBtn);
 
     // Upgrade to Hints Step 2 (tier4)
-    fireEvent.click(screen.getByTestId('upgrade-tier-button'));
+    fireEvent.click(hintsUpgradeBtn);
     expect(onUnlock).toHaveBeenCalledWith('tier4');
 
     // Rerender with Tier 4 unlocked -> shows active suffixes
@@ -169,7 +178,14 @@ describe('Gameplay UI Components', () => {
     );
     fireEvent.click(screen.getByTestId('tier-tab-4'));
     expect(screen.getByTestId('hint-content-tier4')).toHaveTextContent('-inen');
+    expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
     expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
+
+    // Verify toolbar layout: counter is left-aligned in both expanded and collapsed states
+    const expandedToolbar = screen.getByTestId('hint-words-counter').parentElement?.parentElement;
+    expect(expandedToolbar?.firstChild).toContainElement(screen.getByTestId('hint-words-counter'));
+    expect(expandedToolbar?.lastChild).toContainElement(screen.getByTestId('tier-tab-1'));
+    expect(expandedToolbar?.lastChild).toContainElement(screen.getByTestId('hide-hints-button'));
 
     // Hide toggle collapses the deck and persists the preference while keeping area reserved
     const deck = screen.getByTestId('hint-deck');
@@ -177,6 +193,9 @@ describe('Gameplay UI Components', () => {
     fireEvent.click(screen.getByTestId('hide-hints-button'));
     expect(screen.queryByTestId('hint-content-tier4')).not.toBeInTheDocument();
     expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
+    const collapsedToolbar = screen.getByTestId('hint-words-counter').parentElement?.parentElement;
+    expect(collapsedToolbar?.firstChild).toContainElement(screen.getByTestId('hint-words-counter'));
+    expect(collapsedToolbar?.lastChild).toContainElement(screen.getByTestId('show-hints-button'));
     expect(deck).toHaveStyle({ height: '172px' });
     expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('1');
     fireEvent.click(screen.getByTestId('show-hints-button'));

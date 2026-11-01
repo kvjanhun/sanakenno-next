@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HintMatrixTable } from './HintMatrixTable.js';
-import { LevelPips, LockedHintCard, UpgradeButton, WordClues } from './HintParts.js';
+import { LevelPips, LockedHintCard, WordClues } from './HintParts.js';
 import { useHintData, type DerivedHintData } from './hints.js';
 import { ChevronDownIcon } from './icons.js';
 import { useUiStore } from './useUiStore.js';
@@ -50,19 +50,9 @@ export function HintPanels({
       ? 1
       : 0;
 
-  // Next-level action for the active tab only (never cross-tab).
-  const upgradeAction =
-    activeTab === 'matrix'
-      ? matrixLevel === 1
-        ? () => onUnlock('tier3')
-        : null
-      : hintsLevel === 1
-        ? () => onUnlock('tier4')
-        : null;
-
   const counter = (
     <span
-      className="text-[12px] font-semibold"
+      className="text-[12px] font-semibold whitespace-nowrap"
       style={{ color: 'var(--color-text-primary)', fontVariantNumeric: 'tabular-nums' }}
       data-testid="hint-words-counter"
     >
@@ -120,7 +110,7 @@ export function HintPanels({
         data-testid={testId}
         aria-pressed={active}
         onClick={() => setActiveTab(tab)}
-        className="cursor-pointer border-none rounded-md px-3 py-1 text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors duration-150"
+        className="cursor-pointer border-none rounded-md px-2.5 py-1 text-[12px] font-semibold inline-flex items-center gap-1.5 transition-colors duration-150 shrink-0"
         style={{
           backgroundColor: active ? 'var(--color-bg-primary)' : 'transparent',
           color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
@@ -147,34 +137,38 @@ export function HintPanels({
         marginBottom: '0.25rem',
       }}
     >
-      {/* Toolbar: tab selector · upgrade action / words remaining · hide button */}
-      <div className="flex items-center justify-between shrink-0 mb-1.5 px-0.5">
-        <div
-          className="inline-flex rounded-lg p-0.5"
-          style={{ backgroundColor: 'var(--color-bg-secondary)' }}
-        >
-          {tabButton('matrix', 'Matriisi', matrixLevel, 'tier-tab-1')}
-          {tabButton('hints', 'Vihjeet', hintsLevel, 'tier-tab-2')}
-        </div>
+      {/* Toolbar: words remaining on left · tab selector & collapse button on right */}
+      <div
+        className="flex items-center justify-between shrink-0 mb-1.5 px-0.5"
+        style={{ height: '30px' }}
+      >
+        <div className="flex items-center">{counter}</div>
 
-        {/* Hidden aliases kept for legacy test selectors */}
-        <button
-          type="button"
-          data-testid="tier-tab-3"
-          className="hidden"
-          onClick={() => setActiveTab('matrix')}
-          aria-hidden="true"
-        />
-        <button
-          type="button"
-          data-testid="tier-tab-4"
-          className="hidden"
-          onClick={() => setActiveTab('hints')}
-          aria-hidden="true"
-        />
+        <div className="flex items-center gap-1 shrink-0">
+          <div
+            className="inline-flex rounded-lg p-0.5 shrink-0"
+            style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+          >
+            {tabButton('matrix', 'Matriisi', matrixLevel, 'tier-tab-1')}
+            {tabButton('hints', 'Vihjeet', hintsLevel, 'tier-tab-2')}
+          </div>
 
-        <div className="flex items-center gap-2">
-          {upgradeAction ? <UpgradeButton onClick={upgradeAction} /> : counter}
+          {/* Hidden aliases kept for legacy test selectors */}
+          <button
+            type="button"
+            data-testid="tier-tab-3"
+            className="hidden"
+            onClick={() => setActiveTab('matrix')}
+            aria-hidden="true"
+          />
+          <button
+            type="button"
+            data-testid="tier-tab-4"
+            className="hidden"
+            onClick={() => setActiveTab('hints')}
+            aria-hidden="true"
+          />
+
           <button
             type="button"
             data-testid="hide-hints-button"
@@ -209,6 +203,7 @@ export function HintPanels({
                 activeLengths={activeLengths}
                 activeLetters={activeLetters}
                 isRevealed={matrixLevel === 2}
+                onUpgrade={matrixLevel === 1 ? () => onUnlock('tier3') : undefined}
               />
             </div>
           ))}
@@ -226,7 +221,11 @@ export function HintPanels({
               data-testid={hintsLevel === 2 ? 'hint-content-tier4' : 'hint-content-tier2'}
               className="w-full h-full flex flex-col justify-start"
             >
-              <WordClues data={data} showSuffixes={hintsLevel === 2} />
+              <WordClues
+                data={data}
+                showSuffixes={hintsLevel === 2}
+                onUpgrade={hintsLevel === 1 ? () => onUnlock('tier4') : undefined}
+              />
             </div>
           ))}
       </div>

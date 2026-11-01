@@ -29,8 +29,13 @@ export function UpgradeButton({ onClick }: { onClick: () => void }): React.JSX.E
       type="button"
       data-testid="upgrade-tier-button"
       onClick={onClick}
-      className="cursor-pointer rounded-full px-2.5 py-[2px] text-[11px] font-semibold bg-transparent transition-colors hover:bg-[var(--color-bg-secondary)]"
-      style={{ color: 'var(--color-accent)', border: '1px solid var(--color-accent)' }}
+      className="cursor-pointer rounded-full px-2.5 py-[2px] text-[11px] font-semibold transition-colors hover:bg-[var(--color-bg-secondary)]"
+      style={{
+        backgroundColor: 'var(--color-bg-primary)',
+        color: 'var(--color-accent)',
+        border: '1px solid var(--color-accent)',
+        boxShadow: '0 1px 2px var(--color-button-shadow)',
+      }}
     >
       Avaa seuraava taso →
     </button>
@@ -99,9 +104,11 @@ function SectionLabel({ children }: { children: React.ReactNode }): React.JSX.El
 export function WordClues({
   data,
   showSuffixes,
+  onUpgrade,
 }: {
   data: DerivedHintData;
   showSuffixes: boolean;
+  onUpgrade?: () => void;
 }): React.JSX.Element {
   const suffixes = [...data.suffixMap].sort(
     (a, b) => Number(b.remaining > 0) - Number(a.remaining > 0),
@@ -110,7 +117,7 @@ export function WordClues({
   const visibleSuffixes = overflow ? suffixes.slice(0, MAX_SUFFIX_CELLS - 1) : suffixes;
 
   return (
-    <div className="w-full flex flex-col gap-2">
+    <div className="w-full h-full flex flex-col justify-between gap-2">
       <div>
         <SectionLabel>Pangrammit · alkukirjain (pituus)</SectionLabel>
         <div className="flex flex-wrap gap-1.5 pl-1">
@@ -146,7 +153,7 @@ export function WordClues({
         </div>
       </div>
 
-      {showSuffixes && (
+      {showSuffixes ? (
         <div>
           <SectionLabel>Sananpäätteet · jäljellä</SectionLabel>
           <div
@@ -182,7 +189,11 @@ export function WordClues({
             )}
           </div>
         </div>
-      )}
+      ) : onUpgrade ? (
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-2">
+          <UpgradeButton onClick={onUpgrade} />
+        </div>
+      ) : null}
     </div>
   );
 }

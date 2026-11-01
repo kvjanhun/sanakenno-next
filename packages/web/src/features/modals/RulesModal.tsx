@@ -129,19 +129,23 @@ export function RulesModal({ show, onClose }: RulesModalProps): React.JSX.Elemen
               <span className="h-4 flex items-center shrink-0">
                 <CircleHelpIcon size={14} style={{ color: 'var(--color-accent)' }} />
               </span>
-              <span>Yleiskuva: sanojen ja pangrammien kokonaismäärä</span>
+              <span>
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Matriisi:
+                </span>{' '}
+                sanojen määrä alkukirjaimittain (taso 1) ja pituudet kirjaimittain (taso 2).
+              </span>
             </li>
             <li className="flex items-start gap-2 text-xs">
               <span className="h-4 flex items-center shrink-0">
                 <CircleHelpIcon size={14} style={{ color: 'var(--color-accent)' }} />
               </span>
-              <span>Pituudet: sanojen pituusjakauma</span>
-            </li>
-            <li className="flex items-start gap-2 text-xs">
-              <span className="h-4 flex items-center shrink-0">
-                <CircleHelpIcon size={14} style={{ color: 'var(--color-accent)' }} />
+              <span>
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                  Vihjeet:
+                </span>{' '}
+                pangrammien alkukirjaimet ja pituudet (taso 1) sekä sananpäätteet (taso 2).
               </span>
-              <span>Alkuparit: sanojen ensimmäiset 2 kirjainta</span>
             </li>
           </ul>
         </div>
