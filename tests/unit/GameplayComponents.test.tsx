@@ -171,13 +171,17 @@ describe('Gameplay UI Components', () => {
     expect(screen.getByTestId('hint-content-tier4')).toHaveTextContent('-inen');
     expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
 
-    // Hide toggle collapses the deck to one row and persists the preference
+    // Hide toggle collapses the deck and persists the preference while keeping area reserved
+    const deck = screen.getByTestId('hint-deck');
+    expect(deck).toHaveStyle({ height: '172px' });
     fireEvent.click(screen.getByTestId('hide-hints-button'));
     expect(screen.queryByTestId('hint-content-tier4')).not.toBeInTheDocument();
     expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
+    expect(deck).toHaveStyle({ height: '172px' });
     expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('1');
     fireEvent.click(screen.getByTestId('show-hints-button'));
     expect(screen.getByTestId('hint-content-tier4')).toBeInTheDocument();
+    expect(deck).toHaveStyle({ height: '172px' });
     expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('0');
   });
 
