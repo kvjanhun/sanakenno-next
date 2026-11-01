@@ -9,6 +9,7 @@ import {
   loadFromStorage,
   puzzleStateKey,
   revealedKey,
+  saveToStorage,
   setRawStorage,
   type PersistedPuzzleState,
 } from '../../packages/web/src/features/gameplay/storage.js';
@@ -249,5 +250,38 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     await useGameStore.getState().submitWord();
     expect(useGameStore.getState().foundWords.has('lainaaika')).toBe(true);
     expect(useGameStore.getState().score).toBe(9);
+  });
+
+  it('resets unlocked hints when loading a different unplayed puzzle', async () => {
+    const puzzleA = await buildSamplePuzzle(20);
+    await useGameStore.getState().loadPuzzle(puzzleA);
+
+    useGameStore.getState().unlockHint('summary');
+    expect(useGameStore.getState().hintsUnlocked.size).toBe(1);
+
+    const puzzleB = await buildSamplePuzzle(21);
+    await useGameStore.getState().loadPuzzle(puzzleB);
+
+    expect(useGameStore.getState().hintsUnlocked.size).toBe(0);
+    expect(useGameStore.getState().scoreBeforeHints).toBeNull();
+  });
+
+  it('loads saved hints when loading a previously played puzzle', async () => {
+    saveToStorage(puzzleStateKey(22), {
+      foundWords: [],
+      score: 10,
+      hintsUnlocked: ['summary', 'pairs'],
+      startedAt: Date.now(),
+      totalPausedMs: 0,
+      scoreBeforeHints: 10,
+    });
+
+    const puzzle = await buildSamplePuzzle(22);
+    await useGameStore.getState().loadPuzzle(puzzle);
+
+    expect(useGameStore.getState().hintsUnlocked.size).toBe(2);
+    expect(useGameStore.getState().hintsUnlocked.has('summary')).toBe(true);
+    expect(useGameStore.getState().hintsUnlocked.has('pairs')).toBe(true);
+    expect(useGameStore.getState().scoreBeforeHints).toBe(10);
   });
 });
