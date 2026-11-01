@@ -260,7 +260,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
           `+${pts}`,
           'ok',
           2500,
-          `Kaikki ${firstLetter?.toUpperCase()}-sanat löydetty! 🎯`,
+          `Kaikki ${firstLetter?.toUpperCase()}-alkuiset löydetty!`,
           'special',
         );
     } else {
