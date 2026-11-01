@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sk-app-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#24262B"/>
+      <stop offset="50%" stop-color="#1B1C20"/>
+      <stop offset="100%" stop-color="#121316"/>
+    </linearGradient>
+
+    <linearGradient id="sk-app-neutral" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E5E5E8"/>
+    </linearGradient>
+
+    <linearGradient id="sk-app-orange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FF7A52"/>
+      <stop offset="100%" stop-color="#E8441A"/>
+    </linearGradient>
+
+    <filter id="sk-app-tile-shadow" x="-30%" y="-25%" width="160%" height="165%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- iOS / macOS Squircle Base (22% radius = 112px on 512px) -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#sk-app-bg)"/>
+
+  <!-- Clean precision border rim with subtle warm orange hint -->
+  <rect x="1" y="1" width="510" height="510" rx="111" fill="none" stroke="#FF643E" stroke-opacity="0.22" stroke-width="2"/>
+  <rect x="2" y="2" width="508" height="508" rx="110" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1.5"/>
+
+  <!-- Centered Style 2 Triad Mark -->
+  <g transform="translate(76, 76) scale(3.6)" filter="url(#sk-app-tile-shadow)">
+    <g>
+      <path d="M 25.55 10.20 Q 28.58 8.45 31.61 10.20 L 45.47 18.20 Q 48.50 19.95 48.50 23.45 L 48.50 39.45 Q 48.50 42.95 45.47 44.70 L 31.61 52.70 Q 28.58 54.45 25.55 52.70 L 11.69 44.70 Q 8.66 42.95 8.66 39.45 L 8.66 23.45 Q 8.66 19.95 11.69 18.20 Z" fill="#B4B4B8" transform="translate(0, 1.4)"/>
+      <path d="M 25.55 10.20 Q 28.58 8.45 31.61 10.20 L 45.47 18.20 Q 48.50 19.95 48.50 23.45 L 48.50 39.45 Q 48.50 42.95 45.47 44.70 L 31.61 52.70 Q 28.58 54.45 25.55 52.70 L 11.69 44.70 Q 8.66 42.95 8.66 39.45 L 8.66 23.45 Q 8.66 19.95 11.69 18.20 Z" fill="url(#sk-app-neutral)" stroke="#D8D8DC" stroke-width="0.8"/>
+      <path d="M 25.98 10.95 Q 28.58 9.45 31.18 10.95 L 44.69 18.75 Q 47.29 20.25 47.29 23.25 L 47.29 38.85 Q 47.29 41.85 44.69 43.35 L 31.18 51.15 Q 28.58 52.65 25.98 51.15 L 12.47 43.35 Q 9.87 41.85 9.87 38.85 L 9.87 23.25 Q 9.87 20.25 12.47 18.75 Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="0.8"/>
+    </g>
+    <g>
+      <path d="M 46.97 47.30 Q 50.00 45.55 53.03 47.30 L 66.89 55.30 Q 69.92 57.05 69.92 60.55 L 69.92 76.55 Q 69.92 80.05 66.89 81.80 L 53.03 89.80 Q 50.00 91.55 46.97 89.80 L 33.11 81.80 Q 30.08 80.05 30.08 76.55 L 30.08 60.55 Q 30.08 57.05 33.11 55.30 Z" fill="#B4B4B8" transform="translate(0, 1.4)"/>
+      <path d="M 46.97 47.30 Q 50.00 45.55 53.03 47.30 L 66.89 55.30 Q 69.92 57.05 69.92 60.55 L 69.92 76.55 Q 69.92 80.05 66.89 81.80 L 53.03 89.80 Q 50.00 91.55 46.97 89.80 L 33.11 81.80 Q 30.08 80.05 30.08 76.55 L 30.08 60.55 Q 30.08 57.05 33.11 55.30 Z" fill="url(#sk-app-neutral)" stroke="#D8D8DC" stroke-width="0.8"/>
+      <path d="M 47.40 48.05 Q 50.00 46.55 52.60 48.05 L 66.11 55.85 Q 68.71 57.35 68.71 60.35 L 68.71 75.95 Q 68.71 78.95 66.11 80.45 L 52.60 88.25 Q 50.00 89.75 47.40 88.25 L 33.89 80.45 Q 31.29 78.95 31.29 75.95 L 31.29 60.35 Q 31.29 57.35 33.89 55.85 Z" fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="0.8"/>
+    </g>
+    <g>
+      <path d="M 68.39 10.20 Q 71.42 8.45 74.45 10.20 L 88.31 18.20 Q 91.34 19.95 91.34 23.45 L 91.34 39.45 Q 91.34 42.95 88.31 44.70 L 74.45 52.70 Q 71.42 54.45 68.39 52.70 L 54.53 44.70 Q 51.50 42.95 51.50 39.45 L 51.50 23.45 Q 51.50 19.95 54.53 18.20 Z" fill="#A02808" transform="translate(0, 1.6)"/>
+      <path d="M 68.39 10.20 Q 71.42 8.45 74.45 10.20 L 88.31 18.20 Q 91.34 19.95 91.34 23.45 L 91.34 39.45 Q 91.34 42.95 88.31 44.70 L 74.45 52.70 Q 71.42 54.45 68.39 52.70 L 54.53 44.70 Q 51.50 42.95 51.50 39.45 L 51.50 23.45 Q 51.50 19.95 54.53 18.20 Z" fill="url(#sk-app-orange)" stroke="#D84018" stroke-width="0.6"/>
+      <path d="M 68.82 10.95 Q 71.42 9.45 74.02 10.95 L 87.53 18.75 Q 90.13 20.25 90.13 23.25 L 90.13 38.85 Q 90.13 41.85 87.53 43.35 L 74.02 51.15 Q 71.42 52.65 68.82 51.15 L 55.31 43.35 Q 52.71 41.85 52.71 38.85 L 52.71 23.25 Q 52.71 20.25 55.31 18.75 Z" fill="none" stroke="#FFA57A" stroke-opacity="0.55" stroke-width="0.8"/>
+    </g>
+  </g>
+</svg>
