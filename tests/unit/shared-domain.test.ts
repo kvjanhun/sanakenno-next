@@ -140,14 +140,11 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
         { suffix: 'llinen', total: 1, found: 1, remaining: 0 },
       ]);
 
-      // Top suffixes and top pairs derived deterministically (total desc, Finnish alpha asc)
-      expect(derived.topSuffixes).toEqual([
-        { suffix: 'inen', total: 1, found: 0, remaining: 1 },
-        { suffix: 'llinen', total: 1, found: 1, remaining: 0 },
-      ]);
+      // Top suffixes and top pairs derived deterministically (remaining desc, Finnish alpha asc)
+      expect(derived.topSuffixes).toEqual([{ suffix: 'inen', total: 1, found: 0, remaining: 1 }]);
     });
 
-    it('getTopPairs and getTopSuffixes sort by total descending then Finnish alphabetical ascending with limit', async () => {
+    it('getTopPairs and getTopSuffixes sort by remaining descending then Finnish alphabetical ascending with limit', async () => {
       const { getTopPairs, getTopSuffixes } = await import('@sanakenno/shared');
       const pairs = [
         { pair: 'ka', total: 5, found: 1, remaining: 4 },
@@ -163,8 +160,8 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
 
       const top7 = getTopPairs(pairs, 7);
       expect(top7).toHaveLength(7);
-      // 'aa' and 'ka' have total 5, sorted Finnish alpha: 'aa', 'ka', 'ää'
-      expect(top7.map((p) => p.pair)).toEqual(['aa', 'ka', 'ää', 'pa', 'la', 'ko', 'ta']);
+      // 'ää' remaining 5, 'ka' remaining 4, 'aa', 'la', 'pa' remaining 3, 'ko', 'ta' remaining 2
+      expect(top7.map((p) => p.pair)).toEqual(['ää', 'ka', 'aa', 'la', 'pa', 'ko', 'ta']);
 
       const suffixes = [
         { suffix: 'inen', total: 4, found: 1, remaining: 3 },

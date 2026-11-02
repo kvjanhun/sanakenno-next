@@ -363,9 +363,9 @@ export function deriveHintData(
 
 export function getTopPairs(pairMap: PairEntry[], limit = 7): PairEntry[] {
   return [...pairMap]
-    .filter((entry) => entry.total > 0)
+    .filter((entry) => entry.remaining > 0)
     .sort((a, b) => {
-      const diff = b.total - a.total;
+      const diff = b.remaining - a.remaining;
       if (diff !== 0) return diff;
       return compareFinnishAlphabetically(a.pair, b.pair);
     })
@@ -374,9 +374,9 @@ export function getTopPairs(pairMap: PairEntry[], limit = 7): PairEntry[] {
 
 export function getTopSuffixes(suffixMap: SuffixEntry[], limit = 7): SuffixEntry[] {
   return [...suffixMap]
-    .filter((entry) => entry.total > 0)
+    .filter((entry) => entry.remaining > 0)
     .sort((a, b) => {
-      const diff = b.total - a.total;
+      const diff = b.remaining - a.remaining;
       if (diff !== 0) return diff;
       return compareFinnishAlphabetically(a.suffix, b.suffix);
     })

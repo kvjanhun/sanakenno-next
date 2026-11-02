@@ -201,30 +201,33 @@ export function PangramClues({ data }: { data: DerivedHintData }): React.JSX.Ele
 export function PairClues({ pairs }: { pairs: PairEntry[] }): React.JSX.Element {
   return (
     <div data-testid="clue-section-pairs" className="w-full flex flex-col justify-center shrink-0">
-      <ClueLabel>Alkuparit · 7 yleisintä</ClueLabel>
+      <ClueLabel>Alkuparit · 7 yleisintä jäljellä</ClueLabel>
       <div className="flex flex-wrap items-center gap-1.5 pl-0.5">
-        {pairs.map((entry) => {
-          const isDone = entry.remaining === 0;
-          return (
+        {pairs.length === 0 ? (
+          <span
+            className="text-[11px] font-medium pl-0.5"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          >
+            Kaikki löydetty ✓
+          </span>
+        ) : (
+          pairs.map((entry) => (
             <span
               key={entry.pair}
               className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight"
               style={{
                 backgroundColor: 'var(--color-bg-secondary)',
                 fontVariantNumeric: 'tabular-nums',
-                color: isDone ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
+                color: 'var(--color-text-primary)',
               }}
             >
               <span className="font-bold lowercase">{entry.pair.toLowerCase()}</span>
-              <span
-                className="font-semibold"
-                style={{ color: isDone ? undefined : 'var(--color-accent)' }}
-              >
-                {isDone ? '✓' : entry.remaining}
+              <span className="font-semibold" style={{ color: 'var(--color-accent)' }}>
+                {entry.remaining}
               </span>
             </span>
-          );
-        })}
+          ))
+        )}
       </div>
     </div>
   );
@@ -237,30 +240,33 @@ export function SuffixClues({ suffixes }: { suffixes: SuffixEntry[] }): React.JS
       data-testid="clue-section-suffixes"
       className="w-full flex flex-col justify-center shrink-0"
     >
-      <ClueLabel>Sananpäätteet · 7 yleisintä</ClueLabel>
+      <ClueLabel>Sananpäätteet · 7 yleisintä jäljellä</ClueLabel>
       <div className="flex flex-wrap items-center gap-1.5 pl-0.5">
-        {suffixes.map((entry) => {
-          const isDone = entry.remaining === 0;
-          return (
+        {suffixes.length === 0 ? (
+          <span
+            className="text-[11px] font-medium pl-0.5"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          >
+            Kaikki löydetty ✓
+          </span>
+        ) : (
+          suffixes.map((entry) => (
             <span
               key={entry.suffix}
               className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight"
               style={{
                 backgroundColor: 'var(--color-bg-secondary)',
                 fontVariantNumeric: 'tabular-nums',
-                color: isDone ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
+                color: 'var(--color-text-primary)',
               }}
             >
               <span className="font-bold">-{entry.suffix}</span>
-              <span
-                className="font-semibold"
-                style={{ color: isDone ? undefined : 'var(--color-accent)' }}
-              >
-                {isDone ? '✓' : entry.remaining}
+              <span className="font-semibold" style={{ color: 'var(--color-accent)' }}>
+                {entry.remaining}
               </span>
             </span>
-          );
-        })}
+          ))
+        )}
       </div>
     </div>
   );
