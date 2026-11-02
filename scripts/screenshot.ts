@@ -131,7 +131,7 @@ async function captureWithCdp(
       await new Promise((r) => setTimeout(r, 500));
     }
 
-    if (target.action === 'view-clues-open') {
+    if (target.action === 'view-clues-open' || target.action === 'view-clues-open-typed') {
       await send('Runtime.evaluate', {
         expression: `
           (async () => {
@@ -151,6 +151,20 @@ async function captureWithCdp(
         awaitPromise: true,
       });
       await new Promise((r) => setTimeout(r, 500));
+    }
+
+    if (target.action === 'view-clues-open-typed') {
+      await send('Runtime.evaluate', {
+        expression: `
+          (() => {
+            for (const char of 'huppu') {
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: char, code: 'Key' + char.toUpperCase() }));
+            }
+          })()
+        `,
+        awaitPromise: false,
+      });
+      await new Promise((r) => setTimeout(r, 300));
     }
 
     const result = (await send('Page.captureScreenshot', {
@@ -210,6 +224,13 @@ async function main() {
         height: 844,
         mobile: true,
         action: 'view-clues-open',
+      },
+      {
+        name: 'mobile-clues-typed',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-clues-open-typed',
       },
     ];
 

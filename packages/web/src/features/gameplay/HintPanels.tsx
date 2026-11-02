@@ -75,7 +75,7 @@ export function HintPanels({
           overflow: 'hidden',
           fontFamily: 'var(--font-sans)',
           marginTop: '4px',
-          marginBottom: '0.25rem',
+          marginBottom: '0.5rem',
         }}
       >
         <div
@@ -140,7 +140,7 @@ export function HintPanels({
         overflow: 'hidden',
         fontFamily: 'var(--font-sans)',
         marginTop: '4px',
-        marginBottom: '0.25rem',
+        marginBottom: '0.5rem',
       }}
     >
       {/* Toolbar: words remaining on left · tab selector & collapse button on right */}

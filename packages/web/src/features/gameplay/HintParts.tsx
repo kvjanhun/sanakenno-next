@@ -296,7 +296,7 @@ export function WordClues({
   return (
     <div
       data-testid="hint-content-vihjeet"
-      className="w-full h-full flex flex-col justify-between py-0.5"
+      className="w-full h-full flex flex-col justify-between pt-0.5 pb-2"
     >
       {/* 1. Pangrams */}
       <div

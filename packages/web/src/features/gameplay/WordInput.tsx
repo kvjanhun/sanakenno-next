@@ -41,12 +41,13 @@ export function WordInput({
 
   return (
     <div
-      className={`text-center text-[30px] font-semibold leading-none${shake ? ' word-shake' : ''}`}
+      className={`flex items-center justify-center text-center text-[30px] font-semibold leading-none${shake ? ' word-shake' : ''}`}
       style={{
         fontFamily: 'var(--font-game)',
         fontKerning: 'normal',
         letterSpacing: '0',
-        minHeight: '44px',
+        minHeight: '38px',
+        height: '38px',
       }}
       aria-live="polite"
       aria-atomic="true"
