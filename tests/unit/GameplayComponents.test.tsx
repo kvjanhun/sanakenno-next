@@ -145,13 +145,19 @@ describe('Gameplay UI Components', () => {
     // Matrix fully open: no further CTA and no status text on this tab
     expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
 
-    // Switch to Vihjeet tab while it is still locked
+    // Switch to Vihjeet tab while all 3 parts are still locked
     fireEvent.click(screen.getByTestId('tier-tab-2'));
-    const activateHintsBtn = screen.getByTestId('activate-hints-button');
-    fireEvent.click(activateHintsBtn);
+    expect(screen.getByLabelText('Taso 0/3')).toBeInTheDocument();
+    expect(screen.getByTestId('clue-locked-pangrams')).toBeInTheDocument();
+    expect(screen.getByTestId('clue-locked-pairs')).toBeInTheDocument();
+    expect(screen.getByTestId('clue-locked-suffixes')).toBeInTheDocument();
+
+    // Unlock Pangrams independently
+    const unlockPangramsBtn = screen.getByTestId('unlock-pangrams-button');
+    fireEvent.click(unlockPangramsBtn);
     expect(onUnlock).toHaveBeenCalledWith('tier2');
 
-    // Rerender with Tier 2 unlocked -> shows pangram clues & upgrade button in bottom area
+    // Rerender with Pangrams unlocked (1/3 open)
     rerender(
       <HintPanels
         hintsUnlocked={new Set(['tier1', 'tier2', 'tier3'])}
@@ -160,29 +166,48 @@ describe('Gameplay UI Components', () => {
       />,
     );
     fireEvent.click(screen.getByTestId('tier-tab-2'));
+    expect(screen.getByLabelText('Taso 1/3')).toBeInTheDocument();
     const vihjeetTier2Content = screen.getByTestId('hint-content-tier2');
     expect(vihjeetTier2Content).toHaveTextContent(/K\s*\(11\)/);
     expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
-    const hintsUpgradeBtn = screen.getByTestId('upgrade-tier-button');
-    expect(hintsUpgradeBtn).toHaveTextContent('Avaa seuraava taso');
-    expect(vihjeetTier2Content).toContainElement(hintsUpgradeBtn);
 
-    // Upgrade to Hints Step 2 (tier4)
-    fireEvent.click(hintsUpgradeBtn);
-    expect(onUnlock).toHaveBeenCalledWith('tier4');
+    // Unlock Pairs independently
+    const unlockPairsBtn = screen.getByTestId('unlock-pairs-button');
+    fireEvent.click(unlockPairsBtn);
+    expect(onUnlock).toHaveBeenCalledWith('pairs');
 
-    // Rerender with Tier 4 unlocked -> shows active suffixes
+    // Rerender with Pangrams + Pairs unlocked (2/3 open)
     rerender(
       <HintPanels
-        hintsUnlocked={new Set(['tier1', 'tier2', 'tier3', 'tier4'])}
+        hintsUnlocked={new Set(['tier1', 'tier2', 'tier3', 'pairs'])}
         onUnlock={onUnlock}
         hintData={hintData}
       />,
     );
-    fireEvent.click(screen.getByTestId('tier-tab-4'));
+    fireEvent.click(screen.getByTestId('tier-tab-2'));
+    expect(screen.getByLabelText('Taso 2/3')).toBeInTheDocument();
+    expect(screen.getByTestId('clue-section-pairs')).toBeInTheDocument();
+
+    // Unlock Suffixes independently
+    const unlockSuffixesBtn = screen.getByTestId('unlock-suffixes-button');
+    fireEvent.click(unlockSuffixesBtn);
+    expect(onUnlock).toHaveBeenCalledWith('tier4');
+
+    // Rerender with all 3 unlocked (3/3 open)
+    rerender(
+      <HintPanels
+        hintsUnlocked={new Set(['tier1', 'tier2', 'tier3', 'tier4', 'pairs'])}
+        onUnlock={onUnlock}
+        hintData={hintData}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('tier-tab-2'));
+    expect(screen.getByLabelText('Taso 3/3')).toBeInTheDocument();
     expect(screen.getByTestId('hint-content-tier4')).toHaveTextContent('-inen');
+    expect(screen.getByTestId('clue-section-pangrams')).toBeInTheDocument();
+    expect(screen.getByTestId('clue-section-pairs')).toBeInTheDocument();
+    expect(screen.getByTestId('clue-section-suffixes')).toBeInTheDocument();
     expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
-    expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
 
     // Verify toolbar layout: counter is left-aligned in both expanded and collapsed states
     const expandedToolbar = screen.getByTestId('hint-words-counter').parentElement?.parentElement;

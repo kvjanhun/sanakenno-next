@@ -37,18 +37,18 @@ export function HintPanels({
     data.letterMap.some((item) => item.letter === letter && item.total > 0),
   );
 
-  // Two independent two-level unlocks (legacy IDs map onto the same levels).
+  // Independent unlocks (legacy IDs map onto the same levels).
   const has = (...ids: string[]) => ids.some((id) => hintsUnlocked.has(id));
   const matrixLevel: 0 | 1 | 2 = has('tier3', 'matrix_full', 'distribution')
     ? 2
     : has('tier1', 'matrix_totals', 'matrix', 'summary')
       ? 1
       : 0;
-  const hintsLevel: 0 | 1 | 2 = has('tier4', 'suffixes', 'pairs')
-    ? 2
-    : has('tier2', 'pangrams')
-      ? 1
-      : 0;
+
+  const hasPangrams = has('tier2', 'pangrams');
+  const hasPairs = has('pairs');
+  const hasSuffixes = has('tier4', 'suffixes');
+  const unlockedCluesCount = (hasPangrams ? 1 : 0) + (hasPairs ? 1 : 0) + (hasSuffixes ? 1 : 0);
 
   const counter = (
     <span
@@ -102,7 +102,13 @@ export function HintPanels({
     );
   }
 
-  const tabButton = (tab: HintTabType, label: string, level: 0 | 1 | 2, testId: string) => {
+  const tabButton = (
+    tab: HintTabType,
+    label: string,
+    level: number,
+    testId: string,
+    maxPips = 2,
+  ) => {
     const active = activeTab === tab;
     return (
       <button
@@ -118,7 +124,7 @@ export function HintPanels({
         }}
       >
         {label}
-        <LevelPips level={level} />
+        <LevelPips level={level} max={maxPips} />
       </button>
     );
   };
@@ -146,8 +152,8 @@ export function HintPanels({
             className="inline-flex rounded-lg p-0.5 shrink-0"
             style={{ backgroundColor: 'var(--color-bg-secondary)' }}
           >
-            {tabButton('matrix', 'Matriisi', matrixLevel, 'tier-tab-1')}
-            {tabButton('hints', 'Vihjeet', hintsLevel, 'tier-tab-2')}
+            {tabButton('matrix', 'Matriisi', matrixLevel, 'tier-tab-1', 2)}
+            {tabButton('hints', 'Vihjeet', unlockedCluesCount, 'tier-tab-2', 3)}
           </div>
 
           {/* Hidden aliases kept for legacy test selectors */}
@@ -205,26 +211,19 @@ export function HintPanels({
             </div>
           ))}
 
-        {activeTab === 'hints' &&
-          (hintsLevel === 0 ? (
-            <LockedHintCard
-              title="Sanavihjeet"
-              description="Pangrammien alkukirjaimet ja pituudet. Seuraava taso lisää sanojen päätteet."
-              buttonLabel="Avaa vihjeet"
-              onUnlock={() => onUnlock('tier2')}
+        {activeTab === 'hints' && (
+          <div className="w-full h-full flex flex-col justify-start">
+            <WordClues
+              data={data}
+              hasPangrams={hasPangrams}
+              hasPairs={hasPairs}
+              hasSuffixes={hasSuffixes}
+              onUnlockPangrams={() => onUnlock('tier2')}
+              onUnlockPairs={() => onUnlock('pairs')}
+              onUnlockSuffixes={() => onUnlock('tier4')}
             />
-          ) : (
-            <div
-              data-testid={hintsLevel === 2 ? 'hint-content-tier4' : 'hint-content-tier2'}
-              className="w-full h-full flex flex-col justify-start"
-            >
-              <WordClues
-                data={data}
-                showSuffixes={hintsLevel === 2}
-                onUpgrade={hintsLevel === 1 ? () => onUnlock('tier4') : undefined}
-              />
-            </div>
-          ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -114,6 +114,8 @@ export {
 
 export {
   deriveHintData,
+  getTopPairs,
+  getTopSuffixes,
   compareFinnishAlphabetically,
   normalizeFinnishText,
   matchSuffix,

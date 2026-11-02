@@ -139,6 +139,39 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
         { suffix: 'inen', total: 1, found: 0, remaining: 1 },
         { suffix: 'llinen', total: 1, found: 1, remaining: 0 },
       ]);
+
+      // Top suffixes and top pairs derived deterministically (total desc, Finnish alpha asc)
+      expect(derived.topSuffixes).toEqual([
+        { suffix: 'inen', total: 1, found: 0, remaining: 1 },
+        { suffix: 'llinen', total: 1, found: 1, remaining: 0 },
+      ]);
+    });
+
+    it('getTopPairs and getTopSuffixes sort by total descending then Finnish alphabetical ascending with limit', async () => {
+      const { getTopPairs, getTopSuffixes } = await import('@sanakenno/shared');
+      const pairs = [
+        { pair: 'ka', total: 5, found: 1, remaining: 4 },
+        { pair: 'ko', total: 2, found: 0, remaining: 2 },
+        { pair: 'aa', total: 5, found: 2, remaining: 3 },
+        { pair: 'ää', total: 5, found: 0, remaining: 5 },
+        { pair: 'sa', total: 1, found: 1, remaining: 0 },
+        { pair: 'la', total: 3, found: 0, remaining: 3 },
+        { pair: 'pa', total: 4, found: 1, remaining: 3 },
+        { pair: 'ta', total: 2, found: 0, remaining: 2 },
+        { pair: 'va', total: 2, found: 0, remaining: 2 },
+      ];
+
+      const top7 = getTopPairs(pairs, 7);
+      expect(top7).toHaveLength(7);
+      // 'aa' and 'ka' have total 5, sorted Finnish alpha: 'aa', 'ka', 'ää'
+      expect(top7.map((p) => p.pair)).toEqual(['aa', 'ka', 'ää', 'pa', 'la', 'ko', 'ta']);
+
+      const suffixes = [
+        { suffix: 'inen', total: 4, found: 1, remaining: 3 },
+        { suffix: 'ton', total: 2, found: 0, remaining: 2 },
+        { suffix: 'kas', total: 6, found: 2, remaining: 4 },
+      ];
+      expect(getTopSuffixes(suffixes, 2).map((s) => s.suffix)).toEqual(['kas', 'inen']);
     });
   });
 

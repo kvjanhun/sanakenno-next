@@ -81,6 +81,8 @@ export interface DerivedHintData {
   unfoundPangrams: HintPangramDetail[];
   matrix: HintMatrix;
   suffixMap: SuffixEntry[];
+  topPairs: PairEntry[];
+  topSuffixes: SuffixEntry[];
 }
 
 /**
@@ -354,5 +356,29 @@ export function deriveHintData(
       totalsByLength: matrixTotalsByLength,
     },
     suffixMap,
+    topPairs: getTopPairs(pairMap, 7),
+    topSuffixes: getTopSuffixes(suffixMap, 7),
   };
+}
+
+export function getTopPairs(pairMap: PairEntry[], limit = 7): PairEntry[] {
+  return [...pairMap]
+    .filter((entry) => entry.total > 0)
+    .sort((a, b) => {
+      const diff = b.total - a.total;
+      if (diff !== 0) return diff;
+      return compareFinnishAlphabetically(a.pair, b.pair);
+    })
+    .slice(0, limit);
+}
+
+export function getTopSuffixes(suffixMap: SuffixEntry[], limit = 7): SuffixEntry[] {
+  return [...suffixMap]
+    .filter((entry) => entry.total > 0)
+    .sort((a, b) => {
+      const diff = b.total - a.total;
+      if (diff !== 0) return diff;
+      return compareFinnishAlphabetically(a.suffix, b.suffix);
+    })
+    .slice(0, limit);
 }

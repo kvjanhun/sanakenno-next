@@ -118,6 +118,41 @@ async function captureWithCdp(
       await new Promise((r) => setTimeout(r, 500));
     }
 
+    if (target.action === 'view-clues-closed') {
+      await send('Runtime.evaluate', {
+        expression: `
+          (async () => {
+            const tab = document.querySelector('[data-testid="tier-tab-2"]');
+            if (tab) tab.click();
+          })()
+        `,
+        awaitPromise: true,
+      });
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    if (target.action === 'view-clues-open') {
+      await send('Runtime.evaluate', {
+        expression: `
+          (async () => {
+            const tab = document.querySelector('[data-testid="tier-tab-2"]');
+            if (tab) tab.click();
+            await new Promise((r) => setTimeout(r, 200));
+            const b1 = document.querySelector('[data-testid="unlock-pangrams-button"]');
+            if (b1) b1.click();
+            await new Promise((r) => setTimeout(r, 100));
+            const b2 = document.querySelector('[data-testid="unlock-pairs-button"]');
+            if (b2) b2.click();
+            await new Promise((r) => setTimeout(r, 100));
+            const b3 = document.querySelector('[data-testid="unlock-suffixes-button"]');
+            if (b3) b3.click();
+          })()
+        `,
+        awaitPromise: true,
+      });
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
     const result = (await send('Page.captureScreenshot', {
       format: 'png',
       clip: { x: 0, y: 0, width: target.width, height: target.height, scale: 1 },
@@ -153,8 +188,29 @@ async function main() {
     const targets = [
       { name: 'desktop', width: 1280, height: 800, mobile: false, action: undefined },
       { name: 'desktop-matrix', width: 1280, height: 800, mobile: false, action: 'unlock-matrix' },
+      {
+        name: 'desktop-clues-open',
+        width: 1280,
+        height: 800,
+        mobile: false,
+        action: 'view-clues-open',
+      },
       { name: 'mobile', width: 390, height: 844, mobile: true, action: undefined },
       { name: 'mobile-matrix', width: 390, height: 844, mobile: true, action: 'unlock-matrix' },
+      {
+        name: 'mobile-clues-closed',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-clues-closed',
+      },
+      {
+        name: 'mobile-clues-open',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-clues-open',
+      },
     ];
 
     for (const target of targets) {

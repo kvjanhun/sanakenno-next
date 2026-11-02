@@ -1,13 +1,14 @@
-import type { DerivedHintData } from './hints.js';
+import type { DerivedHintData, PairEntry, SuffixEntry } from './hints.js';
 
-/** Maximum suffix cells that fit the fixed-height deck (6 columns × 5 rows). */
+/** Legacy constant preserved for compatibility. */
 export const MAX_SUFFIX_CELLS = 30;
 
-/** Two small dots showing how many of a tab's two levels are open. */
-export function LevelPips({ level }: { level: 0 | 1 | 2 }): React.JSX.Element {
+/** Dots showing how many levels or parts are open. Supports max=2 or max=3. */
+export function LevelPips({ level, max = 2 }: { level: number; max?: number }): React.JSX.Element {
+  const pips = Array.from({ length: max }, (_, i) => i + 1);
   return (
-    <span className="inline-flex items-center gap-[3px]" aria-label={`Taso ${level}/2`}>
-      {[1, 2].map((n) => (
+    <span className="inline-flex items-center gap-[3px]" aria-label={`Taso ${level}/${max}`}>
+      {pips.map((n) => (
         <span
           key={n}
           className="block rounded-full transition-colors duration-150"
@@ -42,7 +43,7 @@ export function UpgradeButton({ onClick }: { onClick: () => void }): React.JSX.E
   );
 }
 
-/** Locked state of a tab: what the hint reveals plus one clear accent button. */
+/** Locked state card used for the Matrix tab when level is 0. */
 export function LockedHintCard({
   title,
   description,
@@ -88,112 +89,259 @@ export function LockedHintCard({
   );
 }
 
-/** Section label used inside the deck content. */
-function SectionLabel({ children }: { children: React.ReactNode }): React.JSX.Element {
+/** Compact locked clue row for Vihjeet tab sections. */
+export function ClueLockedRow({
+  title,
+  description,
+  onUnlock,
+  testId,
+  buttonTestId,
+}: {
+  title: string;
+  description: string;
+  onUnlock: () => void;
+  testId?: string;
+  buttonTestId?: string;
+}): React.JSX.Element {
   return (
     <div
-      className="text-[11px] font-bold uppercase tracking-wider pl-1 mb-1"
-      style={{ color: 'var(--color-text-primary)' }}
+      data-testid={testId}
+      className="w-full flex items-center justify-between rounded-lg px-2.5 py-1 box-border transition-colors shrink-0"
+      style={{
+        backgroundColor: 'var(--color-bg-secondary)',
+        minHeight: '32px',
+      }}
+    >
+      <div className="flex items-baseline gap-2 min-w-0 pr-2">
+        <span
+          className="text-[12px] font-bold shrink-0 leading-tight"
+          style={{ color: 'var(--color-text-primary)' }}
+        >
+          {title}
+        </span>
+        <span
+          className="text-[11px] truncate leading-tight"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
+          {description}
+        </span>
+      </div>
+      <button
+        type="button"
+        data-testid={buttonTestId ?? 'activate-hints-button'}
+        onClick={onUnlock}
+        className="cursor-pointer border-none rounded-full px-2.5 py-0.5 text-[11px] font-bold shrink-0 transition-opacity hover:opacity-90 active:scale-95"
+        style={{
+          backgroundColor: 'var(--color-accent)',
+          color: 'var(--color-on-accent)',
+        }}
+      >
+        Avaa
+      </button>
+    </div>
+  );
+}
+
+/** Section label inside unlocked clue blocks. */
+function ClueLabel({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <div
+      className="text-[10px] font-bold uppercase tracking-wider pl-0.5 mb-1 leading-none"
+      style={{ color: 'var(--color-text-secondary)' }}
     >
       {children}
     </div>
   );
 }
 
-/** Pangram chips (level 1) and the suffix grid (level 2) of the Vihjeet tab. */
-export function WordClues({
-  data,
-  showSuffixes,
-  onUpgrade,
-}: {
-  data: DerivedHintData;
-  showSuffixes: boolean;
-  onUpgrade?: () => void;
-}): React.JSX.Element {
-  const suffixes = [...data.suffixMap].sort(
-    (a, b) => Number(b.remaining > 0) - Number(a.remaining > 0),
-  );
-  const overflow = suffixes.length > MAX_SUFFIX_CELLS;
-  const visibleSuffixes = overflow ? suffixes.slice(0, MAX_SUFFIX_CELLS - 1) : suffixes;
-
+/** Unlocked Pangram clues. */
+export function PangramClues({ data }: { data: DerivedHintData }): React.JSX.Element {
   return (
-    <div className="w-full h-full flex flex-col justify-between gap-2">
-      <div>
-        <SectionLabel>Pangrammit · alkukirjain (pituus)</SectionLabel>
-        <div className="flex flex-wrap gap-1.5 pl-1">
-          {data.unfoundPangrams.map((p, idx) => (
+    <div
+      data-testid="clue-section-pangrams"
+      className="w-full flex flex-col justify-center shrink-0"
+    >
+      <ClueLabel>Pangrammit · alkukirjain (pituus)</ClueLabel>
+      <div className="flex flex-wrap items-center gap-1.5 pl-0.5">
+        {data.unfoundPangrams.map((p, idx) => (
+          <span
+            key={`unfound-pangram-${idx}`}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] leading-tight"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            <span className="font-bold" style={{ color: 'var(--color-accent)' }}>
+              {p.first_letter.toUpperCase()}
+            </span>
+            <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              ({p.length})
+            </span>
+          </span>
+        ))}
+        {Array.from({ length: data.pangramStats.found }).map((_, idx) => (
+          <span
+            key={`found-pangram-${idx}`}
+            className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] leading-tight"
+            style={{
+              backgroundColor: 'var(--color-bg-secondary)',
+              color: 'var(--color-text-tertiary)',
+            }}
+          >
+            ✓ löydetty
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Unlocked Top 7 starting pairs clues. */
+export function PairClues({ pairs }: { pairs: PairEntry[] }): React.JSX.Element {
+  return (
+    <div data-testid="clue-section-pairs" className="w-full flex flex-col justify-center shrink-0">
+      <ClueLabel>Alkuparit · 7 yleisintä</ClueLabel>
+      <div className="flex flex-wrap items-center gap-1.5 pl-0.5">
+        {pairs.map((entry) => {
+          const isDone = entry.remaining === 0;
+          return (
             <span
-              key={`unfound-pangram-${idx}`}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px]"
+              key={entry.pair}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight"
               style={{
                 backgroundColor: 'var(--color-bg-secondary)',
                 fontVariantNumeric: 'tabular-nums',
+                color: isDone ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
               }}
             >
-              <span className="font-bold" style={{ color: 'var(--color-accent)' }}>
-                {p.first_letter.toUpperCase()}
-              </span>
-              <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                ({p.length})
+              <span className="font-bold uppercase">{entry.pair}</span>
+              <span
+                className="font-semibold"
+                style={{ color: isDone ? undefined : 'var(--color-accent)' }}
+              >
+                {isDone ? '✓' : entry.remaining}
               </span>
             </span>
-          ))}
-          {Array.from({ length: data.pangramStats.found }).map((_, idx) => (
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Unlocked Top 7 suffixes clues. */
+export function SuffixClues({ suffixes }: { suffixes: SuffixEntry[] }): React.JSX.Element {
+  return (
+    <div
+      data-testid="clue-section-suffixes"
+      className="w-full flex flex-col justify-center shrink-0"
+    >
+      <ClueLabel>Sananpäätteet · 7 yleisintä</ClueLabel>
+      <div className="flex flex-wrap items-center gap-1.5 pl-0.5">
+        {suffixes.map((entry) => {
+          const isDone = entry.remaining === 0;
+          return (
             <span
-              key={`found-pangram-${idx}`}
-              className="inline-flex items-center rounded-md px-2 py-0.5 text-[12px]"
+              key={entry.suffix}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight"
               style={{
                 backgroundColor: 'var(--color-bg-secondary)',
-                color: 'var(--color-text-tertiary)',
+                fontVariantNumeric: 'tabular-nums',
+                color: isDone ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
               }}
             >
-              ✓ löydetty
+              <span className="font-bold">-{entry.suffix}</span>
+              <span
+                className="font-semibold"
+                style={{ color: isDone ? undefined : 'var(--color-accent)' }}
+              >
+                {isDone ? '✓' : entry.remaining}
+              </span>
             </span>
-          ))}
-        </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Complete 3-module Vihjeet clues container. */
+export function WordClues({
+  data,
+  hasPangrams,
+  hasPairs,
+  hasSuffixes,
+  onUnlockPangrams,
+  onUnlockPairs,
+  onUnlockSuffixes,
+}: {
+  data: DerivedHintData;
+  hasPangrams: boolean;
+  hasPairs: boolean;
+  hasSuffixes: boolean;
+  onUnlockPangrams: () => void;
+  onUnlockPairs: () => void;
+  onUnlockSuffixes: () => void;
+}): React.JSX.Element {
+  const topPairs = data.topPairs ?? [];
+  const topSuffixes = data.topSuffixes ?? [];
+
+  return (
+    <div
+      data-testid="hint-content-vihjeet"
+      className="w-full h-full flex flex-col justify-between py-0.5"
+    >
+      {/* 1. Pangrams */}
+      <div
+        data-testid={hasPangrams ? 'hint-content-tier2' : undefined}
+        className="w-full flex flex-col justify-center"
+      >
+        {hasPangrams ? (
+          <PangramClues data={data} />
+        ) : (
+          <ClueLockedRow
+            title="Pangrammit"
+            description="Alkukirjaimet ja pituudet"
+            onUnlock={onUnlockPangrams}
+            testId="clue-locked-pangrams"
+            buttonTestId="unlock-pangrams-button"
+          />
+        )}
       </div>
 
-      {showSuffixes ? (
-        <div>
-          <SectionLabel>Sananpäätteet · jäljellä</SectionLabel>
-          <div
-            className="grid grid-cols-6 gap-x-1 gap-y-1 pl-1 text-[11px] leading-[15px]"
-            style={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            {visibleSuffixes.map((entry) => (
-              <span
-                key={entry.suffix}
-                className="truncate whitespace-nowrap"
-                style={{
-                  color:
-                    entry.remaining === 0
-                      ? 'var(--color-text-tertiary)'
-                      : 'var(--color-text-primary)',
-                }}
-              >
-                <span className="font-bold">-{entry.suffix}</span>{' '}
-                <span
-                  className="font-semibold"
-                  style={{
-                    color: entry.remaining === 0 ? undefined : 'var(--color-accent)',
-                  }}
-                >
-                  {entry.remaining === 0 ? '✓' : entry.remaining}
-                </span>
-              </span>
-            ))}
-            {overflow && (
-              <span style={{ color: 'var(--color-text-secondary)' }}>
-                +{suffixes.length - visibleSuffixes.length}
-              </span>
-            )}
-          </div>
-        </div>
-      ) : onUpgrade ? (
-        <div className="flex-1 min-h-0 flex flex-col items-center justify-center py-2">
-          <UpgradeButton onClick={onUpgrade} />
-        </div>
-      ) : null}
+      {/* 2. Starting Pairs */}
+      <div className="w-full flex flex-col justify-center">
+        {hasPairs ? (
+          <PairClues pairs={topPairs} />
+        ) : (
+          <ClueLockedRow
+            title="Alkuparit"
+            description="7 yleisintä alkua ja määrät"
+            onUnlock={onUnlockPairs}
+            testId="clue-locked-pairs"
+            buttonTestId="unlock-pairs-button"
+          />
+        )}
+      </div>
+
+      {/* 3. Suffixes */}
+      <div
+        data-testid={hasSuffixes ? 'hint-content-tier4' : undefined}
+        className="w-full flex flex-col justify-center"
+      >
+        {hasSuffixes ? (
+          <SuffixClues suffixes={topSuffixes} />
+        ) : (
+          <ClueLockedRow
+            title="Sananpäätteet"
+            description="7 yleisintä päätettä ja määrät"
+            onUnlock={onUnlockSuffixes}
+            testId="clue-locked-suffixes"
+            buttonTestId="unlock-suffixes-button"
+          />
+        )}
+      </div>
     </div>
   );
 }

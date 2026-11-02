@@ -1,8 +1,13 @@
 import { useMemo } from 'react';
-import { deriveHintData, type DerivedHintData } from '@sanakenno/shared';
+import {
+  deriveHintData,
+  type DerivedHintData,
+  type PairEntry,
+  type SuffixEntry,
+} from '@sanakenno/shared';
 import { useGameStore } from './useGameStore.js';
 
-export type { DerivedHintData };
+export type { DerivedHintData, PairEntry, SuffixEntry };
 
 /** Visible web hint IDs including progressive tiers and legacy IDs. */
 export const VISIBLE_HINT_IDS = [
@@ -13,6 +18,8 @@ export const VISIBLE_HINT_IDS = [
   'summary',
   'distribution',
   'pairs',
+  'pangrams',
+  'suffixes',
 ] as const;
 
 export type VisibleHintId = (typeof VISIBLE_HINT_IDS)[number];
