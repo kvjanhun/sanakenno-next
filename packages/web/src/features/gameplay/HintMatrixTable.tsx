@@ -23,21 +23,39 @@ export function HintMatrixTable({
   isRevealed,
   onUpgrade,
 }: HintMatrixTableProps): React.JSX.Element {
+  // Adaptive column width: generous breathing room (up to 32px) for typical puzzles,
+  // dynamically tightening down to 17px when up to 16 columns must fit within 332px mobile width.
+  const colWidth = Math.max(17, Math.min(32, Math.floor(272 / Math.max(1, activeLengths.length))));
+
   return (
-    <div className="relative w-full h-full flex flex-col justify-start">
+    <div className="relative w-full h-full flex flex-col items-start justify-start">
       <table
-        className="w-full text-center text-[11.5px] leading-[15px]"
+        className="w-max text-[11.5px] leading-[15px] table-fixed"
         style={{
           fontFamily: 'var(--font-sans)',
           fontVariantNumeric: 'tabular-nums',
           borderCollapse: 'collapse',
         }}
       >
+        <colgroup>
+          <col className="w-[28px] min-w-[28px] max-w-[28px]" />
+          <col className="w-[32px] min-w-[32px] max-w-[32px]" />
+          {activeLengths.map((len) => (
+            <col
+              key={len}
+              style={{
+                width: `${colWidth}px`,
+                minWidth: `${colWidth}px`,
+                maxWidth: `${colWidth}px`,
+              }}
+            />
+          ))}
+        </colgroup>
         <thead>
           <tr style={{ color: 'var(--color-text-secondary)' }}>
-            <th className="text-left font-semibold pb-1 w-8 pl-1 text-[11px]">Kirj.</th>
+            <th className="text-left font-semibold pb-1 w-[28px] pl-1 text-[11px]">Kirj.</th>
             <th
-              className="text-right font-semibold pb-1 w-10 pr-2.5 text-[11px]"
+              className="text-right font-semibold pb-1 w-[32px] pr-2 text-[11px]"
               style={{ borderRight: '1px solid var(--color-border)' }}
             >
               Yht.
@@ -47,8 +65,11 @@ export function HintMatrixTable({
               return (
                 <th
                   key={len}
-                  className="font-semibold pb-1 text-right px-0.5 text-[11px]"
+                  className="font-semibold pb-1 text-center text-[11px]"
                   style={{
+                    width: `${colWidth}px`,
+                    minWidth: `${colWidth}px`,
+                    maxWidth: `${colWidth}px`,
                     color:
                       isRevealed && !lenDone ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                   }}
@@ -66,7 +87,7 @@ export function HintMatrixTable({
             return (
               <tr key={letter}>
                 <td
-                  className="text-left font-bold pl-1 py-[1px]"
+                  className="text-left font-bold pl-1 py-[1px] w-[28px]"
                   style={{
                     color: done ? 'var(--color-text-tertiary)' : 'var(--color-accent)',
                   }}
@@ -74,7 +95,7 @@ export function HintMatrixTable({
                   {letter.toUpperCase()}
                 </td>
                 <td
-                  className="text-right font-bold pr-2.5 py-[1px]"
+                  className="text-right font-bold pr-2 py-[1px] w-[32px]"
                   style={{
                     borderRight: '1px solid var(--color-border)',
                     color: done ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
@@ -88,8 +109,11 @@ export function HintMatrixTable({
                   return (
                     <td
                       key={len}
-                      className="text-right px-0.5 py-[1px]"
+                      className="text-center py-[1px]"
                       style={{
+                        width: `${colWidth}px`,
+                        minWidth: `${colWidth}px`,
+                        maxWidth: `${colWidth}px`,
                         color: show ? 'var(--color-text-primary)' : FAINT,
                         fontWeight: show ? 600 : 400,
                       }}
@@ -106,7 +130,7 @@ export function HintMatrixTable({
       {!isRevealed && onUpgrade && (
         <div
           className="absolute inset-y-0 right-0 flex items-center justify-center pointer-events-none"
-          style={{ left: '72px' }}
+          style={{ left: '60px' }}
         >
           <div className="pointer-events-auto">
             <UpgradeButton onClick={onUpgrade} />

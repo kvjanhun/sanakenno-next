@@ -46,7 +46,7 @@ async function waitForServer(url: string, maxAttempts = 30): Promise<void> {
 async function captureWithCdp(
   chrome: string,
   url: string,
-  target: { name: string; width: number; height: number; mobile?: boolean },
+  target: { name: string; width: number; height: number; mobile?: boolean; action?: string },
   outPath: string,
 ): Promise<void> {
   const port = 9333;
@@ -102,6 +102,22 @@ async function captureWithCdp(
 
     await new Promise((r) => setTimeout(r, 1200));
 
+    if (target.action === 'unlock-matrix') {
+      await send('Runtime.evaluate', {
+        expression: `
+          (async () => {
+            const btn1 = document.querySelector('[data-testid="activate-hints-button"]');
+            if (btn1) btn1.click();
+            await new Promise((r) => setTimeout(r, 200));
+            const btn2 = document.querySelector('[data-testid="upgrade-tier-button"]');
+            if (btn2) btn2.click();
+          })()
+        `,
+        awaitPromise: true,
+      });
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
     const result = (await send('Page.captureScreenshot', {
       format: 'png',
       clip: { x: 0, y: 0, width: target.width, height: target.height, scale: 1 },
@@ -135,15 +151,17 @@ async function main() {
 
   try {
     const targets = [
-      { name: 'desktop', width: 1280, height: 800, mobile: false },
-      { name: 'mobile', width: 390, height: 844, mobile: true },
+      { name: 'desktop', width: 1280, height: 800, mobile: false, action: undefined },
+      { name: 'desktop-matrix', width: 1280, height: 800, mobile: false, action: 'unlock-matrix' },
+      { name: 'mobile', width: 390, height: 844, mobile: true, action: undefined },
+      { name: 'mobile-matrix', width: 390, height: 844, mobile: true, action: 'unlock-matrix' },
     ];
 
     for (const target of targets) {
       const outPath = path.join(OUT_DIR, `${target.name}.png`);
       console.log(`Capturing ${target.name} (${target.width}x${target.height}) to ${outPath}...`);
 
-      if (target.mobile) {
+      if (target.mobile || target.action) {
         await captureWithCdp(chrome, url, target, outPath);
       } else {
         execFileSync(
