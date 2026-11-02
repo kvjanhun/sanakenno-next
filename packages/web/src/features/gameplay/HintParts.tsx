@@ -215,7 +215,7 @@ export function PairClues({ pairs }: { pairs: PairEntry[] }): React.JSX.Element 
                 color: isDone ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
               }}
             >
-              <span className="font-bold uppercase">{entry.pair}</span>
+              <span className="font-bold lowercase">{entry.pair.toLowerCase()}</span>
               <span
                 className="font-semibold"
                 style={{ color: isDone ? undefined : 'var(--color-accent)' }}
