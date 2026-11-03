@@ -89,7 +89,7 @@ export function RankProgress({
         </button>
       </div>
 
-      <div className="flex items-center gap-2.5 h-6">
+      <div className="flex items-center gap-2.5 h-5">
         <div
           className="relative flex-1 rounded-full overflow-hidden transition-[width] duration-200 border border-solid"
           style={{

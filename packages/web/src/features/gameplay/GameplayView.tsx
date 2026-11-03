@@ -307,7 +307,7 @@ export function GameplayView(): React.JSX.Element {
           className="w-full max-w-[440px] mx-auto px-3.5 sm:px-4 pt-1"
           style={{
             touchAction: 'manipulation',
-            paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)',
+            paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.5rem)',
           }}
         >
           {isLoading && !puzzle && (
