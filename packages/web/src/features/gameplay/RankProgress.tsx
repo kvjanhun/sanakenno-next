@@ -89,10 +89,16 @@ export function RankProgress({
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 h-5">
         <div
-          className="relative h-2 flex-1 rounded-full overflow-hidden"
-          style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+          className="relative flex-1 rounded-full overflow-hidden transition-[width] duration-200 border border-solid"
+          style={{
+            height: '10px',
+            boxSizing: 'border-box',
+            backgroundColor: 'var(--color-bg-secondary)',
+            borderColor: 'var(--color-border)',
+            boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.12)',
+          }}
           role="progressbar"
           aria-valuenow={score}
           aria-valuemin={0}
@@ -103,7 +109,9 @@ export function RankProgress({
             data-testid="rank-progress-fill"
             style={{
               width: `${totalProgress}%`,
-              backgroundColor: 'var(--color-accent)',
+              background:
+                'linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.08) 100%), var(--color-accent)',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
             }}
           />
 
@@ -124,48 +132,50 @@ export function RankProgress({
           ))}
         </div>
 
-        <div
-          className="flex items-center gap-1 shrink-0"
-          title="Saavutukset ilman apuja (25%, 50%, 70%)"
-          aria-label="Saavutukset ilman apuja"
-        >
-          {noHintAchievements.map((ach) => {
-            const isReached = ach.unlocked;
-            const isLost = hasUnlockedHints && !isReached;
-            return (
-              <span
-                key={ach.name}
-                data-testid={`milestone-pip-${ach.pct}`}
-                data-state={isReached ? 'reached' : isLost ? 'lost' : 'open'}
-                title={`${ach.name} (${ach.pct}% pisteistä): ${
-                  isReached
-                    ? 'Saavutettu'
-                    : isLost
-                      ? 'Ei enää saavutettavissa (avut käytössä)'
-                      : 'Tavoite ilman apuja'
-                }`}
-                className="flex items-center justify-center transition-colors duration-200"
-                style={{
-                  width: '14px',
-                  height: '14px',
-                  color: isReached
-                    ? 'var(--color-accent)'
-                    : isLost
-                      ? 'color-mix(in srgb, var(--color-text-tertiary) 45%, transparent)'
-                      : 'var(--color-text-tertiary)',
-                }}
-              >
-                {isReached ? (
-                  <CircleStarIcon size={14} strokeWidth={2.3} />
-                ) : isLost ? (
-                  <CircleOffIcon size={13} strokeWidth={2.2} />
-                ) : (
-                  <CircleIcon size={12} strokeWidth={2.2} />
-                )}
-              </span>
-            );
-          })}
-        </div>
+        {!showRanks && (
+          <div
+            className="flex items-center gap-1 shrink-0"
+            title="Saavutukset ilman apuja (25%, 50%, 70%)"
+            aria-label="Saavutukset ilman apuja"
+          >
+            {noHintAchievements.map((ach) => {
+              const isReached = ach.unlocked;
+              const isLost = hasUnlockedHints && !isReached;
+              return (
+                <span
+                  key={ach.name}
+                  data-testid={`milestone-pip-${ach.pct}`}
+                  data-state={isReached ? 'reached' : isLost ? 'lost' : 'open'}
+                  title={`${ach.name} (${ach.pct}% pisteistä): ${
+                    isReached
+                      ? 'Saavutettu'
+                      : isLost
+                        ? 'Ei enää saavutettavissa (avut käytössä)'
+                        : 'Tavoite ilman apuja'
+                  }`}
+                  className="flex items-center justify-center transition-colors duration-200"
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    color: isReached
+                      ? 'var(--color-accent)'
+                      : isLost
+                        ? 'color-mix(in srgb, var(--color-text-tertiary) 45%, transparent)'
+                        : 'var(--color-text-tertiary)',
+                  }}
+                >
+                  {isReached ? (
+                    <CircleStarIcon size={14} strokeWidth={2.3} />
+                  ) : isLost ? (
+                    <CircleOffIcon size={13} strokeWidth={2.2} />
+                  ) : (
+                    <CircleIcon size={12} strokeWidth={2.2} />
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {showRanks && (
@@ -179,8 +189,9 @@ export function RankProgress({
             zIndex: 20,
             background: 'var(--color-bg-primary)',
             border: '1px solid var(--color-border)',
-            borderRadius: '0 0 8px 8px',
-            marginTop: '0.25rem',
+            borderRadius: '0 0 10px 10px',
+            marginTop: '0.35rem',
+            boxShadow: '0 4px 16px var(--color-button-shadow)',
             overflow: 'hidden',
           }}
         >
@@ -188,7 +199,7 @@ export function RankProgress({
             data-testid="rank-panel-no-hints"
             style={{
               borderBottom: '1px solid var(--color-border)',
-              padding: '0.6rem 0.75rem',
+              padding: '0.65rem 0.85rem',
               background: 'var(--color-bg-secondary)',
             }}
           >
@@ -204,20 +215,49 @@ export function RankProgress({
                 {noHintSuffix}
               </span>
               <div
-                className="flex shrink-0 items-center gap-1"
+                className="flex shrink-0 items-center gap-1.5"
                 aria-label={`Ilman apuja: ${
                   noHintAchievements.filter((item) => item.unlocked).length
                 } / ${noHintAchievements.length} saavutusta`}
               >
-                {noHintAchievements.map((achievement, index) => (
-                  <NoHintAchievementIcon
-                    key={achievement.name}
-                    index={index}
-                    name={achievement.name}
-                    unlocked={achievement.unlocked}
-                    inactive={hasUnlockedHints && !achievement.unlocked}
-                  />
-                ))}
+                {noHintAchievements.map((achievement, index) => {
+                  const isReached = achievement.unlocked;
+                  const isLost = hasUnlockedHints && !isReached;
+                  const iconName = isReached ? 'circle-star' : isLost ? 'circle-off' : 'circle';
+                  const color = isReached
+                    ? 'var(--color-accent)'
+                    : isLost
+                      ? 'color-mix(in srgb, var(--color-text-tertiary) 40%, var(--color-bg-secondary))'
+                      : 'var(--color-text-tertiary)';
+
+                  return (
+                    <span
+                      key={achievement.name}
+                      data-testid={`milestone-pip-${achievement.pct}`}
+                      data-state={isReached ? 'reached' : isLost ? 'lost' : 'open'}
+                      data-no-hint-indicator={index + 1}
+                      data-no-hint-state={isReached ? 'unlocked' : 'locked'}
+                      data-no-hint-icon={iconName}
+                      title={`${achievement.name} (${achievement.pct}% pisteistä): ${
+                        isReached
+                          ? 'Saavutettu'
+                          : isLost
+                            ? 'Ei enää saavutettavissa (avut käytössä)'
+                            : 'Tavoite ilman apuja'
+                      }`}
+                      className="flex h-7 w-7 items-center justify-center transition-colors duration-200"
+                      style={{ color }}
+                    >
+                      {isReached ? (
+                        <CircleStarIcon size={26} strokeWidth={2.3} />
+                      ) : isLost ? (
+                        <CircleOffIcon size={26} strokeWidth={2.3} />
+                      ) : (
+                        <CircleIcon size={24} strokeWidth={2.3} />
+                      )}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -239,43 +279,5 @@ export function RankProgress({
         </div>
       )}
     </div>
-  );
-}
-
-function NoHintAchievementIcon({
-  index,
-  name,
-  unlocked,
-  inactive,
-}: {
-  index: number;
-  name: string;
-  unlocked: boolean;
-  inactive: boolean;
-}): React.JSX.Element {
-  const iconName = unlocked ? 'circle-star' : inactive ? 'circle-off' : 'circle';
-  const color = unlocked
-    ? 'var(--color-accent)'
-    : inactive
-      ? 'color-mix(in srgb, var(--color-text-tertiary) 40%, var(--color-bg-secondary))'
-      : 'var(--color-text-tertiary)';
-
-  return (
-    <span
-      className="flex h-7 w-7 items-center justify-center"
-      data-no-hint-indicator={index + 1}
-      data-no-hint-state={unlocked ? 'unlocked' : 'locked'}
-      data-no-hint-icon={iconName}
-      title={name}
-      style={{ color }}
-    >
-      {unlocked ? (
-        <CircleStarIcon size={22} strokeWidth={2.3} />
-      ) : inactive ? (
-        <CircleOffIcon size={22} strokeWidth={2.3} />
-      ) : (
-        <CircleIcon size={21} strokeWidth={2.3} />
-      )}
-    </span>
   );
 }

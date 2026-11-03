@@ -214,4 +214,53 @@ describe('RankProgress Component', () => {
     expect(screen.getByTestId('milestone-pip-50')).toHaveAttribute('data-state', 'lost');
     expect(screen.getByTestId('milestone-pip-70')).toHaveAttribute('data-state', 'lost');
   });
+
+  it('renders prominent bar styling and guarantees zero duplicate stars when modal is opened', () => {
+    const { rerender } = render(
+      <RankProgress
+        score={40}
+        maxScore={100}
+        rank="Sanavalmis"
+        showRanks={false}
+        onToggleRanks={vi.fn()}
+        scoreBeforeHints={40}
+        hasUnlockedHints={false}
+      />,
+    );
+
+    const progressBar = screen.getByRole('progressbar');
+    expect(progressBar).toHaveClass('border');
+    expect(progressBar.style.height).toBe('10px');
+    expect(progressBar.style.borderColor).toBe('var(--color-border)');
+    expect(progressBar.style.boxShadow).toContain('inset');
+
+    // When closed, exactly 1 set of 3 milestone pips exists in the DOM
+    expect(screen.getAllByTestId('milestone-pip-25')).toHaveLength(1);
+    expect(screen.getAllByTestId('milestone-pip-50')).toHaveLength(1);
+    expect(screen.getAllByTestId('milestone-pip-70')).toHaveLength(1);
+
+    // Open the modal
+    rerender(
+      <RankProgress
+        score={40}
+        maxScore={100}
+        rank="Sanavalmis"
+        showRanks={true}
+        onToggleRanks={vi.fn()}
+        scoreBeforeHints={40}
+        hasUnlockedHints={false}
+      />,
+    );
+
+    // When opened, still exactly 1 set of 3 milestone pips exists in the DOM (no duplicates)
+    expect(screen.getAllByTestId('milestone-pip-25')).toHaveLength(1);
+    expect(screen.getAllByTestId('milestone-pip-50')).toHaveLength(1);
+    expect(screen.getAllByTestId('milestone-pip-70')).toHaveLength(1);
+
+    // Verify the pips are now inside the modal's top header with enlarged size container
+    const panelNoHints = screen.getByTestId('rank-panel-no-hints');
+    const pip25InModal = screen.getByTestId('milestone-pip-25');
+    expect(panelNoHints).toContainElement(pip25InModal);
+    expect(pip25InModal).toHaveClass('h-7', 'w-7');
+  });
 });
