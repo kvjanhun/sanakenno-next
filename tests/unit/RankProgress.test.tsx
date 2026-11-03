@@ -72,45 +72,45 @@ describe('RankProgress Component', () => {
     const fill = screen.getByTestId('rank-progress-fill');
     expect(fill).toHaveStyle({ width: '20%' });
 
-    // 5 High-contrast intermediate rank notches: 2%, 10%, 20%, 40%, 70% with 2px cuts
+    // 5 intermediate rank notches: 2%, 10%, 20%, 40%, 70% with subtle 1px inset ticks
     const notch2 = screen.getByTestId('rank-notch-2');
     expect(notch2).toHaveAttribute('data-rank', 'Hyvä alku');
     expect(notch2).toHaveStyle({
       left: '2%',
-      width: '2px',
-      backgroundColor: 'var(--color-bg-primary)',
+      width: '1px',
+      backgroundColor: 'var(--color-rank-notch)',
     });
 
     const notch10 = screen.getByTestId('rank-notch-10');
     expect(notch10).toHaveAttribute('data-rank', 'Nyt mennään!');
     expect(notch10).toHaveStyle({
       left: '10%',
-      width: '2px',
-      backgroundColor: 'var(--color-bg-primary)',
+      width: '1px',
+      backgroundColor: 'var(--color-rank-notch)',
     });
 
     const notch20 = screen.getByTestId('rank-notch-20');
     expect(notch20).toHaveAttribute('data-rank', 'Onnistuja');
     expect(notch20).toHaveStyle({
       left: '20%',
-      width: '2px',
-      backgroundColor: 'var(--color-bg-primary)',
+      width: '1px',
+      backgroundColor: 'var(--color-rank-notch)',
     });
 
     const notch40 = screen.getByTestId('rank-notch-40');
     expect(notch40).toHaveAttribute('data-rank', 'Sanavalmis');
     expect(notch40).toHaveStyle({
       left: '40%',
-      width: '2px',
-      backgroundColor: 'var(--color-bg-primary)',
+      width: '1px',
+      backgroundColor: 'var(--color-rank-notch)',
     });
 
     const notch70 = screen.getByTestId('rank-notch-70');
     expect(notch70).toHaveAttribute('data-rank', 'Ällistyttävä');
     expect(notch70).toHaveStyle({
       left: '70%',
-      width: '2px',
-      backgroundColor: 'var(--color-bg-primary)',
+      width: '1px',
+      backgroundColor: 'var(--color-rank-notch)',
     });
 
     // 3 unassisted milestone blips beside the bar (calm neutral tertiary styling when open)
@@ -230,7 +230,7 @@ describe('RankProgress Component', () => {
 
     const progressBar = screen.getByRole('progressbar');
     expect(progressBar).toHaveClass('border');
-    expect(progressBar.style.height).toBe('10px');
+    expect(progressBar.style.height).toBe('15px');
     expect(progressBar.style.borderColor).toBe('var(--color-border)');
     expect(progressBar.style.boxShadow).toContain('inset');
 

@@ -102,6 +102,13 @@ async function captureWithCdp(
 
     await new Promise((r) => setTimeout(r, 1200));
 
+    if (target.action === 'theme-light') {
+      await send('Runtime.evaluate', {
+        expression: `document.documentElement.setAttribute('data-theme', 'light')`,
+      });
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
     if (target.action === 'unlock-matrix') {
       await send('Runtime.evaluate', {
         expression: `
@@ -210,6 +217,7 @@ async function main() {
         action: 'view-clues-open',
       },
       { name: 'mobile', width: 390, height: 844, mobile: true, action: undefined },
+      { name: 'mobile-light', width: 390, height: 844, mobile: true, action: 'theme-light' },
       { name: 'mobile-matrix', width: 390, height: 844, mobile: true, action: 'unlock-matrix' },
       {
         name: 'mobile-clues-closed',

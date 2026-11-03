@@ -89,15 +89,15 @@ export function RankProgress({
         </button>
       </div>
 
-      <div className="flex items-center gap-2 h-5">
+      <div className="flex items-center gap-2.5 h-6">
         <div
           className="relative flex-1 rounded-full overflow-hidden transition-[width] duration-200 border border-solid"
           style={{
-            height: '10px',
+            height: '15px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-bg-secondary)',
             borderColor: 'var(--color-border)',
-            boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.12)',
+            boxShadow: 'inset 0 1.5px 3px rgba(0, 0, 0, 0.12)',
           }}
           role="progressbar"
           aria-valuenow={score}
@@ -121,12 +121,15 @@ export function RankProgress({
               data-testid={`rank-notch-${r.pct}`}
               data-rank={r.name}
               title={`${r.name} (${r.pct}%)`}
-              className="absolute top-0 bottom-0 pointer-events-none z-10"
+              className="absolute pointer-events-none z-10"
               style={{
                 left: `${r.pct}%`,
-                width: '2px',
+                top: '2.5px',
+                bottom: '2.5px',
+                width: '1px',
+                borderRadius: '9999px',
                 transform: 'translateX(-50%)',
-                backgroundColor: 'var(--color-bg-primary)',
+                backgroundColor: 'var(--color-rank-notch)',
               }}
             />
           ))}
@@ -134,7 +137,7 @@ export function RankProgress({
 
         {!showRanks && (
           <div
-            className="flex items-center gap-1 shrink-0"
+            className="flex items-center gap-1.5 shrink-0"
             title="Saavutukset ilman apuja (25%, 50%, 70%)"
             aria-label="Saavutukset ilman apuja"
           >
@@ -155,8 +158,8 @@ export function RankProgress({
                   }`}
                   className="flex items-center justify-center transition-colors duration-200"
                   style={{
-                    width: '14px',
-                    height: '14px',
+                    width: '21px',
+                    height: '21px',
                     color: isReached
                       ? 'var(--color-accent)'
                       : isLost
@@ -165,11 +168,11 @@ export function RankProgress({
                   }}
                 >
                   {isReached ? (
-                    <CircleStarIcon size={14} strokeWidth={2.3} />
+                    <CircleStarIcon size={21} strokeWidth={2.3} />
                   ) : isLost ? (
-                    <CircleOffIcon size={13} strokeWidth={2.2} />
+                    <CircleOffIcon size={20} strokeWidth={2.2} />
                   ) : (
-                    <CircleIcon size={12} strokeWidth={2.2} />
+                    <CircleIcon size={18} strokeWidth={2.2} />
                   )}
                 </span>
               );

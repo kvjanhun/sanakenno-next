@@ -27,6 +27,7 @@
   --color-button-shadow: #1a1a1a26;
   --color-on-accent: #ffffff;
   --color-error: #dc2626;
+  --color-rank-notch: color-mix(in srgb, var(--color-on-accent) 45%, transparent);
 
   /* Default accent = hehku, light */
   --color-accent: #ff643e;
@@ -54,6 +55,7 @@
     --color-hex-stroke: #3e3e3e;
     --color-button-shadow: #0000005c;
     --color-error: #f87171;
+    --color-rank-notch: color-mix(in srgb, var(--color-text-primary) 22%, transparent);
     /* Default accent = hehku, dark */
     --color-accent: #e05030;
     --color-accent-faded: #7d3525;
@@ -75,6 +77,7 @@
   --color-hex-stroke: #3e3e3e;
   --color-button-shadow: #0000005c;
   --color-error: #f87171;
+  --color-rank-notch: color-mix(in srgb, var(--color-text-primary) 22%, transparent);
   --color-accent: #e05030;
   --color-accent-faded: #7d3525;
 }
