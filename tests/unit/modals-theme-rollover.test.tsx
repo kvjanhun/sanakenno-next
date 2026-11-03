@@ -356,7 +356,7 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     expect(screen.getByText('palo-ovi')).toBeInTheDocument();
     expect(screen.getByText('Matriisi:')).toBeInTheDocument();
     expect(screen.getByText('Vihjeet:')).toBeInTheDocument();
-    expect(screen.queryByText(/Alkuparit/)).not.toBeInTheDocument();
+    expect(screen.getByText(/alkupareille/)).toBeInTheDocument();
     expect(screen.queryByText(/Yleiskuva/)).not.toBeInTheDocument();
   });
 });

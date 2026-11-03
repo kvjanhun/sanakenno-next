@@ -144,7 +144,8 @@ export function RulesModal({ show, onClose }: RulesModalProps): React.JSX.Elemen
                 <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   Vihjeet:
                 </span>{' '}
-                pangrammien alkukirjaimet ja pituudet (taso 1) sekä sananpäätteet (taso 2).
+                erikseen avattavat osiot pangrammeille (alkukirjaimet ja pituudet), alkupareille (7
+                yleisintä alkua) sekä sananpäätteille (7 yleisintä päätettä).
               </span>
             </li>
           </ul>
