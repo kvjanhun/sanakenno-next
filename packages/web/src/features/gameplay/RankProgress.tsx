@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { noHintAchievementStates, progressToNextRank, rankThresholds } from '@sanakenno/shared';
+import { RANKS, noHintAchievementStates, rankThresholds } from '@sanakenno/shared';
 import { ChevronDownIcon, CircleIcon, CircleOffIcon, CircleStarIcon } from './icons.js';
 
 export interface RankProgressProps {
@@ -12,6 +12,8 @@ export interface RankProgressProps {
   hasUnlockedHints: boolean;
 }
 
+const INTERMEDIATE_RANKS = [...RANKS].filter((r) => r.pct > 0 && r.pct < 100).reverse();
+
 export function RankProgress({
   score,
   maxScore,
@@ -22,7 +24,7 @@ export function RankProgress({
   hasUnlockedHints,
 }: RankProgressProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
-  const progress = Math.min(100, Math.max(0, progressToNextRank(score, maxScore)));
+  const totalProgress = maxScore > 0 ? Math.min(100, Math.max(0, (score / maxScore) * 100)) : 0;
   const thresholds = rankThresholds(rank, maxScore);
   const noHintAchievements = noHintAchievementStates(scoreBeforeHints, maxScore);
   const currentNoHintAchievement = [...noHintAchievements].reverse().find((item) => item.unlocked);
@@ -89,7 +91,7 @@ export function RankProgress({
 
       <div className="flex items-center gap-2">
         <div
-          className="h-2 flex-1 rounded-full overflow-hidden"
+          className="relative h-2 flex-1 rounded-full overflow-hidden"
           style={{ backgroundColor: 'var(--color-bg-secondary)' }}
           role="progressbar"
           aria-valuenow={score}
@@ -98,11 +100,28 @@ export function RankProgress({
         >
           <div
             className="h-full rounded-full transition-[width] duration-200 ease-out"
+            data-testid="rank-progress-fill"
             style={{
-              width: `${Math.round(progress)}%`,
+              width: `${totalProgress}%`,
               backgroundColor: 'var(--color-accent)',
             }}
           />
+
+          {INTERMEDIATE_RANKS.map((r) => (
+            <div
+              key={r.name}
+              data-testid={`rank-notch-${r.pct}`}
+              data-rank={r.name}
+              title={`${r.name} (${r.pct}%)`}
+              className="absolute top-0 bottom-0 pointer-events-none z-10"
+              style={{
+                left: `${r.pct}%`,
+                width: '2px',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'var(--color-bg-primary)',
+              }}
+            />
+          ))}
         </div>
 
         <div
@@ -165,24 +184,10 @@ export function RankProgress({
             overflow: 'hidden',
           }}
         >
-          <ul className="list-none p-0 m-0 text-sm space-y-1" style={{ padding: '0.5rem 0.75rem' }}>
-            {thresholds.map((t) => (
-              <li
-                key={t.name}
-                className="flex justify-between"
-                style={{
-                  color: t.isCurrent ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                  fontWeight: t.isCurrent ? 700 : 400,
-                }}
-              >
-                <span>{t.name}</span>
-                <span>{t.points}</span>
-              </li>
-            ))}
-          </ul>
           <div
+            data-testid="rank-panel-no-hints"
             style={{
-              borderTop: '1px solid var(--color-border)',
+              borderBottom: '1px solid var(--color-border)',
               padding: '0.6rem 0.75rem',
               background: 'var(--color-bg-secondary)',
             }}
@@ -216,6 +221,21 @@ export function RankProgress({
               </div>
             </div>
           </div>
+          <ul className="list-none p-0 m-0 text-sm space-y-1" style={{ padding: '0.5rem 0.75rem' }}>
+            {thresholds.map((t) => (
+              <li
+                key={t.name}
+                className="flex justify-between"
+                style={{
+                  color: t.isCurrent ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  fontWeight: t.isCurrent ? 700 : 400,
+                }}
+              >
+                <span>{t.name}</span>
+                <span>{t.points}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

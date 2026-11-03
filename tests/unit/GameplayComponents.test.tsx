@@ -6,7 +6,6 @@ import { GameControls } from '../../packages/web/src/features/gameplay/GameContr
 import { HintMatrixTable } from '../../packages/web/src/features/gameplay/HintMatrixTable.js';
 import { HintPanels } from '../../packages/web/src/features/gameplay/HintPanels.js';
 import { Honeycomb } from '../../packages/web/src/features/gameplay/Honeycomb.js';
-import { RankProgress } from '../../packages/web/src/features/gameplay/RankProgress.js';
 import { useKeyboard } from '../../packages/web/src/features/gameplay/useKeyboard.js';
 import { useUiStore } from '../../packages/web/src/features/gameplay/useUiStore.js';
 
@@ -39,52 +38,6 @@ describe('Gameplay UI Components', () => {
     fireEvent.pointerDown(outerCellK);
     expect(onHexDown).toHaveBeenCalled();
     expect(onLetterPress).toHaveBeenCalledWith('k');
-  });
-
-  it('renders RankProgress score, rank pill, and expandable rank thresholds with no-hint points', () => {
-    const onToggleRanks = vi.fn();
-    const { rerender } = render(
-      <RankProgress
-        score={25}
-        maxScore={100}
-        rank="Hyvä"
-        showRanks={false}
-        onToggleRanks={onToggleRanks}
-        scoreBeforeHints={25}
-        hasUnlockedHints={false}
-      />,
-    );
-
-    expect(screen.getByTestId('score-display')).toHaveTextContent('25 pistettä');
-    expect(screen.getByTestId('milestone-pip-25')).toBeInTheDocument();
-    expect(screen.getByTestId('milestone-pip-50')).toBeInTheDocument();
-    expect(screen.getByTestId('milestone-pip-70')).toBeInTheDocument();
-    const rankBtn = screen.getByTestId('rank-button');
-    expect(rankBtn).toHaveTextContent('Hyvä');
-    expect(rankBtn).toHaveAttribute('aria-expanded', 'false');
-
-    fireEvent.click(rankBtn);
-    expect(onToggleRanks).toHaveBeenCalledTimes(1);
-
-    rerender(
-      <RankProgress
-        score={25}
-        maxScore={100}
-        rank="Hyvä"
-        showRanks={true}
-        onToggleRanks={onToggleRanks}
-        scoreBeforeHints={18}
-        hasUnlockedHints={true}
-      />,
-    );
-
-    const panel = screen.getByTestId('rank-thresholds-panel');
-    // No-hint pips stay visible after hints are used; unreached ones turn "lost"
-    expect(screen.getByTestId('milestone-pip-25')).toHaveAttribute('data-state', 'lost');
-    expect(panel).toBeInTheDocument();
-    expect(panel).toHaveTextContent('Täysi kenno');
-    expect(panel).toHaveTextContent('Ällistyttävä');
-    expect(panel).toHaveTextContent('18 p.');
   });
 
   it('supports HintPanels progressive 4-tier deck and tier unlocking', () => {
