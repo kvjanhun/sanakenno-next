@@ -33,14 +33,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: [
-      '**/dist/',
-      '**/dev-dist/',
-      'node_modules/',
-      'coverage/',
-      'playwright-report/',
-      'test-results/',
-      '.turbo/',
-    ],
+    ignores: ['**/dist/', '**/dev-dist/', 'node_modules/', 'coverage/'],
   },
 );

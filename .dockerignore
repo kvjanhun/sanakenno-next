@@ -10,9 +10,6 @@ coverage
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
-playwright-report
-test-results
-.turbo
 .git
 .github
 .DS_Store

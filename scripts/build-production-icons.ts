@@ -22,9 +22,9 @@ function roundedHexPath(cx: number, cy: number, r: number, cr: number): string {
 
   let d = '';
   for (let i = 0; i < 6; i++) {
-    const prev = pts[(i + 5) % 6];
-    const curr = pts[i];
-    const next = pts[(i + 1) % 6];
+    const prev = pts[(i + 5) % 6]!;
+    const curr = pts[i]!;
+    const next = pts[(i + 1) % 6]!;
     const v1 = { x: prev.x - curr.x, y: prev.y - curr.y };
     const len1 = Math.hypot(v1.x, v1.y);
     const u1 = { x: v1.x / len1, y: v1.y / len1 };

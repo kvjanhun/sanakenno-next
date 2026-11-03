@@ -6,6 +6,8 @@ coverage/
 *.db
 *.db-wal
 *.db-shm
+*-litestream/
+.*-litestream/
 .screenshots/
 .turbo/
 .DS_Store

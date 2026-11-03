@@ -14,5 +14,5 @@
       "zustand": ["./packages/web/node_modules/zustand"]
     }
   },
-  "include": ["tests/**/*", "vitest.config.ts", "playwright.config.ts"]
+  "include": ["tests/**/*", "scripts/**/*", "vitest.config.ts"]
 }

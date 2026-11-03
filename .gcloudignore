@@ -11,9 +11,6 @@ coverage/
 *.db-wal
 *.db-shm
 *.sqlite
-playwright-report/
-test-results/
-.turbo/
 .DS_Store
 .env
 .env.*
