@@ -168,7 +168,7 @@ describe('Gameplay UI Components', () => {
     fireEvent.click(screen.getByTestId('tier-tab-2'));
     expect(screen.getByLabelText('Taso 1/3')).toBeInTheDocument();
     const vihjeetTier2Content = screen.getByTestId('hint-content-tier2');
-    expect(vihjeetTier2Content).toHaveTextContent(/K\s*\(11\)/);
+    expect(vihjeetTier2Content).toHaveTextContent(/k\s*\(11\)/);
     expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
 
     // Unlock Pairs independently
