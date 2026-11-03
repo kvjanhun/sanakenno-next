@@ -146,7 +146,7 @@ export function ClueLockedRow({
 function ClueLabel({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <div
-      className="text-[10px] font-bold uppercase tracking-wider pl-0.5 mb-1 leading-none"
+      className="text-[11px] tracking-wider pl-0.5 mb-1 leading-none"
       style={{ color: 'var(--color-text-secondary)' }}
     >
       {children}
@@ -173,7 +173,7 @@ export function PangramClues({ data }: { data: DerivedHintData }): React.JSX.Ele
             }}
           >
             <span className="font-bold" style={{ color: 'var(--color-accent)' }}>
-              {p.first_letter.toUpperCase()}
+              {p.first_letter}
             </span>
             <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               ({p.length})
