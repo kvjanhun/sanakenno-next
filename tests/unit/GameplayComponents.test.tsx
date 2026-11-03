@@ -8,8 +8,13 @@ import { HintPanels } from '../../packages/web/src/features/gameplay/HintPanels.
 import { Honeycomb } from '../../packages/web/src/features/gameplay/Honeycomb.js';
 import { useKeyboard } from '../../packages/web/src/features/gameplay/useKeyboard.js';
 import { useUiStore } from '../../packages/web/src/features/gameplay/useUiStore.js';
+import { beforeEach } from 'vitest';
 
 describe('Gameplay UI Components', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useUiStore.getState().setHintsHidden(true);
+  });
   it('renders Honeycomb center and outer letters and fires letter callbacks on interaction', () => {
     const onLetterPress = vi.fn();
     const onHexDown = vi.fn();
@@ -63,8 +68,17 @@ describe('Gameplay UI Components', () => {
       <HintPanels hintsUnlocked={new Set()} onUnlock={onUnlock} hintData={hintData} />,
     );
 
-    // Level 0: both tabs locked, matrix tab shows a single unlock button
+    // Hints default to collapsed (shows counter and "Näytä avut" button)
     expect(screen.getByTestId('hint-words-counter')).toHaveTextContent('3/4');
+    const showHintsBtn = screen.getByTestId('show-hints-button');
+    expect(showHintsBtn).toHaveTextContent('Näytä avut');
+    expect(screen.queryByTestId('activate-hints-button')).not.toBeInTheDocument();
+
+    // Expanding hints shows the active tab content
+    fireEvent.click(showHintsBtn);
+    expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('0');
+
+    // Level 0: both tabs locked, matrix tab shows a single unlock button
     expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
     const activateBtn = screen.getByTestId('activate-hints-button');
     fireEvent.click(activateBtn);

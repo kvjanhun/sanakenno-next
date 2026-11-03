@@ -113,6 +113,9 @@ async function captureWithCdp(
       await send('Runtime.evaluate', {
         expression: `
           (async () => {
+            const showBtn = document.querySelector('[data-testid="show-hints-button"]');
+            if (showBtn) showBtn.click();
+            await new Promise((r) => setTimeout(r, 100));
             const btn1 = document.querySelector('[data-testid="activate-hints-button"]');
             if (btn1) btn1.click();
             await new Promise((r) => setTimeout(r, 200));
@@ -129,6 +132,9 @@ async function captureWithCdp(
       await send('Runtime.evaluate', {
         expression: `
           (async () => {
+            const showBtn = document.querySelector('[data-testid="show-hints-button"]');
+            if (showBtn) showBtn.click();
+            await new Promise((r) => setTimeout(r, 100));
             const tab = document.querySelector('[data-testid="tier-tab-2"]');
             if (tab) tab.click();
           })()
@@ -142,6 +148,9 @@ async function captureWithCdp(
       await send('Runtime.evaluate', {
         expression: `
           (async () => {
+            const showBtn = document.querySelector('[data-testid="show-hints-button"]');
+            if (showBtn) showBtn.click();
+            await new Promise((r) => setTimeout(r, 100));
             const tab = document.querySelector('[data-testid="tier-tab-2"]');
             if (tab) tab.click();
             await new Promise((r) => setTimeout(r, 200));

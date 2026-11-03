@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 
-/** localStorage key for the player's "hide hint deck" preference. */
+/** localStorage key for the player's "hide hint deck" preference. Defaults to true (collapsed). */
 export const HINTS_HIDDEN_KEY = 'sanakenno_hints_hidden';
 
 function readHintsHidden(): boolean {
   try {
-    return window.localStorage.getItem(HINTS_HIDDEN_KEY) === '1';
+    return window.localStorage.getItem(HINTS_HIDDEN_KEY) !== '0';
   } catch {
-    return false;
+    return true;
   }
 }
 

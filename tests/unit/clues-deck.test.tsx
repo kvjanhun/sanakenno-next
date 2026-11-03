@@ -1,9 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { deriveHintData } from '@sanakenno/shared';
 import { HintPanels } from '../../packages/web/src/features/gameplay/HintPanels.js';
+import { useUiStore } from '../../packages/web/src/features/gameplay/useUiStore.js';
 
 describe('Vihjeet Clues Deck & Granular Unlocks (Spec 16)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    useUiStore.getState().setHintsHidden(false);
+  });
   const letters = new Set(['a', 'e', 'i', 'k', 'l', 'm', 'n', 's', 't']);
 
   const sampleHintData = deriveHintData(
@@ -154,5 +159,17 @@ describe('Vihjeet Clues Deck & Granular Unlocks (Spec 16)', () => {
 
     // Deck preserves fixed height
     expect(screen.getByTestId('hint-deck')).toHaveStyle({ height: '172px' });
+  });
+
+  it('defaults to collapsed and expands when user clicks "Näytä avut"', () => {
+    useUiStore.getState().setHintsHidden(true);
+    render(<HintPanels hintsUnlocked={new Set()} onUnlock={vi.fn()} hintData={sampleHintData} />);
+
+    expect(screen.getByTestId('show-hints-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('tier-tab-2')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('show-hints-button'));
+    expect(screen.getByTestId('tier-tab-2')).toBeInTheDocument();
+    expect(screen.getByTestId('hide-hints-button')).toBeInTheDocument();
   });
 });
