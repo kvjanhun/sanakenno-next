@@ -18,6 +18,7 @@ sanakenno-next/
     screenshot.ts            # Headless Chrome mobile & desktop screenshot capture utility
   .github/workflows/ci-web.yml# GitHub Actions CI & webhook deploy workflow
   specs/                     # Sequenced specs driving autonomous implementation
+    archive/                 # Shipped historical specs (superseded point-in-time slices)
   packages/
     shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, sync-merge, kotus lemma links, share-text, honeycomb-theme, auth-types) & Zod schemas
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer

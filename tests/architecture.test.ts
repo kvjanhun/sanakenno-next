@@ -161,33 +161,47 @@ describe('Architectural Fitness Guardrails', () => {
 
   it('keeps specs/NN-*.md files structurally valid and synchronized with specs/00-backlog.md', () => {
     const backlogContent = fs.readFileSync(path.join(ROOT, 'specs/00-backlog.md'), 'utf8');
-    const specFiles = fs
-      .readdirSync(path.join(ROOT, 'specs'))
-      .filter((name) => /^\d{2}-.*\.md$/.test(name) && name !== '00-backlog.md');
+    const specDirs = [
+      { dir: path.join(ROOT, 'specs'), relPrefix: '' },
+      { dir: path.join(ROOT, 'specs/archive'), relPrefix: 'archive/' },
+    ];
 
-    for (const specFile of specFiles) {
-      const content = fs.readFileSync(path.join(ROOT, 'specs', specFile), 'utf8');
-      const statusRegex = /^Status:\s*(draft|approved|in-progress|ready-for-curation|shipped)$/m;
-      const statusMatch = statusRegex.exec(content);
-      expect(statusMatch, `${specFile} must have a valid Status header`).not.toBeNull();
-      expect(content, `${specFile} must have a Branch header`).toMatch(/^Branch:\s*spec\/\d{2}-/m);
+    for (const { dir, relPrefix } of specDirs) {
+      if (!fs.existsSync(dir)) continue;
+      const specFiles = fs
+        .readdirSync(dir)
+        .filter((name) => /^\d{2}-.*\.md$/.test(name) && name !== '00-backlog.md');
 
-      for (const requiredHeading of [
-        '## 1. Objective',
-        '## 2. Invariants & Non-Goals',
-        '## 3. Contract & Architecture',
-        '## 4. Acceptance Criteria',
-      ]) {
-        expect(content, `${specFile} missing ${requiredHeading}`).toContain(requiredHeading);
+      for (const specFile of specFiles) {
+        const content = fs.readFileSync(path.join(dir, specFile), 'utf8');
+        const statusRegex = /^Status:\s*(draft|approved|in-progress|ready-for-curation|shipped)$/m;
+        const statusMatch = statusRegex.exec(content);
+        expect(statusMatch, `${specFile} must have a valid Status header`).not.toBeNull();
+        expect(content, `${specFile} must have a Branch header`).toMatch(
+          /^Branch:\s*spec\/\d{2}-/m,
+        );
+
+        for (const requiredHeading of [
+          '## 1. Objective',
+          '## 2. Invariants & Non-Goals',
+          '## 3. Contract & Architecture',
+          '## 4. Acceptance Criteria',
+        ]) {
+          expect(content, `${specFile} missing ${requiredHeading}`).toContain(requiredHeading);
+        }
+
+        const status = statusMatch?.[1];
+        if (relPrefix === 'archive/') {
+          expect(status, `Archived spec ${specFile} must be shipped`).toBe('shipped');
+        }
+
+        const escapedFile = `${relPrefix}${specFile}`.replaceAll('.', '\\.');
+        const backlogRowRegex = new RegExp(`\\(${escapedFile}\\)\\s*\\|\\s*\`${status}\``);
+        expect(
+          backlogContent,
+          `specs/00-backlog.md status for ${relPrefix}${specFile} must match Status: ${status}`,
+        ).toMatch(backlogRowRegex);
       }
-
-      const status = statusMatch?.[1];
-      const escapedFile = specFile.replaceAll('.', '\\.');
-      const backlogRowRegex = new RegExp(`\\(${escapedFile}\\)\\s*\\|\\s*\`${status}\``);
-      expect(
-        backlogContent,
-        `specs/00-backlog.md status for ${specFile} must match Status: ${status}`,
-      ).toMatch(backlogRowRegex);
     }
   });
 });

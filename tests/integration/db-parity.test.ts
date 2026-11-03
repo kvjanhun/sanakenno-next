@@ -9,7 +9,7 @@ import {
 } from '../../packages/server/src/db/connection.js';
 import { BASELINE_SQL } from '../../packages/server/src/db/baseline-sql.js';
 
-const V1_SCHEMA_PATH = '/Users/erezac/Projects/sanakenno/server/db/schema.sql';
+const V1_SCHEMA_PATH = process.env.V1_SCHEMA_PATH;
 
 describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
   const tempFiles: string[] = [];
@@ -35,9 +35,10 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
 
   it('opens a database initialized from Sanakenno 1.0 schema.sql and queries all 16 tables with foreign-key cascades', async () => {
     const dbPath = makeTempDbPath();
-    const rawV1Sql = fs.existsSync(V1_SCHEMA_PATH)
-      ? fs.readFileSync(V1_SCHEMA_PATH, 'utf8')
-      : BASELINE_SQL;
+    const rawV1Sql =
+      V1_SCHEMA_PATH && fs.existsSync(V1_SCHEMA_PATH)
+        ? fs.readFileSync(V1_SCHEMA_PATH, 'utf8')
+        : BASELINE_SQL;
 
     const rawSqlite = new SQLite(dbPath);
     rawSqlite.exec(rawV1Sql);
