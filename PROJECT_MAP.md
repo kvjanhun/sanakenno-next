@@ -21,7 +21,7 @@ sanakenno-next/
   specs/                     # Sequenced specs driving autonomous implementation
     archive/                 # Shipped historical specs (superseded point-in-time slices)
   packages/
-    shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, sync-merge, kotus lemma links, share-text, honeycomb-theme, auth-types) & Zod schemas
+    shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, achievements, sync-merge, kotus lemma links, share-text, honeycomb-theme, auth-types) & Zod schemas
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer
       src/
         db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0003 migration runner, deterministic seed
@@ -40,8 +40,8 @@ sanakenno-next/
         api/                 # Typed Hono RPC client (hc<AppType>)
         pwa.config.ts        # PWA manifest, service worker registration & Workbox runtime caching
         features/
-          gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels), useMidnightRollover, and hybrid state
-          modals/            # ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal
+          gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AchievementNotification), useMidnightRollover, and hybrid state
+          modals/            # ArchiveModal, PuzzleWordsModal, StatsModal (tabbed summary + AchievementsList), RulesModal, SettingsModal
           player-sync/       # Player auth store, monotonic sync reconciliation, SyncModal, ConnectBanner
           theme/             # 6-palette CSS custom property theme system (usePaletteStore, useThemePreferenceStore, ThemeSelector, ThemeToggle)
           admin/             # Code-split admin panel (AdminLayout, LoginPage, PuzzleEditor, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
@@ -82,3 +82,9 @@ Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 
 - Both hyphenated and un-hyphenated forms (`aamu-uninen` and `aamuuninen`) resolve to the identical normalized SHA-256 hash in gameplay.
 - Kotus dictionary links and revealed word lists in `PuzzleWordsModal` always use canonical hyphenated lemmas.
+
+### 6. Daily Streak Integrity & Milestone Separation
+
+- **Milestones (`NoHintMilestone`):** Per-puzzle unassisted point markers (25%, 50%, 70%) on the progress bar.
+- **Achievements (`ACHIEVEMENT_DEFINITIONS`):** Long-term player badges across 6 categories with 5 tiers each (Pronssi, Hopea, Kulta, Timantti, Mestari).
+- **Streak ("Putki"):** Strictly measures consecutive calendar days in `Europe/Helsinki` on which the player solved words in the active daily puzzle. Archive plays never advance or create streaks.

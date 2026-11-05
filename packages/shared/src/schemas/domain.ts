@@ -29,6 +29,12 @@ export const StatsRecordSchema = z.object({
   longest_word: z.string().optional(),
   pangrams_found: z.number().int().nonnegative().optional(),
   best_no_hint_score: z.number().int().nonnegative().optional(),
+  is_daily: z.boolean().optional(),
+  played_at_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  long_words_count: z.number().int().nonnegative().optional(),
 });
 
 export const PlayerStatsSchema = z.object({

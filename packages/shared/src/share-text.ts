@@ -1,4 +1,4 @@
-import { noHintAchievementStates, rankForScore } from './scoring.js';
+import { noHintMilestoneStates, rankForScore } from './scoring.js';
 
 type HintCollection = ReadonlySet<string> | readonly string[] | null;
 
@@ -30,9 +30,9 @@ function noHintScoreForShare({ score, hintsUnlocked, scoreBeforeHints }: ShareTe
   return hasUnlockedHints(hintsUnlocked) ? (scoreBeforeHints ?? 0) : score;
 }
 
-function noHintAchievementLine(input: ShareTextInput): string {
+function noHintMilestoneLine(input: ShareTextInput): string {
   const noHintScore = noHintScoreForShare(input);
-  const states = noHintAchievementStates(noHintScore, input.maxScore);
+  const states = noHintMilestoneStates(noHintScore, input.maxScore);
   const stars = states.map((state) => (state.unlocked ? '\u2B50\uFE0F' : '\u26AB\uFE0F')).join('');
   const percentage = clampedPercentage(noHintScore, input.maxScore);
   const allStars = states.length > 0 && states.every((state) => state.unlocked);
@@ -50,7 +50,7 @@ export function buildShareText(input: ShareTextInput): string {
     `Sanakenno \u2014 Kenno #${input.displayNumber}`,
     `${rankPrefix}${rank} \u00B7 ${input.score}/${input.maxScore} p.`,
     progressBar(input.score, input.maxScore),
-    noHintAchievementLine(input),
+    noHintMilestoneLine(input),
     'sanakenno.fi',
   ].join('\n');
 }

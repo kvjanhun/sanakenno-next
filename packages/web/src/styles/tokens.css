@@ -29,6 +29,13 @@
   --color-error: #dc2626;
   --color-rank-notch: color-mix(in srgb, var(--color-on-accent) 45%, transparent);
 
+  /* Achievement tier tokens */
+  --color-tier-bronze: #cd7f32;
+  --color-tier-silver: #94a3b8;
+  --color-tier-gold: #eab308;
+  --color-tier-diamond: #38bdf8;
+  --color-tier-master: #a855f7;
+
   /* Default accent = hehku, light */
   --color-accent: #ff643e;
   --color-accent-faded: #ffb2a0;

@@ -183,6 +183,26 @@ async function captureWithCdp(
       await new Promise((r) => setTimeout(r, 300));
     }
 
+    if (target.action?.startsWith('view-stats')) {
+      await send('Runtime.evaluate', {
+        expression: `
+          (async () => {
+            const statsBtn = document.querySelector('button[aria-label="Tilastot"]');
+            if (statsBtn) statsBtn.click();
+            await new Promise((r) => setTimeout(r, 200));
+            ${
+              target.action.includes('achievements')
+                ? `const achTab = Array.from(document.querySelectorAll('button[role="tab"]')).find(b => b.textContent?.includes('Saavutukset'));
+                   if (achTab) achTab.click();`
+                : ''
+            }
+          })()
+        `,
+        awaitPromise: true,
+      });
+      await new Promise((r) => setTimeout(r, 400));
+    }
+
     const result = (await send('Page.captureScreenshot', {
       format: 'png',
       clip: { x: 0, y: 0, width: target.width, height: target.height, scale: 1 },
@@ -225,9 +245,30 @@ async function main() {
         mobile: false,
         action: 'view-clues-open',
       },
+      {
+        name: 'desktop-stats-achievements',
+        width: 1280,
+        height: 800,
+        mobile: false,
+        action: 'view-stats-achievements',
+      },
       { name: 'mobile', width: 390, height: 844, mobile: true, action: undefined },
       { name: 'mobile-light', width: 390, height: 844, mobile: true, action: 'theme-light' },
       { name: 'mobile-matrix', width: 390, height: 844, mobile: true, action: 'unlock-matrix' },
+      {
+        name: 'mobile-stats-achievements',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-stats-achievements',
+      },
+      {
+        name: 'mobile-stats-summary',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-stats-summary',
+      },
       {
         name: 'mobile-clues-closed',
         width: 390,

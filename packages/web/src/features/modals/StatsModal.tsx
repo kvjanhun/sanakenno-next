@@ -15,6 +15,7 @@ import { ShareIcon } from '../gameplay/icons.js';
 import { loadFromStorage, puzzleStateKey } from '../gameplay/storage.js';
 import { useGameStore } from '../gameplay/useGameStore.js';
 import { useUiStore } from '../gameplay/useUiStore.js';
+import { AchievementsList } from './AchievementsList.js';
 import { ModalShell } from './ModalShell.js';
 
 interface StoredPuzzleState {
@@ -56,7 +57,7 @@ export interface StatsModalProps {
 
 /**
  * Player statistics modal rendering lifetime stats, current/best streak,
- * rank distribution, no-hint achievement stats, and share action.
+ * rank distribution, no-hint milestone stats, and share action.
  */
 export function StatsModal({
   show,
@@ -65,6 +66,7 @@ export function StatsModal({
   shareCopied: propShareCopied,
 }: StatsModalProps): React.JSX.Element {
   const [stats, setStats] = useState<PlayerStats>(emptyStats());
+  const [activeTab, setActiveTab] = useState<'summary' | 'achievements'>('summary');
   const storeShareCopied = useUiStore((s) => s.shareCopied);
   const hasPuzzle = useGameStore((s) => s.puzzle !== null);
   const shareCopied = propShareCopied !== undefined ? propShareCopied : storeShareCopied;
@@ -96,7 +98,53 @@ export function StatsModal({
 
   return (
     <ModalShell show={show} title="Tilastot" titleId="stats-title" onClose={onClose}>
-      {records.length === 0 ? (
+      <div
+        className="flex rounded-lg p-1 mb-4 gap-1"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '1px solid var(--color-border)',
+        }}
+        role="tablist"
+        aria-label="Tilastojen välilehdet"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'summary'}
+          onClick={() => setActiveTab('summary')}
+          className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer border-none"
+          style={{
+            background: activeTab === 'summary' ? 'var(--color-bg-primary)' : 'transparent',
+            color:
+              activeTab === 'summary' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+            boxShadow: activeTab === 'summary' ? '0 1px 3px var(--color-button-shadow)' : 'none',
+          }}
+        >
+          Yhteenveto
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'achievements'}
+          onClick={() => setActiveTab('achievements')}
+          className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer border-none"
+          style={{
+            background: activeTab === 'achievements' ? 'var(--color-bg-primary)' : 'transparent',
+            color:
+              activeTab === 'achievements'
+                ? 'var(--color-text-primary)'
+                : 'var(--color-text-secondary)',
+            boxShadow:
+              activeTab === 'achievements' ? '0 1px 3px var(--color-button-shadow)' : 'none',
+          }}
+        >
+          Saavutukset
+        </button>
+      </div>
+
+      {activeTab === 'achievements' ? (
+        <AchievementsList stats={stats} streak={{ current: currentStreak, best: bestStreak }} />
+      ) : records.length === 0 ? (
         <div className="text-sm py-4 text-center" style={{ color: 'var(--color-text-tertiary)' }}>
           Ei vielä tilastoja. Pelaa kenno!
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { RANKS, noHintAchievementStates, rankThresholds } from '@sanakenno/shared';
+import { RANKS, noHintMilestoneStates, rankThresholds } from '@sanakenno/shared';
 import { ChevronDownIcon, CircleIcon, CircleOffIcon, CircleStarIcon } from './icons.js';
 
 export interface RankProgressProps {
@@ -26,14 +26,14 @@ export function RankProgress({
   const containerRef = useRef<HTMLDivElement>(null);
   const totalProgress = maxScore > 0 ? Math.min(100, Math.max(0, (score / maxScore) * 100)) : 0;
   const thresholds = rankThresholds(rank, maxScore);
-  const noHintAchievements = noHintAchievementStates(scoreBeforeHints, maxScore);
-  const currentNoHintAchievement = [...noHintAchievements].reverse().find((item) => item.unlocked);
+  const noHintMilestones = noHintMilestoneStates(scoreBeforeHints, maxScore);
+  const currentNoHintMilestone = [...noHintMilestones].reverse().find((item) => item.unlocked);
   const currentNoHintText =
-    currentNoHintAchievement?.name === 'Ällistyttävä ilman apuja'
+    currentNoHintMilestone?.name === 'Ällistyttävä ilman apuja'
       ? 'uskomatonta!'
-      : currentNoHintAchievement?.name === 'Avuitta taitava'
+      : currentNoHintMilestone?.name === 'Avuitta taitava'
         ? 'taidokasta!'
-        : currentNoHintAchievement?.name === 'Omin avuin'
+        : currentNoHintMilestone?.name === 'Omin avuin'
           ? 'hyvä!'
           : '';
   const noHintSuffix = ` ilman apuja${currentNoHintText ? `, ${currentNoHintText}` : ''}`;
@@ -141,7 +141,7 @@ export function RankProgress({
             title="Saavutukset ilman apuja (25%, 50%, 70%)"
             aria-label="Saavutukset ilman apuja"
           >
-            {noHintAchievements.map((ach) => {
+            {noHintMilestones.map((ach) => {
               const isReached = ach.unlocked;
               const isLost = hasUnlockedHints && !isReached;
               return (
@@ -220,11 +220,11 @@ export function RankProgress({
               <div
                 className="flex shrink-0 items-center gap-1.5"
                 aria-label={`Ilman apuja: ${
-                  noHintAchievements.filter((item) => item.unlocked).length
-                } / ${noHintAchievements.length} saavutusta`}
+                  noHintMilestones.filter((item) => item.unlocked).length
+                } / ${noHintMilestones.length} saavutusta`}
               >
-                {noHintAchievements.map((achievement, index) => {
-                  const isReached = achievement.unlocked;
+                {noHintMilestones.map((milestone, index) => {
+                  const isReached = milestone.unlocked;
                   const isLost = hasUnlockedHints && !isReached;
                   const iconName = isReached ? 'circle-star' : isLost ? 'circle-off' : 'circle';
                   const color = isReached
@@ -235,13 +235,13 @@ export function RankProgress({
 
                   return (
                     <span
-                      key={achievement.name}
-                      data-testid={`milestone-pip-${achievement.pct}`}
+                      key={milestone.name}
+                      data-testid={`milestone-pip-${milestone.pct}`}
                       data-state={isReached ? 'reached' : isLost ? 'lost' : 'open'}
                       data-no-hint-indicator={index + 1}
                       data-no-hint-state={isReached ? 'unlocked' : 'locked'}
                       data-no-hint-icon={iconName}
-                      title={`${achievement.name} (${achievement.pct}% pisteistä): ${
+                      title={`${milestone.name} (${milestone.pct}% pisteistä): ${
                         isReached
                           ? 'Saavutettu'
                           : isLost

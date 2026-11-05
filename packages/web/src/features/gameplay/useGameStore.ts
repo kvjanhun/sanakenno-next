@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import {
   buildShareText,
+  computeStreak,
+  evaluateAchievements,
   getHelsinkiDateString,
   isPangram,
   rankForScore,
@@ -37,6 +39,13 @@ export interface GameState {
   scoreBeforeHints: number | null;
   startedAt: number;
   totalPausedMs: number;
+  newAchievement: {
+    id: string;
+    title: string;
+    tierName: string;
+    target: number;
+    unit?: string;
+  } | null;
 
   center: () => string;
   allLetters: () => Set<string>;
@@ -50,6 +59,7 @@ export interface GameState {
   deleteLetter: () => void;
   shuffleLetters: () => void;
   submitWord: () => Promise<void>;
+  clearNewAchievement: () => void;
   unlockHint: (id: string) => void;
   tickTimer: (startedAt: number, totalPausedMs: number) => void;
   saveState: () => void;
@@ -90,6 +100,8 @@ export const useGameStore = create<GameState>()((set, get) => ({
   scoreBeforeHints: null,
   startedAt: 0,
   totalPausedMs: 0,
+  newAchievement: null,
+  clearNewAchievement: () => set({ newAchievement: null }),
 
   center: () => get().puzzle?.center ?? '',
   allLetters: () => {
@@ -209,9 +221,13 @@ export const useGameStore = create<GameState>()((set, get) => ({
       }
     }
 
-    recordLocalStatsUpdate({
+    const viewingDate = useUiStore.getState().viewingPuzzleDate;
+    const isDaily =
+      viewingDate === null && (puzzle.date ? puzzle.date === getHelsinkiDateString() : true);
+
+    const statsResult = recordLocalStatsUpdate({
       puzzleNumber: puzzle.puzzle_number,
-      dateStr: useUiStore.getState().viewingPuzzleDate ?? getHelsinkiDateString(),
+      dateStr: viewingDate ?? getHelsinkiDateString(),
       rank: newRank,
       score: newScore,
       maxScore: puzzle.max_score,
@@ -220,7 +236,33 @@ export const useGameStore = create<GameState>()((set, get) => ({
       hintsUsed: visibleHintsUnlocked.length,
       elapsedMs: Math.max(0, Date.now() - state.startedAt - state.totalPausedMs),
       bestNoHintScore,
+      isDaily,
     });
+
+    if (statsResult) {
+      const prevStreak = computeStreak(statsResult.previous.records);
+      const newStreak = computeStreak(statsResult.updated.records);
+      const prevEvals = evaluateAchievements(statsResult.previous, prevStreak);
+      const newEvals = evaluateAchievements(statsResult.updated, newStreak);
+
+      for (const newProg of newEvals) {
+        const oldProg = prevEvals.find((p) => p.id === newProg.id);
+        const oldTier = oldProg?.unlockedTier ?? 0;
+        if (newProg.unlockedTier > oldTier && newProg.currentTier) {
+          const tier = newProg.currentTier;
+          set({
+            newAchievement: {
+              id: newProg.id,
+              title: newProg.title,
+              tierName: tier.name,
+              target: tier.target,
+              unit: newProg.unit,
+            },
+          });
+          break;
+        }
+      }
+    }
 
     void useAuthStore.getState().syncProgress({
       puzzle_number: puzzle.puzzle_number,

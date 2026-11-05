@@ -41,6 +41,9 @@ export function mergeStatsRecord(existing: StatsRecord, incoming: StatsRecord): 
       bestNoHintScoreForRecord(existing),
       bestNoHintScoreForRecord(incoming),
     ),
+    is_daily: Boolean(existing.is_daily || incoming.is_daily),
+    played_at_date: incoming.played_at_date ?? existing.played_at_date,
+    long_words_count: Math.max(existing.long_words_count ?? 0, incoming.long_words_count ?? 0),
   };
 }
 
@@ -84,6 +87,8 @@ export function isStatsRecordBetterThanServer(
     return true;
   }
   if ((local.pangrams_found ?? 0) > (server.pangrams_found ?? 0)) return true;
+  if (local.is_daily && !server.is_daily) return true;
+  if ((local.long_words_count ?? 0) > (server.long_words_count ?? 0)) return true;
   return bestNoHintScoreForRecord(local) > bestNoHintScoreForRecord(server);
 }
 

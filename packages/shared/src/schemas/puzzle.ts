@@ -10,6 +10,10 @@ export const PuzzleResponseSchema = z.object({
   puzzle_number: z.number().int().nonnegative(),
   display_number: z.number().int().positive(),
   total_puzzles: z.number().int().nonnegative(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 export type PuzzleResponse = z.infer<typeof PuzzleResponseSchema>;

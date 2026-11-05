@@ -1,5 +1,6 @@
 import {
   emptyStats,
+  getHelsinkiDateString,
   isPangram,
   STATS_STORAGE_KEY,
   updateStatsRecord,
@@ -123,13 +124,16 @@ export function recordLocalStatsUpdate(params: {
   hintsUsed: number;
   elapsedMs: number;
   bestNoHintScore: number;
-}): void {
-  if (isPuzzleRevealed(params.puzzleNumber)) return;
+  isDaily?: boolean;
+}): { previous: PlayerStats; updated: PlayerStats } | null {
+  if (isPuzzleRevealed(params.puzzleNumber)) return null;
   let longestWord = '';
   let pangramsFound = 0;
+  let longWordsCount = 0;
   for (const w of params.foundWords) {
     if (w.length > longestWord.length) longestWord = w;
     if (isPangram(w, params.validLetters)) pangramsFound++;
+    if (w.length >= 10) longWordsCount++;
   }
   const existing = loadFromStorage<PlayerStats>(STATS_STORAGE_KEY) ?? emptyStats();
   const updated = updateStatsRecord(existing, {
@@ -144,8 +148,12 @@ export function recordLocalStatsUpdate(params: {
     longest_word: longestWord,
     pangrams_found: pangramsFound,
     best_no_hint_score: params.bestNoHintScore,
+    is_daily: params.isDaily ?? false,
+    played_at_date: getHelsinkiDateString(),
+    long_words_count: longWordsCount,
   });
   saveToStorage(STATS_STORAGE_KEY, updated);
+  return { previous: existing, updated };
 }
 
 /** Copy text to clipboard or Web Share API, returning the method used. */

@@ -21,7 +21,8 @@ import {
   isStatsRecordBetterThanServer,
   mergePuzzleState,
   mergeStatsRecord,
-  noHintAchievementStates,
+  noHintMilestoneStates,
+  NO_HINT_MILESTONES,
   PlayerStatsSchema,
   progressToNextRank,
   PuzzleStateSchema,
@@ -64,8 +65,9 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
       expect(progressToNextRank(100, 100)).toBe(100);
     });
 
-    it('computes no-hint achievement unlock states, word colorization, and column chunking', () => {
-      const states = noHintAchievementStates(50, 100);
+    it('computes no-hint milestone unlock states, word colorization, and column chunking', () => {
+      expect(NO_HINT_MILESTONES.map((m) => m.pct)).toEqual([25, 50, 70]);
+      const states = noHintMilestoneStates(50, 100);
       expect(states.map((s) => s.unlocked)).toEqual([true, true, false]);
       expect(states[1]?.name).toBe('Avuitta taitava');
 

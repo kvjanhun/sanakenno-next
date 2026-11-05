@@ -9,6 +9,7 @@ import { SyncModal } from '../player-sync/SyncModal.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { usePaletteStore } from '../theme/usePaletteStore.js';
 import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
+import { AchievementNotification } from './AchievementNotification.js';
 import { Celebration } from './Celebration.js';
 import { FoundWords } from './FoundWords.js';
 import { GameControls } from './GameControls.js';
@@ -443,6 +444,8 @@ export function GameplayView(): React.JSX.Element {
           onShare={handleShare}
         />
       )}
+
+      <AchievementNotification />
     </div>
   );
 }

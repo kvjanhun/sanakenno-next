@@ -18,15 +18,20 @@ export interface RankThreshold {
   isCurrent: boolean;
 }
 
-export interface NoHintAchievement {
+export interface NoHintMilestone {
   pct: number;
   name: string;
 }
 
-export interface NoHintAchievementState extends NoHintAchievement {
+export interface NoHintMilestoneState extends NoHintMilestone {
   points: number;
   unlocked: boolean;
 }
+
+/** @deprecated Use NoHintMilestone instead */
+export type NoHintAchievement = NoHintMilestone;
+/** @deprecated Use NoHintMilestoneState instead */
+export type NoHintAchievementState = NoHintMilestoneState;
 
 export const RANK_NAMES = [
   'Etsi sanoja!',
@@ -52,11 +57,14 @@ export const RANKS: readonly Rank[] = [
 
 const LOWEST_RANK_NAME = 'Etsi sanoja!';
 
-export const NO_HINT_ACHIEVEMENTS: readonly NoHintAchievement[] = [
+export const NO_HINT_MILESTONES: readonly NoHintMilestone[] = [
   { pct: 25, name: 'Omin avuin' },
   { pct: 50, name: 'Avuitta taitava' },
   { pct: 70, name: 'Ällistyttävä ilman apuja' },
 ];
+
+/** @deprecated Use NO_HINT_MILESTONES instead */
+export const NO_HINT_ACHIEVEMENTS: readonly NoHintMilestone[] = NO_HINT_MILESTONES;
 
 /** Score a single word. 4-letter words = 1 pt; longer = length. Pangram bonus +7. */
 export function scoreWord(word: string, allLetters: Set<string> | string[]): number {
@@ -97,20 +105,23 @@ export function rankThresholds(currentRank: string, maxScore: number): RankThres
   }));
 }
 
-/** Compute locked/unlocked state for each no-hint achievement tier. */
-export function noHintAchievementStates(
+/** Compute locked/unlocked state for each no-hint milestone tier. */
+export function noHintMilestoneStates(
   noHintScore: number,
   maxScore: number,
-): NoHintAchievementState[] {
-  return NO_HINT_ACHIEVEMENTS.map((achievement) => {
-    const points = maxScore > 0 ? Math.ceil((achievement.pct / 100) * maxScore) : 0;
+): NoHintMilestoneState[] {
+  return NO_HINT_MILESTONES.map((milestone) => {
+    const points = maxScore > 0 ? Math.ceil((milestone.pct / 100) * maxScore) : 0;
     return {
-      ...achievement,
+      ...milestone,
       points,
       unlocked: maxScore > 0 && noHintScore >= points,
     };
   });
 }
+
+/** @deprecated Use noHintMilestoneStates instead */
+export const noHintAchievementStates = noHintMilestoneStates;
 
 /** Compute progress percentage toward the next rank (0–100). */
 export function progressToNextRank(score: number, maxScore: number): number {

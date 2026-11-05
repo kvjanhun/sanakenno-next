@@ -2,7 +2,7 @@
  * Player statistics computation — pure functions.
  */
 
-import { NO_HINT_ACHIEVEMENTS, RANKS } from './scoring.js';
+import { NO_HINT_MILESTONES, RANKS } from './scoring.js';
 
 export interface StatsRecord {
   puzzle_number: number;
@@ -16,6 +16,9 @@ export interface StatsRecord {
   longest_word?: string;
   pangrams_found?: number;
   best_no_hint_score?: number;
+  is_daily?: boolean;
+  played_at_date?: string;
+  long_words_count?: number;
 }
 
 export interface PlayerStats {
@@ -73,6 +76,16 @@ export function bestNoHintScoreForRecord(record: StatsRecord): number {
   return record.hints_used === 0 ? Math.max(0, record.best_score) : 0;
 }
 
+export function isDailyRecord(record: StatsRecord): boolean {
+  if (record.is_daily !== undefined) {
+    return record.is_daily;
+  }
+  if (record.played_at_date) {
+    return record.played_at_date === record.date;
+  }
+  return true;
+}
+
 /**
  * Upsert a stats record. Only upgrades best_rank and best_score.
  * Returns a new PlayerStats (immutable).
@@ -112,6 +125,9 @@ export function updateStatsRecord(stats: PlayerStats, record: StatsRecord): Play
               bestNoHintScoreForRecord(r),
               bestNoHintScoreForRecord(record),
             ),
+            is_daily: Boolean(r.is_daily || record.is_daily),
+            played_at_date: record.played_at_date ?? r.played_at_date,
+            long_words_count: Math.max(r.long_words_count ?? 0, record.long_words_count ?? 0),
           }
         : r,
     ),
@@ -126,9 +142,10 @@ export function computeStreak(
   records: StatsRecord[],
   today?: string,
 ): { current: number; best: number } {
-  if (records.length === 0) return { current: 0, best: 0 };
+  const dailyRecords = records.filter(isDailyRecord);
+  if (dailyRecords.length === 0) return { current: 0, best: 0 };
 
-  const dates = [...new Set(records.map((r) => r.date))].sort().reverse();
+  const dates = [...new Set(dailyRecords.map((r) => r.date))].sort().reverse();
   const latestDateStr = dates[0];
   if (!latestDateStr) return { current: 0, best: 0 };
 
@@ -138,7 +155,7 @@ export function computeStreak(
   const daysDiff = Math.round((todayDate.getTime() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
 
   let current = 0;
-  if (daysDiff <= 1) {
+  if (daysDiff >= 0 && daysDiff <= 1) {
     current = 1;
     for (let i = 1; i < dates.length; i++) {
       const prevStr = dates[i - 1];
@@ -192,9 +209,9 @@ export function computeLifetimeStats(records: StatsRecord[]): LifetimeStats {
   );
 }
 
-/** Compute lifetime no-hint achievement totals shown in stats views. */
+/** Compute lifetime no-hint milestone totals shown in stats views. */
 export function computeLifetimeNoHintStats(records: StatsRecord[]): LifetimeNoHintStats {
-  const topTierPct = NO_HINT_ACHIEVEMENTS[NO_HINT_ACHIEVEMENTS.length - 1]?.pct ?? 70;
+  const topTierPct = NO_HINT_MILESTONES[NO_HINT_MILESTONES.length - 1]?.pct ?? 70;
 
   return records.reduce<LifetimeNoHintStats>(
     (totals, record) => {

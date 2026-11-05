@@ -95,17 +95,21 @@ export {
   RANKS,
   RANK_NAMES,
   type RankName,
+  NO_HINT_MILESTONES,
   NO_HINT_ACHIEVEMENTS,
   scoreWord,
   isPangram,
   recalcScore,
   rankForScore,
   rankThresholds,
+  noHintMilestoneStates,
   noHintAchievementStates,
   progressToNextRank,
   colorizeWord,
   toColumns,
   type Rank,
+  type NoHintMilestone,
+  type NoHintMilestoneState,
   type NoHintAchievement,
   type NoHintAchievementState,
   type ColorizedChar,
@@ -179,3 +183,18 @@ export {
   isStatsRecordBetterThanServer,
   isPuzzleStateBetterThanServer,
 } from './sync-merge.js';
+
+export {
+  ACHIEVEMENT_DEFINITIONS,
+  ACHIEVEMENT_TIER_KEYS,
+  ACHIEVEMENT_TIER_NAMES,
+  evaluateAchievements,
+  type AchievementId,
+  type AchievementTier,
+  type AchievementTierKey,
+  type AchievementTierName,
+  type AchievementDefinition,
+  type PlayerAchievementProgress,
+} from './achievements.js';
+
+export { isDailyRecord } from './stats.js';
