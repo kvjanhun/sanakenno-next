@@ -394,4 +394,26 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     expect(screen.getByText(/alkupareille/)).toBeInTheDocument();
     expect(screen.queryByText(/Yleiskuva/)).not.toBeInTheDocument();
   });
+
+  it('renders SettingsModal open licenses accordion and lists Kotus, Zod, and core libraries', () => {
+    render(<SettingsModal show={true} onClose={() => {}} />);
+
+    const licensesTrigger = screen.getByRole('button', { name: 'Lisenssit' });
+    expect(licensesTrigger).toBeInTheDocument();
+
+    // Closed initially
+    expect(screen.queryByText(/Sanakenno käyttää seuraavia/)).not.toBeInTheDocument();
+
+    // Expand
+    fireEvent.click(licensesTrigger);
+    expect(
+      screen.getByText('Sanakenno käyttää seuraavia avoimen lähdekoodin kirjastoja ja aineistoja:'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Kotus (Nykysuomen sanalista)')).toBeInTheDocument();
+    expect(screen.getByText('CC BY 4.0')).toBeInTheDocument();
+    expect(screen.getByText('Zod')).toBeInTheDocument();
+    expect(screen.getByText('Argon2')).toBeInTheDocument();
+    expect(screen.getByText('Lucide Icons')).toBeInTheDocument();
+    expect(screen.getByText('Litestream')).toBeInTheDocument();
+  });
 });

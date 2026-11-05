@@ -7,6 +7,7 @@ High-level map of what exists in `sanakenno-next` and core domain invariants.
 ```text
 sanakenno-next/
   AGENTS.md                  # Agent-first operating rules & 1-Screen Curation Brief mandate
+  OPEN_SOURCE_LICENSES.md    # Comprehensive open source & open data license attribution
   PROJECT_MAP.md             # Current architecture & domain invariants
   Dockerfile                 # Multi-stage production container (Node 22 Alpine, commit.txt stamp)
   docker-compose.yml         # Dual-instance zero-downtime services (sanakenno-a & sanakenno-b)

@@ -92,8 +92,8 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
       {mode === 'options' && (
         <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
           <p style={{ color: 'var(--color-text-secondary)' }}>
-            Pelitilanteesi tallentuu pilveen. Voit yhdistää toisen laitteen
-            jakamalla koodin tai linkin.
+            Pelitilanteesi tallentuu pilveen. Voit yhdistää toisen laitteen jakamalla koodin tai
+            linkin.
           </p>
 
           {error && (

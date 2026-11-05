@@ -13,6 +13,7 @@ import {
 import { msUntilMidnight } from '../gameplay/useMidnightRollover.js';
 import { PALETTE_LABELS, paletteAccent, usePaletteStore } from '../theme/usePaletteStore.js';
 import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
+import { OPEN_LICENSES } from './licenses.js';
 import { ModalShell } from './ModalShell.js';
 
 export interface SettingsModalProps {
@@ -32,42 +33,6 @@ const THEME_CHOICES: readonly {
   { id: 'system', label: 'Laite', icon: MonitorIcon },
   { id: 'light', label: 'Vaalea', icon: SunIcon },
   { id: 'dark', label: 'Tumma', icon: MoonIcon },
-];
-
-const LICENSES = [
-  { name: 'React', license: 'MIT', copyright: 'Meta Platforms, Inc.', url: 'https://react.dev' },
-  { name: 'Vite', license: 'MIT', copyright: 'Evan You', url: 'https://vite.dev' },
-  {
-    name: 'Tailwind CSS',
-    license: 'MIT',
-    copyright: 'Tailwind Labs, Inc.',
-    url: 'https://tailwindcss.com',
-  },
-  {
-    name: 'TanStack Query',
-    license: 'MIT',
-    copyright: 'Tanner Linsley',
-    url: 'https://tanstack.com/query',
-  },
-  {
-    name: 'Zustand',
-    license: 'MIT',
-    copyright: 'Paul Henschel',
-    url: 'https://github.com/pmndrs/zustand',
-  },
-  { name: 'Hono', license: 'MIT', copyright: 'Yusuke Wada', url: 'https://hono.dev' },
-  {
-    name: 'Kysely',
-    license: 'MIT',
-    copyright: 'Sami Koskimäki',
-    url: 'https://kysely.dev',
-  },
-  {
-    name: 'better-sqlite3',
-    license: 'MIT',
-    copyright: 'Joshua Wise',
-    url: 'https://github.com/WiseLibs/better-sqlite3',
-  },
 ];
 
 function formatTimeRemaining(ms: number): string {
@@ -400,10 +365,10 @@ export function SettingsModal({
               className="text-[9.5px] text-center mb-1.5"
               style={{ color: 'var(--color-text-secondary)' }}
             >
-              Sanakenno käyttää seuraavia avoimen lähdekoodin kirjastoja:
+              Sanakenno käyttää seuraavia avoimen lähdekoodin kirjastoja ja aineistoja:
             </p>
-            <div className="space-y-1 max-h-[140px] overflow-y-auto pr-1">
-              {LICENSES.map((entry) => (
+            <div className="space-y-1 max-h-[160px] overflow-y-auto pr-1">
+              {OPEN_LICENSES.map((entry) => (
                 <div
                   key={entry.name}
                   className="flex items-center justify-between gap-4 py-1.5 border-b last:border-b-0"
