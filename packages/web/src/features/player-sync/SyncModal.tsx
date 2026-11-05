@@ -7,12 +7,14 @@ export interface SyncModalProps {
   onClose: () => void;
 }
 
-type ViewMode = 'options' | 'email' | 'sent' | 'confirmRotate' | 'confirmUnlink';
+type ViewMode = 'options' | 'email' | 'sent' | 'confirmUnlink' | 'confirmReset';
 
 export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element {
   const playerKey = useAuthStore((s) => s.playerKey);
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
+  const isLinked = useAuthStore((s) => s.isLinked);
+  const sessionCount = useAuthStore((s) => s.sessionCount);
   const [mode, setMode] = useState<ViewMode>('options');
   const [codeInput, setCodeInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
@@ -78,13 +80,6 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
       setMode('sent');
     }
   }, [emailInput]);
-
-  const handleConfirmRotate = useCallback(async () => {
-    await useAuthStore.getState().rotatePlayerKey();
-    if (!useAuthStore.getState().error) {
-      setMode('options');
-    }
-  }, []);
 
   return (
     <ModalShell
@@ -229,21 +224,25 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
           </div>
 
           <div className="pt-2 flex justify-between items-center text-xs">
+            {isLinked || sessionCount > 1 ? (
+              <button
+                type="button"
+                onClick={() => setMode('confirmUnlink')}
+                className="underline cursor-pointer"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Lopeta synkronointi
+              </button>
+            ) : (
+              <span />
+            )}
             <button
               type="button"
-              onClick={() => setMode('confirmRotate')}
-              className="underline cursor-pointer"
-              style={{ color: 'var(--color-text-tertiary)' }}
-            >
-              Katkaise muut laitteet ja vaihda koodi
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('confirmUnlink')}
+              onClick={() => setMode('confirmReset')}
               className="cursor-pointer font-medium"
               style={{ color: 'var(--color-error)' }}
             >
-              Irrota tämä laite tilistä
+              Nollaa tämän laitteen pelitiedot
             </button>
           </div>
         </div>
@@ -323,47 +322,10 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
         </div>
       )}
 
-      {mode === 'confirmRotate' && (
-        <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-          <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            Haluatko varmasti vaihtaa koodin?
-          </p>
-          <p style={{ color: 'var(--color-text-secondary)' }}>
-            Uusi koodi mitätöi aiemmat toisilla laitteilla aktiiviset istunnot. Tämän laitteen
-            edistyminen säilyy.
-          </p>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setMode('options')}
-              className="px-3 py-1.5 rounded text-xs cursor-pointer"
-              style={{
-                backgroundColor: 'var(--color-bg-secondary)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              Peruuta
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmRotate}
-              disabled={isLoading}
-              className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer"
-              style={{
-                backgroundColor: 'var(--color-error)',
-                color: 'var(--color-bg-primary)',
-              }}
-            >
-              {isLoading ? 'Vaihdetaan...' : 'Vaihda koodi'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {mode === 'confirmUnlink' && (
         <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
           <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            Haluatko varmasti irrottaa tämän laitteen tilistä?
+            Haluatko lopettaa synkronoinnin?
           </p>
           <p
             style={{
@@ -372,54 +334,10 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               lineHeight: '1.4',
             }}
           >
-            Tämä laite ei enää synkronoidu muiden laitteidesi kanssa. Muut laitteet jatkavat
-            ennallaan vanhalla tilillä.
+            Pelitilanteesi ja tilastosi säilyvät tällä laitteella, mutta laitteet eivät enää päivity
+            keskenään.
           </p>
-          <div className="space-y-2 pt-1">
-            <button
-              type="button"
-              onClick={() => handleUnlink(false)}
-              disabled={isLoading}
-              className="w-full p-2.5 rounded-lg border font-semibold text-xs cursor-pointer text-left transition-colors"
-              style={{
-                backgroundColor: 'var(--color-bg-secondary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              <div className="font-semibold text-xs mb-0.5">
-                Säilytä edistyminen uudella tilillä
-              </div>
-              <div
-                className="text-[11px] font-normal"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                Pelitilanne ja tilastot säilyvät tällä laitteella, mutta uusi peli ei enää siirry
-                muille laitteille.
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleUnlink(true)}
-              disabled={isLoading}
-              className="w-full p-2.5 rounded-lg border font-semibold text-xs cursor-pointer text-left transition-colors"
-              style={{
-                backgroundColor: 'var(--color-bg-secondary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-error)',
-              }}
-            >
-              <div className="font-semibold text-xs mb-0.5">Tyhjennä laite ja aloita alusta</div>
-              <div
-                className="text-[11px] font-normal"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                Kaikki tämän laitteen paikalliset tiedot tyhjennetään ja laite aloittaa puhtaalta
-                pöydältä.
-              </div>
-            </button>
-          </div>
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"
               onClick={() => setMode('options')}
@@ -430,6 +348,61 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               }}
             >
               Peruuta
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUnlink(false)}
+              disabled={isLoading}
+              className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer"
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                color: 'var(--color-on-accent)',
+              }}
+            >
+              {isLoading ? 'Lopetetaan...' : 'Lopeta synkronointi'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'confirmReset' && (
+        <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
+          <p className="font-semibold" style={{ color: 'var(--color-error)' }}>
+            Haluatko varmasti nollata tämän laitteen pelitiedot?
+          </p>
+          <p
+            style={{
+              color: 'var(--color-text-secondary)',
+              fontSize: '0.78rem',
+              lineHeight: '1.4',
+            }}
+          >
+            Kaikki tämän laitteen löydetyt sanat, pistetilanne ja tilastot tyhjennetään pysyvästi.
+            Tätä toimintoa ei voi perua.
+          </p>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setMode('options')}
+              className="px-3 py-1.5 rounded text-xs cursor-pointer"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              Peruuta
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUnlink(true)}
+              disabled={isLoading}
+              className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer"
+              style={{
+                backgroundColor: 'var(--color-error)',
+                color: 'var(--color-bg-primary)',
+              }}
+            >
+              {isLoading ? 'Nollataan...' : 'Nollaa pelitiedot'}
             </button>
           </div>
         </div>
