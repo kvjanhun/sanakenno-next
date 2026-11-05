@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   applyServerPreferences,
   buildLocalPreferences,
@@ -24,6 +24,7 @@ describe('Player Sync & Reconcile (Web Store)', () => {
       playerId: null,
       playerKey: null,
       isLinked: false,
+      sessionCount: 1,
       isLoading: false,
       error: null,
     });
@@ -265,5 +266,51 @@ describe('Player Sync & Reconcile (Web Store)', () => {
     expect(res.pushedStates).toBe(1); // puzzle 1 ahead
     expect(pushedStats).toHaveLength(2);
     expect(pushedStates).toHaveLength(1);
+  });
+
+  it('logout preserves local progress by default or with clearLocalProgress: false', async () => {
+    saveToStorage(STATS_STORAGE_KEY, { records: [{ puzzle_number: 1 }] });
+    saveToStorage(puzzleStateKey(1), { foundWords: ['kana'] });
+
+    const initSpy = vi.fn().mockResolvedValue(undefined);
+    useAuthStore.setState({
+      initPlayer: initSpy,
+      isLoggedIn: true,
+      playerId: 99,
+      isLinked: true,
+      sessionCount: 2,
+    });
+
+    await useAuthStore.getState().logout({ clearLocalProgress: false });
+
+    expect(loadFromStorage(STATS_STORAGE_KEY)).toEqual({ records: [{ puzzle_number: 1 }] });
+    expect(loadFromStorage(puzzleStateKey(1))).toEqual({ foundWords: ['kana'] });
+    expect(useAuthStore.getState().isLinked).toBe(false);
+    expect(useAuthStore.getState().sessionCount).toBe(1);
+    expect(initSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('logout wipes local stats and puzzle states when clearLocalProgress: true', async () => {
+    saveToStorage(STATS_STORAGE_KEY, { records: [{ puzzle_number: 1 }] });
+    saveToStorage(puzzleStateKey(1), { foundWords: ['kana'] });
+    saveToStorage('revealed_1', 'true');
+
+    const initSpy = vi.fn().mockResolvedValue(undefined);
+    useAuthStore.setState({
+      initPlayer: initSpy,
+      isLoggedIn: true,
+      playerId: 99,
+      isLinked: true,
+      sessionCount: 2,
+    });
+
+    await useAuthStore.getState().logout({ clearLocalProgress: true });
+
+    expect(loadFromStorage(STATS_STORAGE_KEY)).toBeNull();
+    expect(loadFromStorage(puzzleStateKey(1))).toBeNull();
+    expect(window.localStorage.getItem('revealed_1')).toBeNull();
+    expect(useAuthStore.getState().isLinked).toBe(false);
+    expect(useAuthStore.getState().sessionCount).toBe(1);
+    expect(initSpy).toHaveBeenCalledTimes(1);
   });
 });

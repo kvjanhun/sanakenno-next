@@ -64,8 +64,9 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
         { headers: { Authorization: `Bearer ${player.token}` } },
       );
       expect(meRes.status).toBe(200);
-      const meData = (await meRes.json()) as { player_id: number };
+      const meData = (await meRes.json()) as { player_id: number; session_count: number };
       expect(meData.player_id).toBe(player.player_id);
+      expect(meData.session_count).toBe(1);
     });
 
     it('rejects unauthorized requests with 401', async () => {
@@ -106,6 +107,15 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
         })
         .execute();
 
+      // Before rotate, 2 active sessions exist
+      const preMeRes = await harness.client.api.player.me.$get(
+        {},
+        { headers: { Authorization: `Bearer ${player.token}` } },
+      );
+      expect(preMeRes.status).toBe(200);
+      const preMeData = (await preMeRes.json()) as { session_count: number };
+      expect(preMeData.session_count).toBe(2);
+
       const rotateRes = await harness.client.api.player.auth.rotate.$post(
         {},
         { headers: { Authorization: `Bearer ${player.token}` } },
@@ -114,12 +124,14 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       const rotateData = (await rotateRes.json()) as { player_key: string };
       expect(rotateData.player_key).not.toBe(player.player_key);
 
-      // Current session still works
+      // Current session still works and now reports session_count = 1
       const meRes = await harness.client.api.player.me.$get(
         {},
         { headers: { Authorization: `Bearer ${player.token}` } },
       );
       expect(meRes.status).toBe(200);
+      const meData = (await meRes.json()) as { session_count: number };
+      expect(meData.session_count).toBe(1);
 
       // Auxiliary session was invalidated
       const auxMeRes = await harness.client.api.player.me.$get(

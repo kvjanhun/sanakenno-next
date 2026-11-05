@@ -182,6 +182,41 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
+  it('renders SettingsModal with single sync management button and dual cloud/device indicator', () => {
+    const onOpenSync = vi.fn();
+    const { rerender } = render(
+      <SettingsModal
+        show={true}
+        onClose={() => {}}
+        onOpenSync={onOpenSync}
+        isLinked={false}
+        sessionCount={1}
+      />,
+    );
+
+    expect(screen.getByText('Pilvitallennus aktiivinen')).toBeInTheDocument();
+    expect(screen.getByText('Käytössä vain tällä laitteella')).toBeInTheDocument();
+    expect(screen.queryByText('Synkronoi tämä laite')).not.toBeInTheDocument();
+    expect(screen.queryByText('Yhdistä olemassa olevaan tiliin')).not.toBeInTheDocument();
+
+    const manageBtn = screen.getByRole('button', { name: 'Hallitse synkronointia' });
+    expect(manageBtn).toBeInTheDocument();
+    fireEvent.click(manageBtn);
+    expect(onOpenSync).toHaveBeenCalledTimes(1);
+
+    // When linked across multiple devices (sessionCount = 2)
+    rerender(
+      <SettingsModal
+        show={true}
+        onClose={() => {}}
+        onOpenSync={onOpenSync}
+        isLinked={true}
+        sessionCount={2}
+      />,
+    );
+    expect(screen.getByText('Synkronoitu (2 laitetta)')).toBeInTheDocument();
+  });
+
   it('detects Europe/Helsinki midnight rollover on timer/interval and visibilitychange', () => {
     vi.useFakeTimers();
     // 2026-04-01 23:59:50 in Europe/Helsinki (EEST = UTC+3 -> 20:59:50Z)

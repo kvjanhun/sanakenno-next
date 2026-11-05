@@ -87,6 +87,8 @@ export function GameplayView(): React.JSX.Element {
   });
 
   const [connectToken, setConnectToken] = useState<string | null>(null);
+  const isLinked = useAuthStore((s) => s.isLinked);
+  const sessionCount = useAuthStore((s) => s.sessionCount);
 
   useEffect(() => {
     void useAuthStore.getState().initialize();
@@ -265,6 +267,8 @@ export function GameplayView(): React.JSX.Element {
           useUiStore.getState().setShowSettings(false);
           useUiStore.getState().setShowAuth(true);
         }}
+        isLinked={isLinked}
+        sessionCount={sessionCount}
       />
       <SyncModal show={showAuth} onClose={() => useUiStore.getState().setShowAuth(false)} />
       <ConnectBanner token={connectToken} onClose={() => setConnectToken(null)} />

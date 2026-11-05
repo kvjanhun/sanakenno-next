@@ -7,7 +7,7 @@ export interface SyncModalProps {
   onClose: () => void;
 }
 
-type ViewMode = 'options' | 'email' | 'sent' | 'confirmRotate';
+type ViewMode = 'options' | 'email' | 'sent' | 'confirmRotate' | 'confirmUnlink';
 
 export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element {
   const playerKey = useAuthStore((s) => s.playerKey);
@@ -16,7 +16,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
   const [mode, setMode] = useState<ViewMode>('options');
   const [codeInput, setCodeInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [copiedTarget, setCopiedTarget] = useState<'code' | 'link' | null>(null);
 
   const connectUrl = useMemo(() => {
     if (!playerKey || typeof window === 'undefined') return '';
@@ -28,17 +28,17 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
       setMode('options');
       setCodeInput('');
       setEmailInput('');
-      setCopied(false);
+      setCopiedTarget(null);
       useAuthStore.getState().clearError();
     }
   }, [show]);
 
-  const copyText = useCallback(async (text: string) => {
+  const copyText = useCallback(async (text: string, target: 'code' | 'link') => {
     if (!text || typeof navigator === 'undefined') return;
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedTarget(target);
+      setTimeout(() => setCopiedTarget(null), 2000);
     } catch {
       useAuthStore.setState({ error: 'Kopiointi leikepöydälle epäonnistui' });
     }
@@ -53,10 +53,13 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
     }
   }, [codeInput, onClose]);
 
-  const handleLogout = useCallback(async () => {
-    await useAuthStore.getState().logout();
-    onClose();
-  }, [onClose]);
+  const handleUnlink = useCallback(
+    async (clearLocalProgress: boolean) => {
+      await useAuthStore.getState().logout({ clearLocalProgress });
+      onClose();
+    },
+    [onClose],
+  );
 
   const handleSendEmail = useCallback(async () => {
     const email = emailInput.trim();
@@ -124,26 +127,26 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => copyText(playerKey)}
+                  onClick={() => copyText(playerKey, 'code')}
                   className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-opacity"
                   style={{
                     backgroundColor: 'var(--color-accent)',
                     color: 'var(--color-bg-primary)',
                   }}
                 >
-                  {copied ? 'Kopioitu!' : 'Kopioi koodi'}
+                  {copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
                 </button>
                 {connectUrl && (
                   <button
                     type="button"
-                    onClick={() => copyText(connectUrl)}
+                    onClick={() => copyText(connectUrl, 'link')}
                     className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-opacity"
                     style={{
                       backgroundColor: 'var(--color-bg-tertiary)',
                       color: 'var(--color-text-primary)',
                     }}
                   >
-                    Kopioi linkki
+                    {copiedTarget === 'link' ? 'Linkki kopioitu!' : 'Kopioi linkki'}
                   </button>
                 )}
                 <button
@@ -206,15 +209,15 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               className="underline cursor-pointer"
               style={{ color: 'var(--color-text-tertiary)' }}
             >
-              Vaihda yhdistämiskoodi
+              Katkaise muut laitteet ja vaihda koodi
             </button>
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => setMode('confirmUnlink')}
               className="cursor-pointer font-medium"
               style={{ color: 'var(--color-error)' }}
             >
-              Nollaa laitetunnus
+              Irrota tämä laite tilistä
             </button>
           </div>
         </div>
@@ -326,6 +329,81 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               }}
             >
               {isLoading ? 'Vaihdetaan...' : 'Vaihda koodi'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'confirmUnlink' && (
+        <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
+          <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            Haluatko varmasti irrottaa tämän laitteen tilistä?
+          </p>
+          <p
+            style={{
+              color: 'var(--color-text-secondary)',
+              fontSize: '0.78rem',
+              lineHeight: '1.4',
+            }}
+          >
+            Tämä laite ei enää synkronoidu muiden laitteidesi kanssa. Muut laitteet jatkavat
+            ennallaan vanhalla tilillä.
+          </p>
+          <div className="space-y-2 pt-1">
+            <button
+              type="button"
+              onClick={() => handleUnlink(false)}
+              disabled={isLoading}
+              className="w-full p-2.5 rounded-lg border font-semibold text-xs cursor-pointer text-left transition-colors"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              <div className="font-semibold text-xs mb-0.5">
+                Säilytä edistyminen uudella tilillä
+              </div>
+              <div
+                className="text-[11px] font-normal"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Pelitilanne ja tilastot säilyvät tällä laitteella, mutta uusi peli ei enää siirry
+                muille laitteille.
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUnlink(true)}
+              disabled={isLoading}
+              className="w-full p-2.5 rounded-lg border font-semibold text-xs cursor-pointer text-left transition-colors"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-error)',
+              }}
+            >
+              <div className="font-semibold text-xs mb-0.5">Tyhjennä laite ja aloita alusta</div>
+              <div
+                className="text-[11px] font-normal"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Kaikki tämän laitteen paikalliset tiedot tyhjennetään ja laite aloittaa puhtaalta
+                pöydältä.
+              </div>
+            </button>
+          </div>
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={() => setMode('options')}
+              className="px-3 py-1.5 rounded text-xs cursor-pointer"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              Peruuta
             </button>
           </div>
         </div>

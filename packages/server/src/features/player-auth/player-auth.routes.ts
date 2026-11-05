@@ -15,6 +15,7 @@ import {
 } from './player-auth.middleware.js';
 import {
   cleanupExpiredPlayerSessions,
+  countActivePlayerSessions,
   createPlayerIdentity,
   createPlayerSession,
   deletePlayerSession,
@@ -144,8 +145,9 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
       await deletePlayerSession(db, currentToken);
       return c.json({ status: 'ok' }, 200);
     })
-    .get('/me', authMiddleware, (c) => {
+    .get('/me', authMiddleware, async (c) => {
       const player = c.get('player');
-      return c.json({ player_id: player.playerId }, 200);
+      const sessionCount = await countActivePlayerSessions(db, player.playerId);
+      return c.json({ player_id: player.playerId, session_count: sessionCount }, 200);
     });
 }

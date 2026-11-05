@@ -22,6 +22,7 @@ import {
   loadFromStorage,
   removeFromStorage,
   saveToStorage,
+  STATS_STORAGE_KEY,
 } from '../gameplay/storage.js';
 import {
   AUTH_TOKEN_STORAGE_KEY,
@@ -38,6 +39,7 @@ export interface AuthState {
   playerId: number | null;
   playerKey: string | null;
   isLinked: boolean;
+  sessionCount: number;
   isLoading: boolean;
   error: string | null;
   initialize: () => Promise<void>;
@@ -47,7 +49,7 @@ export interface AuthState {
   useTransfer: (token: string) => Promise<void>;
   rotatePlayerKey: () => Promise<void>;
   clearError: () => void;
-  logout: () => Promise<void>;
+  logout: (options?: { clearLocalProgress?: boolean }) => Promise<void>;
   syncStatsRecord: (record: StatsRecord) => Promise<void>;
   syncPuzzleState: (state: SyncPuzzleState) => Promise<void>;
   syncProgress: (payload: SyncProgressPayload) => Promise<void>;
@@ -59,6 +61,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   playerId: null,
   playerKey: null,
   isLinked: false,
+  sessionCount: 1,
   isLoading: false,
   error: null,
 
@@ -89,9 +92,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
+      const sessionCount = me.session_count ?? 1;
+      const isLinked = storedIsLinked || sessionCount > 1;
+      if (isLinked && !storedIsLinked) {
+        saveToStorage(LINKED_STATE_STORAGE_KEY, 'true');
+      }
+
       set({
         isLoggedIn: true,
         playerId: me.player_id,
+        sessionCount,
+        isLinked,
         isLoading: false,
       });
 
@@ -121,6 +132,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoggedIn: true,
         playerId: player_id,
         playerKey: player_key,
+        sessionCount: 1,
+        isLinked: false,
         isLoading: false,
       });
 
@@ -180,6 +193,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isLoggedIn: true,
         playerId: res.player_id,
         playerKey: token,
+        sessionCount: 2,
         isLinked: true,
         isLoading: false,
       });
@@ -201,7 +215,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { player_key } = await postPlayerRotate(token);
       saveToStorage(PLAYER_KEY_STORAGE_KEY, player_key);
-      set({ playerKey: player_key, isLoading: false });
+      removeFromStorage(LINKED_STATE_STORAGE_KEY);
+      set({ playerKey: player_key, sessionCount: 1, isLinked: false, isLoading: false });
     } catch (err: unknown) {
       set({
         isLoading: false,
@@ -210,18 +225,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  logout: async () => {
+  logout: async (options?: { clearLocalProgress?: boolean }) => {
     const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
     if (token) {
-      await postPlayerLogout(token);
+      await postPlayerLogout(token).catch(() => undefined);
     }
     removeFromStorage(AUTH_TOKEN_STORAGE_KEY);
     removeFromStorage(PLAYER_KEY_STORAGE_KEY);
     removeFromStorage(LINKED_STATE_STORAGE_KEY);
+
+    if (options?.clearLocalProgress) {
+      removeFromStorage(STATS_STORAGE_KEY);
+      if (typeof window !== 'undefined') {
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (
+              key &&
+              (key.startsWith('sanakenno_state_') ||
+                key.startsWith('revealed_') ||
+                key === 'sanakenno_state')
+            ) {
+              keysToRemove.push(key);
+            }
+          }
+          for (const key of keysToRemove) {
+            window.localStorage.removeItem(key);
+          }
+        } catch {
+          // ignore quota/storage issues
+        }
+      }
+    }
+
     set({
       isLoggedIn: false,
       playerId: null,
       playerKey: null,
+      sessionCount: 1,
       isLinked: false,
     });
     // Create fresh player identity

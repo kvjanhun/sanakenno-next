@@ -27,7 +27,7 @@ sanakenno-next/
         features/
           health/            # System health & rotation headroom (GET /api/health)
           puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
-          player-auth/       # Passwordless player Bearer auth, session TTL, pairing-code email delivery (POST /api/player/auth/*)
+          player-auth/       # Passwordless player Bearer auth, session TTL, pairing-code email delivery, active device count (POST /api/player/auth/*, GET /api/player/me)
           player-sync/       # Monotonic cross-device progress sync (GET /api/player/sync, POST /api/player/sync/*)
           telemetry/         # Public gameplay telemetry (POST /api/achievement, /api/failed-guess, /api/word-find)
           admin-auth/        # Argon2id admin cookie session auth & CSRF guardrails (POST /api/auth/*)

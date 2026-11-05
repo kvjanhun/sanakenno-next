@@ -130,6 +130,26 @@ export async function cleanupExpiredPlayerSessions(db: Kysely<Database>): Promis
 }
 
 /**
+ * Count active (non-expired) sessions for a given player ID.
+ */
+export async function countActivePlayerSessions(
+  db: Kysely<Database>,
+  playerId: number,
+): Promise<number> {
+  const nowIso = new Date().toISOString();
+  const row = await db
+    .selectFrom('player_sessions')
+    .select(db.fn.count<number>('id').as('count'))
+    .where('player_id', '=', playerId)
+    .where((eb) =>
+      eb.and([eb('expires_at', '>', nowIso), eb('expires_at', '>', sql<string>`datetime('now')`)]),
+    )
+    .executeTakeFirst();
+
+  return row ? Number(row.count) : 0;
+}
+
+/**
  * Fetch a player's ID and key hash by player ID.
  */
 export async function getPlayerById(

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { THEME_IDS, type ThemeId, type ThemePreference } from '@sanakenno/shared';
 import {
-  AlertCircleIcon,
   CheckIcon,
   ChevronDownIcon,
   LinkIcon,
@@ -21,6 +20,7 @@ export interface SettingsModalProps {
   onClose: () => void;
   onOpenSync?: () => void;
   isLinked?: boolean;
+  sessionCount?: number;
   syncSlot?: ReactNode;
 }
 
@@ -86,6 +86,7 @@ export function SettingsModal({
   onClose,
   onOpenSync,
   isLinked = false,
+  sessionCount = 1,
   syncSlot,
 }: SettingsModalProps): React.JSX.Element {
   const themeId = usePaletteStore((s) => s.themeId);
@@ -237,28 +238,38 @@ export function SettingsModal({
           </h3>
           {syncSlot ?? (
             <div
-              className="p-2.5 rounded-lg space-y-2"
+              className="p-2.5 rounded-lg space-y-2.5"
               style={{ backgroundColor: 'var(--color-bg-secondary)' }}
             >
-              <div className="flex items-center gap-2">
-                {isLinked ? (
-                  <>
-                    <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                    </span>
-                    <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                      Synkronointi aktiivinen
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircleIcon size={13} className="text-amber-500" />
-                    <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                      Ei synkronoitu
-                    </span>
-                  </>
-                )}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                    Pilvitallennus aktiivinen
+                  </span>
+                </div>
+                <div
+                  className="flex items-center gap-1.5 text-[11px]"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  <SmartphoneIcon
+                    size={12}
+                    style={{
+                      color:
+                        isLinked || sessionCount > 1
+                          ? 'var(--color-accent)'
+                          : 'var(--color-text-tertiary)',
+                    }}
+                  />
+                  <span>
+                    {isLinked || sessionCount > 1
+                      ? `Synkronoitu (${Math.max(sessionCount, 2)} laitetta)`
+                      : 'Käytössä vain tällä laitteella'}
+                  </span>
+                </div>
               </div>
 
               <p
@@ -268,54 +279,23 @@ export function SettingsModal({
                   lineHeight: '1.35',
                 }}
               >
-                {isLinked
-                  ? 'Pelitilanteesi ja tilastosi tallennetaan jatkuvasti pilveen. Voit synkronoida ne muille laitteillesi.'
-                  : 'Tallenna edistymisesi, tilastosi ja asetuksesi, ja synkronoi ne muille laitteillesi.'}
+                {isLinked || sessionCount > 1
+                  ? 'Pelitilanteesi ja tilastosi synkronoituvat automaattisesti yhdistettyjen laitteidesi välillä.'
+                  : 'Pelitilanteesi tallentuu pilveen. Voit synkronoida edistymisesi toiselle laitteelle jakamalla koodin tai linkin.'}
               </p>
 
-              {isLinked ? (
-                <button
-                  type="button"
-                  onClick={onOpenSync}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg border font-semibold text-xs cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--color-bg-primary)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                  }}
-                >
-                  <LinkIcon size={13} />
-                  <span>Hallitse synkronointia</span>
-                </button>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={onOpenSync}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg font-semibold text-xs cursor-pointer border-none"
-                    style={{
-                      backgroundColor: 'var(--color-accent)',
-                      color: 'var(--color-on-accent)',
-                    }}
-                  >
-                    <LinkIcon size={13} />
-                    <span>Synkronoi tämä laite</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onOpenSync}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg border font-semibold text-xs cursor-pointer"
-                    style={{
-                      backgroundColor: 'var(--color-bg-primary)',
-                      borderColor: 'var(--color-border)',
-                      color: 'var(--color-text-primary)',
-                    }}
-                  >
-                    <LinkIcon size={13} />
-                    <span>Yhdistä olemassa olevaan tiliin</span>
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={onOpenSync}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg font-semibold text-xs cursor-pointer border-none"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'var(--color-on-accent)',
+                }}
+              >
+                <LinkIcon size={13} />
+                <span>Hallitse synkronointia</span>
+              </button>
             </div>
           )}
         </div>

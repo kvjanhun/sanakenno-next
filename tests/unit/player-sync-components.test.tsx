@@ -102,20 +102,82 @@ describe('Player Sync UI Components', () => {
       });
     });
 
-    it('handles reset / logout from modal', async () => {
+    it('handles distinct copy feedback for pairing code vs link', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: { writeText },
+      });
+
+      render(<SyncModal show={true} onClose={vi.fn()} />);
+
+      const copyCodeBtn = screen.getByRole('button', { name: 'Kopioi koodi' });
+      const copyLinkBtn = screen.getByRole('button', { name: 'Kopioi linkki' });
+
+      // Click copy link -> link button displays "Linkki kopioitu!", code button stays untouched
+      fireEvent.click(copyLinkBtn);
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Linkki kopioitu!' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Kopioi koodi' })).toBeInTheDocument();
+      });
+
+      // Click copy code -> code button displays "Kopioitu!"
+      fireEvent.click(copyCodeBtn);
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Kopioitu!' })).toBeInTheDocument();
+      });
+    });
+
+    it('handles rotate confirmation with clear label', async () => {
+      const mockRotate = vi.fn().mockResolvedValue(undefined);
+      useAuthStore.setState({
+        rotatePlayerKey: mockRotate,
+      } as unknown as Partial<ReturnType<typeof useAuthStore.getState>>);
+
+      render(<SyncModal show={true} onClose={vi.fn()} />);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Katkaise muut laitteet ja vaihda koodi' }),
+      );
+      expect(screen.getByText('Haluatko varmasti vaihtaa koodin?')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Vaihda koodi' }));
+      await waitFor(() => {
+        expect(mockRotate).toHaveBeenCalled();
+      });
+    });
+
+    it('handles unlinking device with keep-progress or clear-progress choices', async () => {
       const mockLogout = vi.fn().mockResolvedValue(undefined);
       useAuthStore.setState({
         logout: mockLogout,
       } as unknown as Partial<ReturnType<typeof useAuthStore.getState>>);
       const onClose = vi.fn();
 
-      render(<SyncModal show={true} onClose={onClose} />);
+      const { unmount } = render(<SyncModal show={true} onClose={onClose} />);
 
-      const logoutBtn = screen.getByRole('button', { name: 'Nollaa laitetunnus' });
-      fireEvent.click(logoutBtn);
+      // Open unlinking confirmation
+      fireEvent.click(screen.getByRole('button', { name: 'Irrota tämä laite tilistä' }));
+      expect(
+        screen.getByText('Haluatko varmasti irrottaa tämän laitteen tilistä?'),
+      ).toBeInTheDocument();
 
+      // Choice 1: Keep local progress
+      fireEvent.click(screen.getByText('Säilytä edistyminen uudella tilillä'));
       await waitFor(() => {
-        expect(mockLogout).toHaveBeenCalled();
+        expect(mockLogout).toHaveBeenCalledWith({ clearLocalProgress: false });
+        expect(onClose).toHaveBeenCalled();
+      });
+
+      unmount();
+      mockLogout.mockClear();
+      onClose.mockClear();
+
+      // Choice 2: Clear local progress
+      render(<SyncModal show={true} onClose={onClose} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Irrota tämä laite tilistä' }));
+      fireEvent.click(screen.getByText('Tyhjennä laite ja aloita alusta'));
+      await waitFor(() => {
+        expect(mockLogout).toHaveBeenCalledWith({ clearLocalProgress: true });
         expect(onClose).toHaveBeenCalled();
       });
     });

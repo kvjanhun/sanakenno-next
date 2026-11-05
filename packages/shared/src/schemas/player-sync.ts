@@ -24,6 +24,7 @@ export type PlayerAuthRotateResponse = z.infer<typeof PlayerAuthRotateResponseSc
 
 export const PlayerMeResponseSchema = z.object({
   player_id: z.number().int().positive(),
+  session_count: z.number().int().nonnegative().default(1),
 });
 
 export type PlayerMeResponse = z.infer<typeof PlayerMeResponseSchema>;
