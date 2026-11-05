@@ -110,11 +110,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const syncData = await fetchPlayerSync(storedToken);
       if (syncData) {
         const localBefore = gatherLocalData();
-        pullAndMergeData(syncData, () => void get().syncPreferences());
+        const changed = pullAndMergeData(syncData, () => void get().syncPreferences());
         pushLocalDataAheadOfServer(localBefore, syncData, {
           syncStatsRecord: (rec) => get().syncStatsRecord(rec),
           syncPuzzleState: (st) => get().syncPuzzleState(st),
         });
+        if (changed && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+        }
       }
     } catch {
       set({ isLoading: false });
@@ -199,6 +202,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       pullAndMergeData(res, () => void get().syncPreferences());
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+      }
     } catch (err: unknown) {
       set({
         isLoading: false,
@@ -268,6 +274,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
     // Create fresh player identity
     await get().initPlayer();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+    }
   },
 
   syncStatsRecord: async (record: StatsRecord) => {

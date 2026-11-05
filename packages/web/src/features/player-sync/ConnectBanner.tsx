@@ -16,6 +16,9 @@ export function ConnectBanner({ token, onClose }: ConnectBannerProps): React.JSX
     setError(null);
     try {
       await useAuthStore.getState().useTransfer(token);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+      }
       onClose();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Yhdistäminen epäonnistui');

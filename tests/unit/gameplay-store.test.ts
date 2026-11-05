@@ -336,4 +336,40 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     await useGameStore.getState().loadPuzzle(puzzleNextDay);
     expect(useUiStore.getState().hintsHidden).toBe(true);
   });
+
+  it('reloads in-memory game state immediately on sanakenno:sync-reload event', async () => {
+    const puzzle = await buildSamplePuzzle(50);
+    await useGameStore.getState().loadPuzzle(puzzle);
+
+    expect(useGameStore.getState().foundWords.size).toBe(0);
+    expect(useGameStore.getState().score).toBe(0);
+
+    // Simulate external sync merging newly found word into storage
+    saveToStorage(puzzleStateKey(50), {
+      foundWords: ['kana', 'kala'],
+      score: 2,
+      hintsUnlocked: [],
+      startedAt: 1000,
+      totalPausedMs: 0,
+      scoreBeforeHints: 2,
+    });
+
+    // Fire sync-reload event
+    window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+
+    // Wait a tick for async loadState
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(useGameStore.getState().foundWords.size).toBe(2);
+    expect(useGameStore.getState().foundWords.has('kana')).toBe(true);
+    expect(useGameStore.getState().score).toBe(2);
+
+    // Simulate reset clearing storage
+    window.localStorage.removeItem(puzzleStateKey(50));
+    window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(useGameStore.getState().foundWords.size).toBe(0);
+    expect(useGameStore.getState().score).toBe(0);
+  });
 });

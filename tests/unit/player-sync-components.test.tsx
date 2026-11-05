@@ -114,6 +114,8 @@ describe('Player Sync UI Components', () => {
       const copyLinkBtn = screen.getByRole('button', { name: 'Kopioi linkki' });
 
       // Click copy link -> link button displays "Linkki kopioitu!", code button stays untouched
+      expect(copyLinkBtn.querySelector('.inline-grid')).toBeInTheDocument();
+      expect(copyCodeBtn.querySelector('.inline-grid')).toBeInTheDocument();
       fireEvent.click(copyLinkBtn);
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Linkki kopioitu!' })).toBeInTheDocument();

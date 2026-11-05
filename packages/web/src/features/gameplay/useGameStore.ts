@@ -306,6 +306,14 @@ export const useGameStore = create<GameState>()((set, get) => ({
     if (!puzzle) return;
     const saved = readSavedPuzzleState(puzzle.puzzle_number);
     if (!saved) {
+      set({
+        foundWords: new Set<string>(),
+        score: 0,
+        hintsUnlocked: new Set<string>(),
+        scoreBeforeHints: null,
+        startedAt: Date.now(),
+        totalPausedMs: 0,
+      });
       useUiStore.getState().setHintsHidden(true);
       return;
     }
@@ -367,3 +375,9 @@ export const useGameStore = create<GameState>()((set, get) => ({
     });
   },
 }));
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('sanakenno:sync-reload', () => {
+    void useGameStore.getState().loadState();
+  });
+}

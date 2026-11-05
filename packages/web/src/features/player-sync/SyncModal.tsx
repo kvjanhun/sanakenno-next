@@ -49,6 +49,9 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
     if (!token) return;
     await useAuthStore.getState().useTransfer(token);
     if (!useAuthStore.getState().error) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+      }
       onClose();
     }
   }, [codeInput, onClose]);
@@ -56,6 +59,9 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
   const handleUnlink = useCallback(
     async (clearLocalProgress: boolean) => {
       await useAuthStore.getState().logout({ clearLocalProgress });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
+      }
       onClose();
     },
     [onClose],
@@ -134,7 +140,17 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                     color: 'var(--color-bg-primary)',
                   }}
                 >
-                  {copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
+                  <span className="inline-grid [grid-template-areas:'stack'] items-center justify-center">
+                    <span
+                      aria-hidden="true"
+                      className="invisible [grid-area:stack] select-none pointer-events-none"
+                    >
+                      Kopioi koodi
+                    </span>
+                    <span className="[grid-area:stack]">
+                      {copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
+                    </span>
+                  </span>
                 </button>
                 {connectUrl && (
                   <button
@@ -146,7 +162,17 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                       color: 'var(--color-text-primary)',
                     }}
                   >
-                    {copiedTarget === 'link' ? 'Linkki kopioitu!' : 'Kopioi linkki'}
+                    <span className="inline-grid [grid-template-areas:'stack'] items-center justify-center">
+                      <span
+                        aria-hidden="true"
+                        className="invisible [grid-area:stack] select-none pointer-events-none"
+                      >
+                        Linkki kopioitu!
+                      </span>
+                      <span className="[grid-area:stack]">
+                        {copiedTarget === 'link' ? 'Linkki kopioitu!' : 'Kopioi linkki'}
+                      </span>
+                    </span>
                   </button>
                 )}
                 <button
