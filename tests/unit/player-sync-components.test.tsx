@@ -74,9 +74,7 @@ describe('Player Sync UI Components', () => {
 
       expect(screen.getByText('Tämän laitteen yhdistämiskoodi')).toBeInTheDocument();
       expect(
-        screen.getByDisplayValue(
-          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-        ),
+        screen.getByText('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'),
       ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Kopioi koodi' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Kopioi linkki' })).toBeInTheDocument();

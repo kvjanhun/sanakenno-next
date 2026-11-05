@@ -120,24 +120,27 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                 Tämän laitteen yhdistämiskoodi
               </span>
               <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  readOnly
-                  value={playerKey}
+                <div
+                  tabIndex={0}
+                  role="region"
                   aria-label="Tämän laitteen yhdistämiskoodi"
-                  onFocus={(e) => e.target.select()}
-                  className="flex-1 min-w-0 h-8 px-2.5 rounded text-xs font-mono outline-none border overflow-x-auto whitespace-nowrap select-all cursor-text"
+                  className="flex-1 min-w-0 h-9 px-2.5 rounded text-xs font-mono border overflow-x-auto whitespace-nowrap flex items-center select-all cursor-text focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
                   style={{
                     backgroundColor: 'var(--color-bg-primary)',
                     borderColor: 'var(--color-border)',
                     color: 'var(--color-text-primary)',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'var(--color-border) transparent',
+                    WebkitOverflowScrolling: 'touch',
                   }}
-                />
+                >
+                  {playerKey}
+                </div>
                 <button
                   type="button"
                   onClick={() => copyText(playerKey, 'code')}
                   aria-label={copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
-                  className="h-8 px-3 rounded text-xs font-medium cursor-pointer shrink-0 transition-opacity"
+                  className="h-9 px-3 rounded text-xs font-medium cursor-pointer shrink-0 transition-opacity"
                   style={{
                     backgroundColor: 'var(--color-accent)',
                     color: 'var(--color-bg-primary)',
