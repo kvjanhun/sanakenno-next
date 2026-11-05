@@ -30,11 +30,11 @@
   --color-rank-notch: color-mix(in srgb, var(--color-on-accent) 45%, transparent);
 
   /* Achievement tier tokens */
-  --color-tier-bronze: #cd7f32;
-  --color-tier-silver: #94a3b8;
-  --color-tier-gold: #eab308;
-  --color-tier-diamond: #38bdf8;
-  --color-tier-master: #a855f7;
+  --color-tier-bronze: #b45309;
+  --color-tier-silver: #475569;
+  --color-tier-gold: #ca8a04;
+  --color-tier-diamond: #0891b2;
+  --color-tier-master: #9333ea;
 
   /* Default accent = hehku, light */
   --color-accent: #ff643e;
@@ -63,6 +63,12 @@
     --color-button-shadow: #0000005c;
     --color-error: #f87171;
     --color-rank-notch: color-mix(in srgb, var(--color-text-primary) 22%, transparent);
+    /* Achievement tier tokens */
+    --color-tier-bronze: #e08a3c;
+    --color-tier-silver: #7c93b2;
+    --color-tier-gold: #facc15;
+    --color-tier-diamond: #a5f3fc;
+    --color-tier-master: #c084fc;
     /* Default accent = hehku, dark */
     --color-accent: #e05030;
     --color-accent-faded: #7d3525;
@@ -85,6 +91,12 @@
   --color-button-shadow: #0000005c;
   --color-error: #f87171;
   --color-rank-notch: color-mix(in srgb, var(--color-text-primary) 22%, transparent);
+  /* Achievement tier tokens */
+  --color-tier-bronze: #e08a3c;
+  --color-tier-silver: #7c93b2;
+  --color-tier-gold: #facc15;
+  --color-tier-diamond: #a5f3fc;
+  --color-tier-master: #c084fc;
   --color-accent: #e05030;
   --color-accent-faded: #7d3525;
 }

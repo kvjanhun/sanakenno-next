@@ -102,7 +102,7 @@ async function captureWithCdp(
 
     await new Promise((r) => setTimeout(r, 1200));
 
-    if (target.action === 'theme-light') {
+    if (target.action === 'theme-light' || target.action?.includes('-light')) {
       await send('Runtime.evaluate', {
         expression: `document.documentElement.setAttribute('data-theme', 'light')`,
       });
@@ -184,9 +184,51 @@ async function captureWithCdp(
     }
 
     if (target.action?.startsWith('view-stats')) {
-      await send('Runtime.evaluate', {
+      const evalRes = await send('Runtime.evaluate', {
         expression: `
           (async () => {
+            ${
+              target.action.includes('achievements')
+                ? `const sampleRecords = [];
+                   // 7 daily consecutive plays for Bronze streak
+                   for (let i = 0; i < 7; i++) {
+                     const d = new Date();
+                     d.setDate(d.getDate() - i);
+                     const dateStr = d.toISOString().slice(0, 10);
+                     sampleRecords.push({
+                       puzzle_number: i + 1,
+                       date: dateStr,
+                       best_rank: 'Onnistuja',
+                       best_score: 80,
+                       max_score: 100,
+                       words_found: i === 0 ? 600 : 0, // Hopea for total_words (target 500)
+                       pangrams_found: i === 0 ? 80 : 0, // Kulta for pangrams (target 77)
+                       long_words_count: i === 0 ? 110 : 0, // Timantti for long_word (target 100)
+                       hints_used: 1, // hint used so unassisted_master stays 0
+                       elapsed_ms: 60000,
+                       is_daily: true,
+                       played_at_date: dateStr,
+                     });
+                   }
+                   // 50 full boards for Mestari on full_board (target 50)
+                   for (let i = 0; i < 50; i++) {
+                     sampleRecords.push({
+                       puzzle_number: 100 + i,
+                       date: '2026-10-01',
+                       best_rank: 'Täysi kenno',
+                       best_score: 100,
+                       max_score: 100,
+                       words_found: 0,
+                       hints_used: 1,
+                       elapsed_ms: 60000,
+                       is_daily: false,
+                       played_at_date: '2026-10-01',
+                     });
+                   }
+                   const sampleStats = { version: 1, records: sampleRecords };
+                   window.localStorage.setItem('sanakenno_player_stats', JSON.stringify(sampleStats));`
+                : ''
+            }
             const statsBtn = document.querySelector('button[aria-label="Tilastot"]');
             if (statsBtn) statsBtn.click();
             await new Promise((r) => setTimeout(r, 200));
@@ -196,10 +238,23 @@ async function captureWithCdp(
                    if (achTab) achTab.click();`
                 : ''
             }
+            ${
+              target.action.includes('bottom')
+                ? `await new Promise((r) => setTimeout(r, 100));
+                   const scrollContainer = document.querySelector('.overflow-y-auto');
+                   if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;`
+                : ''
+            }
           })()
         `,
         awaitPromise: true,
       });
+      if (evalRes && (evalRes as Record<string, unknown>).exceptionDetails) {
+        console.error(
+          'Stats evaluate error:',
+          (evalRes as Record<string, unknown>).exceptionDetails,
+        );
+      }
       await new Promise((r) => setTimeout(r, 400));
     }
 
@@ -261,6 +316,27 @@ async function main() {
         height: 844,
         mobile: true,
         action: 'view-stats-achievements',
+      },
+      {
+        name: 'mobile-stats-achievements-light',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-stats-achievements-light',
+      },
+      {
+        name: 'mobile-stats-achievements-bottom',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-stats-achievements-bottom',
+      },
+      {
+        name: 'mobile-stats-achievements-light-bottom',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-stats-achievements-light-bottom',
       },
       {
         name: 'mobile-stats-summary',
