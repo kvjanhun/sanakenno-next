@@ -92,7 +92,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
       {mode === 'options' && (
         <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
           <p style={{ color: 'var(--color-text-secondary)' }}>
-            Sanakenno tallentaa edistymisesi tälle laitteelle. Voit yhdistää toisen laitteen
+            Pelitilanteesi tallentuu pilveen. Voit yhdistää toisen laitteen
             jakamalla koodin tai linkin.
           </p>
 
@@ -206,7 +206,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               className="text-xs font-semibold uppercase tracking-wider block"
               style={{ color: 'var(--color-text-tertiary)' }}
             >
-              Yhdistä toiseen laitteeseen
+              Yhdistä toinen laite
             </span>
             <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
               Syötä toisen laitteen yhdistämiskoodi siirtääksesi edistymisesi tähän laitteeseen:
