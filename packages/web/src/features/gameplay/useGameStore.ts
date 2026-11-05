@@ -106,6 +106,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   loadPuzzle: async (data: Puzzle) => {
     useUiStore.getState().setCelebration(null);
     useUiStore.getState().clearWordRejection();
+    useUiStore.getState().setHintsHidden(true);
     set({
       puzzle: data,
       outerLetters: data.letters.filter((l) => l !== data.center),
@@ -270,6 +271,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
   unlockHint: (id: string) => {
     if (!isVisibleHintId(id)) return;
+    useUiStore.getState().setHintsHidden(false);
     set((s) => {
       if (s.hintsUnlocked.has(id)) return s;
       const isFirst = s.hintsUnlocked.size === 0;
@@ -303,7 +305,10 @@ export const useGameStore = create<GameState>()((set, get) => ({
     const { puzzle } = get();
     if (!puzzle) return;
     const saved = readSavedPuzzleState(puzzle.puzzle_number);
-    if (!saved) return;
+    if (!saved) {
+      useUiStore.getState().setHintsHidden(true);
+      return;
+    }
 
     const hashSet = new Set(puzzle.word_hashes);
     const validWords: string[] = [];
@@ -317,14 +322,18 @@ export const useGameStore = create<GameState>()((set, get) => ({
         ? recalcScore(validWords, allLetters)
         : saved.score;
 
+    const visibleHints = filterVisibleHintIds(saved.hintsUnlocked ?? []);
     set({
       foundWords: new Set(validWords),
       score,
-      hintsUnlocked: new Set(filterVisibleHintIds(saved.hintsUnlocked ?? [])),
+      hintsUnlocked: new Set(visibleHints),
       scoreBeforeHints: saved.scoreBeforeHints ?? null,
       startedAt: saved.startedAt || Date.now(),
       totalPausedMs: saved.totalPausedMs ?? 0,
     });
+
+    const hasHintsOpened = visibleHints.length > 0;
+    useUiStore.getState().setHintsHidden(!hasHintsOpened);
   },
 
   copyStatus: async () => {

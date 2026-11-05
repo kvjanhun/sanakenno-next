@@ -3,14 +3,6 @@ import { create } from 'zustand';
 /** localStorage key for the player's "hide hint deck" preference. Defaults to true (collapsed). */
 export const HINTS_HIDDEN_KEY = 'sanakenno_hints_hidden';
 
-function readHintsHidden(): boolean {
-  try {
-    return window.localStorage.getItem(HINTS_HIDDEN_KEY) !== '0';
-  } catch {
-    return true;
-  }
-}
-
 function writeHintsHidden(hidden: boolean): void {
   try {
     window.localStorage.setItem(HINTS_HIDDEN_KEY, hidden ? '1' : '0');
@@ -104,7 +96,7 @@ export const useUiStore = create<UiState>()((set) => ({
   pangramRipple: false,
   shuffleSpin: false,
   shuffleCount: 0,
-  hintsHidden: readHintsHidden(),
+  hintsHidden: true,
 
   setHintsHidden: (hintsHidden) => {
     writeHintsHidden(hintsHidden);
@@ -234,6 +226,7 @@ export const useUiStore = create<UiState>()((set) => ({
       pangramRipple: false,
       shuffleSpin: false,
       shuffleCount: 0,
+      hintsHidden: true,
     });
   },
 }));

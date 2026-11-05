@@ -284,4 +284,56 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useGameStore.getState().hintsUnlocked.has('pairs')).toBe(true);
     expect(useGameStore.getState().scoreBeforeHints).toBe(10);
   });
+
+  it('manages per-puzzle hints collapsed/expanded defaults properly', async () => {
+    // 1. Fresh unplayed puzzle starts with hints collapsed
+    const puzzleA = await buildSamplePuzzle(30);
+    await useGameStore.getState().loadPuzzle(puzzleA);
+    expect(useUiStore.getState().hintsHidden).toBe(true);
+
+    // 2. Player expands hints on puzzle A
+    useUiStore.getState().setHintsHidden(false);
+    expect(useUiStore.getState().hintsHidden).toBe(false);
+
+    // 3. Player opens puzzle B from archive (no hints unlocked) -> hints start collapsed!
+    const puzzleB = await buildSamplePuzzle(31);
+    await useGameStore.getState().loadPuzzle(puzzleB);
+    expect(useUiStore.getState().hintsHidden).toBe(true);
+
+    // 4. Player unlocks a hint on puzzle B
+    useGameStore.getState().unlockHint('tier1');
+    expect(useUiStore.getState().hintsHidden).toBe(false);
+    expect(useGameStore.getState().hintsUnlocked.size).toBe(1);
+
+    // 5. Player opens puzzle C (archive puzzle previously played without hints) -> hints start collapsed!
+    saveToStorage(puzzleStateKey(32), {
+      foundWords: ['kana'],
+      score: 1,
+      hintsUnlocked: [],
+      startedAt: Date.now(),
+      totalPausedMs: 0,
+      scoreBeforeHints: null,
+    });
+    const puzzleC = await buildSamplePuzzle(32);
+    await useGameStore.getState().loadPuzzle(puzzleC);
+    expect(useUiStore.getState().hintsHidden).toBe(true);
+
+    // 6. Player opens puzzle D (archive puzzle previously played with hints unlocked) -> hints default to expanded!
+    saveToStorage(puzzleStateKey(33), {
+      foundWords: ['kana'],
+      score: 1,
+      hintsUnlocked: ['tier1'],
+      startedAt: Date.now(),
+      totalPausedMs: 0,
+      scoreBeforeHints: 1,
+    });
+    const puzzleD = await buildSamplePuzzle(33);
+    await useGameStore.getState().loadPuzzle(puzzleD);
+    expect(useUiStore.getState().hintsHidden).toBe(false);
+
+    // 7. Player returns to next day's puzzle (fresh unplayed) -> hints start collapsed!
+    const puzzleNextDay = await buildSamplePuzzle(34);
+    await useGameStore.getState().loadPuzzle(puzzleNextDay);
+    expect(useUiStore.getState().hintsHidden).toBe(true);
+  });
 });
