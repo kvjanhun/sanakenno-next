@@ -243,27 +243,31 @@ export function SettingsModal({
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                  </span>
+                  <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                  </div>
                   <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                     Pilvitallennus aktiivinen
                   </span>
                 </div>
                 <div
-                  className="flex items-center gap-1.5 text-[11px]"
+                  className="flex items-center gap-2 text-[11px]"
                   style={{ color: 'var(--color-text-secondary)' }}
                 >
-                  <SmartphoneIcon
-                    size={12}
-                    style={{
-                      color:
-                        isLinked || sessionCount > 1
-                          ? 'var(--color-accent)'
-                          : 'var(--color-text-tertiary)',
-                    }}
-                  />
+                  <div className="w-4 h-4 flex items-center justify-center shrink-0">
+                    <SmartphoneIcon
+                      size={14}
+                      style={{
+                        color:
+                          isLinked || sessionCount > 1
+                            ? 'var(--color-accent)'
+                            : 'var(--color-text-tertiary)',
+                      }}
+                    />
+                  </div>
                   <span>
                     {isLinked || sessionCount > 1
                       ? `Synkronoitu (${Math.max(sessionCount, 2)} laitetta)`

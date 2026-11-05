@@ -110,7 +110,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
 
           {playerKey && (
             <div
-              className="p-3 rounded-lg space-y-2"
+              className="p-3 rounded-lg space-y-2.5"
               style={{ backgroundColor: 'var(--color-bg-secondary)' }}
             >
               <span
@@ -119,17 +119,25 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               >
                 Tämän laitteen yhdistämiskoodi
               </span>
-              <div
-                className="font-mono text-xs break-all select-all select-text p-2 rounded"
-                style={{ backgroundColor: 'var(--color-bg-primary)' }}
-              >
-                {playerKey}
-              </div>
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  readOnly
+                  value={playerKey}
+                  aria-label="Tämän laitteen yhdistämiskoodi"
+                  onFocus={(e) => e.target.select()}
+                  className="flex-1 min-w-0 h-8 px-2.5 rounded text-xs font-mono outline-none border overflow-x-auto whitespace-nowrap select-all cursor-text"
+                  style={{
+                    backgroundColor: 'var(--color-bg-primary)',
+                    borderColor: 'var(--color-border)',
+                    color: 'var(--color-text-primary)',
+                  }}
+                />
                 <button
                   type="button"
                   onClick={() => copyText(playerKey, 'code')}
-                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-opacity"
+                  aria-label={copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
+                  className="h-8 px-3 rounded text-xs font-medium cursor-pointer shrink-0 transition-opacity"
                   style={{
                     backgroundColor: 'var(--color-accent)',
                     color: 'var(--color-bg-primary)',
@@ -140,13 +148,15 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                       aria-hidden="true"
                       className="invisible [grid-area:stack] select-none pointer-events-none"
                     >
-                      Kopioi koodi
+                      Kopioitu!
                     </span>
                     <span className="[grid-area:stack]">
-                      {copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
+                      {copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi'}
                     </span>
                   </span>
                 </button>
+              </div>
+              <div className="flex gap-2 pt-0.5">
                 {connectUrl && (
                   <button
                     type="button"
