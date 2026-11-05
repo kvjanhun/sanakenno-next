@@ -121,28 +121,19 @@ export function StatsModal({
             <div className="space-y-1.5" data-stats-all-summary>
               <div className="flex items-center justify-between text-xs py-0.5">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Pelattuja pelejä</span>
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   {records.length}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs py-0.5">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Putki</span>
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   {currentStreak}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs py-0.5">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Pisin putki</span>
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   {bestStreak}
                 </span>
               </div>
@@ -151,19 +142,13 @@ export function StatsModal({
             <div className="mt-1.5 space-y-1.5" data-stats-all-totals>
               <div className="flex items-center justify-between text-xs py-0.5">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Sanoja löydetty</span>
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   {lifetime.totalWords}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs py-0.5">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Pangrammeja löydetty</span>
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   {lifetime.totalPangrams}
                 </span>
               </div>
@@ -191,7 +176,7 @@ export function StatsModal({
                   Keskimääräinen tulos
                 </span>
                 <span
-                  className="text-xs font-semibold font-mono"
+                  className="text-xs font-semibold"
                   style={{ color: 'var(--color-text-primary)' }}
                 >
                   {avgCompletion.toFixed(0)} %
@@ -250,7 +235,7 @@ export function StatsModal({
                         )}
                       </div>
                       <span
-                        className="w-5 text-right shrink-0 font-medium font-mono"
+                        className="w-5 text-right shrink-0 font-medium"
                         style={{ color: 'var(--color-text-tertiary)' }}
                       >
                         {count || ''}
@@ -281,19 +266,13 @@ export function StatsModal({
             <div className="space-y-1.5" data-stats-no-hint-summary>
               <div className="flex items-center justify-between text-xs py-0.5">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Paras tulos</span>
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   {noHintLifetime.highestPercentage.toFixed(0)} %
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs py-0.5">
                 <span style={{ color: 'var(--color-text-secondary)' }}>Ällistyttäviä pelejä</span>
-                <span
-                  className="font-semibold font-mono"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
+                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   {noHintLifetime.topTierCount}
                 </span>
               </div>
