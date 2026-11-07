@@ -227,14 +227,22 @@ export function StatsModal({
                 </span>
               </div>
               <div
-                className="w-full h-1.5 rounded-full overflow-hidden"
-                style={{ background: 'var(--color-bg-primary)' }}
+                className="w-full rounded-full overflow-hidden border border-solid"
+                style={{
+                  height: '10px',
+                  boxSizing: 'border-box',
+                  backgroundColor: 'var(--color-bg-primary)',
+                  borderColor: 'var(--color-border)',
+                  boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.12)',
+                }}
               >
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${Math.min(100, avgCompletion)}%`,
-                    background: 'var(--color-accent)',
+                    background:
+                      'linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.08) 100%), var(--color-accent)',
+                    boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
                   }}
                 />
               </div>
@@ -325,15 +333,23 @@ export function StatsModal({
                         {rank.name}
                       </span>
                       <div
-                        className="flex-1 min-w-0 h-1.5 rounded-full overflow-hidden"
-                        style={{ backgroundColor: 'var(--color-bg-primary)' }}
+                        className="flex-1 min-w-0 rounded-full overflow-hidden border border-solid"
+                        style={{
+                          height: '8px',
+                          boxSizing: 'border-box',
+                          backgroundColor: 'var(--color-bg-primary)',
+                          borderColor: 'var(--color-border)',
+                          boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.12)',
+                        }}
                       >
                         {count > 0 && (
                           <div
-                            className="h-full rounded-full"
+                            className="h-full rounded-full transition-all duration-300"
                             style={{
                               width: `${pct}%`,
-                              backgroundColor: 'var(--color-accent)',
+                              background:
+                                'linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.08) 100%), var(--color-accent)',
+                              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
                             }}
                           />
                         )}

@@ -208,29 +208,30 @@ export function GameplayView(): React.JSX.Element {
                 </span>
                 {puzzle && (
                   <span
+                    className="ml-3.5"
                     style={{
-                      color: 'var(--color-text-tertiary)',
-                      fontWeight: 'normal',
+                      color: 'var(--color-accent)',
+                      fontWeight: 300,
                     }}
                   >
-                    {' '}
-                    — #{puzzle.display_number}
+                    {puzzle.display_number}
                   </span>
                 )}
               </span>
             ) : (
               <>
                 Sanakenno
-                <span style={{ fontWeight: 400 }}> —</span>
+                <span style={{ color: 'var(--color-accent)', fontWeight: 800 }}>.</span>
+                <span style={{ fontWeight: 300 }}>fi</span>
                 {puzzle && (
                   <span
+                    className="ml-3.5"
                     style={{
                       color: 'var(--color-accent)',
-                      fontWeight: 400,
+                      fontWeight: 300,
                     }}
                   >
-                    {' '}
-                    #{puzzle.display_number}
+                    {puzzle.display_number}
                   </span>
                 )}
               </>

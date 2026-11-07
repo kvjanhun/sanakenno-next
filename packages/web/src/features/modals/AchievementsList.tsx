@@ -154,8 +154,14 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
 
         {/* Master progression track */}
         <div
-          className="w-full h-1.5 rounded-full overflow-hidden"
-          style={{ background: 'var(--color-bg-primary)' }}
+          className="w-full rounded-full overflow-hidden border border-solid"
+          style={{
+            height: '10px',
+            boxSizing: 'border-box',
+            backgroundColor: 'var(--color-bg-primary)',
+            borderColor: 'var(--color-border)',
+            boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.12)',
+          }}
         >
           <div
             className="h-full rounded-full transition-all duration-500"
@@ -163,8 +169,9 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
               width: `${(totalUnlockedTiers / totalPossibleTiers) * 100}%`,
               background:
                 totalUnlockedTiers === totalPossibleTiers
-                  ? 'var(--color-tier-master)'
-                  : 'var(--color-accent)',
+                  ? 'linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.08) 100%), var(--color-tier-master)'
+                  : 'linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 45%, rgba(0, 0, 0, 0.08) 100%), var(--color-accent)',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.15)',
             }}
           />
         </div>
