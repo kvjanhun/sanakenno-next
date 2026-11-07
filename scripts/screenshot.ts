@@ -188,7 +188,7 @@ async function captureWithCdp(
         expression: `
           (async () => {
             ${
-              target.action.includes('achievements')
+              target.action.startsWith('view-stats')
                 ? `const sampleRecords = [];
                    // 7 daily consecutive plays for Bronze streak
                    for (let i = 0; i < 7; i++) {
@@ -306,6 +306,13 @@ async function main() {
         height: 800,
         mobile: false,
         action: 'view-stats-achievements',
+      },
+      {
+        name: 'desktop-stats-summary',
+        width: 1280,
+        height: 800,
+        mobile: false,
+        action: 'view-stats-summary',
       },
       { name: 'mobile', width: 390, height: 844, mobile: true, action: undefined },
       { name: 'mobile-light', width: 390, height: 844, mobile: true, action: 'theme-light' },

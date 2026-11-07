@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-  bestNoHintScoreForRecord,
   computeAverageCompletion,
   computeLifetimeNoHintStats,
   computeLifetimeStats,
@@ -12,41 +11,15 @@ import {
   type PlayerStats,
 } from '@sanakenno/shared';
 import { ShareIcon } from '../gameplay/icons.js';
-import { loadFromStorage, puzzleStateKey } from '../gameplay/storage.js';
+import { loadFromStorage } from '../gameplay/storage.js';
 import { useGameStore } from '../gameplay/useGameStore.js';
 import { useUiStore } from '../gameplay/useUiStore.js';
 import { AchievementsList } from './AchievementsList.js';
+import { TrophyIcon } from './achievementIcons.js';
+import { backfillNoHintStats } from './backfillStats.js';
 import { ModalShell } from './ModalShell.js';
 
-interface StoredPuzzleState {
-  score?: number;
-  hintsUnlocked?: string[];
-  scoreBeforeHints?: number | null;
-}
-
-function savedNoHintScore(puzzleNumber: number): number {
-  const state = loadFromStorage<StoredPuzzleState>(puzzleStateKey(puzzleNumber));
-  if (!state) return 0;
-  if (typeof state.scoreBeforeHints === 'number') return state.scoreBeforeHints;
-  if ((state.hintsUnlocked ?? []).length === 0 && typeof state.score === 'number') {
-    return state.score;
-  }
-  return 0;
-}
-
-/** Backfill best no-hint score from legacy records and saved puzzle state. */
-export function backfillNoHintStats(stats: PlayerStats): PlayerStats {
-  return {
-    ...stats,
-    records: stats.records.map((record) => ({
-      ...record,
-      best_no_hint_score: Math.max(
-        bestNoHintScoreForRecord(record),
-        savedNoHintScore(record.puzzle_number),
-      ),
-    })),
-  };
-}
+export { backfillNoHintStats };
 
 export interface StatsModalProps {
   show: boolean;
@@ -149,63 +122,177 @@ export function StatsModal({
           Ei vielä tilastoja. Pelaa kenno!
         </div>
       ) : (
-        <div className="space-y-4">
-          <section
-            data-stats-section="all-games"
+        <div className="flex flex-col gap-2 pb-0.5">
+          {/* 1. KAIKKI PELIT — All-Games Master Card */}
+          <div
+            className="p-3 rounded-2xl flex flex-col gap-2 transition-all"
             style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderRadius: '0.75rem',
-              padding: '1rem',
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
             }}
+            data-stats-section="all-games"
           >
-            <div
-              className="text-xs font-semibold tracking-wide uppercase mb-3"
-              data-stats-heading="all-games"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Kaikki pelit
+            {/* Header: Trophy icon + KAIKKI PELIT + played games */}
+            <div className="flex items-center gap-2">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                style={{
+                  background:
+                    'color-mix(in srgb, var(--color-accent) 18%, var(--color-bg-primary))',
+                  color: 'var(--color-accent)',
+                }}
+              >
+                <TrophyIcon size={16} strokeWidth={2.4} />
+              </div>
+              <div>
+                <h3
+                  className="text-xs font-bold uppercase tracking-wider m-0 leading-none"
+                  data-stats-heading="all-games"
+                  style={{ color: 'var(--color-accent)' }}
+                >
+                  Kaikki pelit
+                </h3>
+                <p
+                  className="text-[11px] m-0 mt-0.5 leading-none"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  {records.length} {records.length === 1 ? 'pelattu peli' : 'pelattua peliä'}
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-1.5" data-stats-all-summary>
-              <div className="flex items-center justify-between text-xs py-0.5">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Pelattuja pelejä</span>
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            {/* Compact 3-metric summary */}
+            <div
+              data-stats-all-summary
+              className="grid grid-cols-3 gap-1 py-1.5 px-2 rounded-xl text-center"
+              style={{
+                background: 'color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-primary))',
+                border:
+                  '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+              }}
+            >
+              <div
+                className="flex flex-col items-center"
+                style={{
+                  borderRight:
+                    '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+                }}
+              >
+                <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Pelattuja pelejä
+                </span>
+                <span
+                  className="text-xs font-bold tabular-nums"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
                   {records.length}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs py-0.5">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Putki</span>
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              <div
+                className="flex flex-col items-center"
+                style={{
+                  borderRight:
+                    '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+                }}
+              >
+                <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Putki
+                </span>
+                <span
+                  className="text-xs font-bold tabular-nums"
+                  style={{ color: 'var(--color-accent)' }}
+                >
                   {currentStreak}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs py-0.5">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Pisin putki</span>
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Pisin putki
+                </span>
+                <span
+                  className="text-xs font-bold tabular-nums"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
                   {bestStreak}
                 </span>
               </div>
             </div>
 
-            <div className="mt-1.5 space-y-1.5" data-stats-all-totals>
-              <div className="flex items-center justify-between text-xs py-0.5">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Sanoja löydetty</span>
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                  {lifetime.totalWords}
+            {/* Average completion track */}
+            <div data-stats-all-average className="flex flex-col gap-1 pt-0.5">
+              <div className="flex justify-between items-baseline text-[11px]">
+                <span style={{ color: 'var(--color-text-secondary)' }}>Keskimääräinen tulos</span>
+                <span className="font-bold tabular-nums" style={{ color: 'var(--color-accent)' }}>
+                  {avgCompletion.toFixed(0)} %
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs py-0.5">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Pangrammeja löydetty</span>
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                  {lifetime.totalPangrams}
-                </span>
+              <div
+                className="w-full h-1.5 rounded-full overflow-hidden"
+                style={{ background: 'var(--color-bg-primary)' }}
+              >
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, avgCompletion)}%`,
+                    background: 'var(--color-accent)',
+                  }}
+                />
               </div>
-              <div className="flex items-start justify-between text-xs py-0.5 gap-4">
-                <span style={{ color: 'var(--color-text-secondary)' }} className="shrink-0">
+            </div>
+
+            {/* Word and pangram totals */}
+            <div
+              data-stats-all-totals
+              className="flex flex-col gap-1.5 py-1.5 px-2 rounded-xl"
+              style={{
+                background: 'color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-primary))',
+                border:
+                  '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+              }}
+            >
+              <div className="grid grid-cols-2 gap-1 text-center">
+                <div
+                  className="flex flex-col items-center"
+                  style={{
+                    borderRight:
+                      '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+                  }}
+                >
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                    Sanoja löydetty
+                  </span>
+                  <span
+                    className="text-xs font-bold tabular-nums"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    {lifetime.totalWords}
+                  </span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                    Pangrammeja
+                  </span>
+                  <span
+                    className="text-xs font-bold tabular-nums"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    {lifetime.totalPangrams}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                className="pt-1 flex items-center justify-between px-1.5 text-xs"
+                style={{
+                  borderTop:
+                    '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+                }}
+              >
+                <span className="text-[10.5px]" style={{ color: 'var(--color-text-secondary)' }}>
                   Pisin sana
                 </span>
                 <span
-                  className="font-semibold text-right break-all"
+                  className="font-semibold text-right truncate max-w-[200px]"
                   style={{ color: 'var(--color-text-primary)' }}
                 >
                   {lifetime.longestWord || '—'}
@@ -213,64 +300,33 @@ export function StatsModal({
               </div>
             </div>
 
-            <div className="my-3.5" style={{ borderTop: '1px solid var(--color-border)' }} />
-
-            <div data-stats-all-average className="space-y-1.5">
-              <div className="flex justify-between items-baseline">
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  Keskimääräinen tulos
-                </span>
-                <span
-                  className="text-xs font-semibold"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  {avgCompletion.toFixed(0)} %
-                </span>
-              </div>
+            {/* Saavutetut tasot (ranks) across all games */}
+            <div data-stats-all-ranks className="flex flex-col gap-1 pt-1">
               <div
-                className="h-2 w-full rounded-full overflow-hidden"
-                style={{
-                  backgroundColor: 'var(--color-bg-tertiary, var(--color-bg-primary))',
-                }}
-              >
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.min(100, avgCompletion)}%`,
-                    backgroundColor: 'var(--color-accent)',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div data-stats-all-ranks className="mt-4">
-              <div
-                className="text-xs font-semibold tracking-wide uppercase mb-2.5"
+                className="text-[10.5px] font-bold uppercase tracking-wider px-1"
                 style={{ color: 'var(--color-text-secondary)' }}
               >
                 Saavutetut tasot
               </div>
-              <div className="space-y-2">
+              <div className="space-y-0.5">
                 {ranksLowestFirst.map((rank) => {
                   const count = rankDist[rank.name] || 0;
                   const pct = (count / maxCount) * 100;
                   return (
-                    <div key={rank.name} className="flex items-center gap-2 text-xs">
+                    <div
+                      key={rank.name}
+                      className="flex items-center gap-2 text-[10.5px] px-1 py-0.5"
+                    >
                       <span
-                        className="w-24 shrink-0 truncate"
+                        className="w-20 shrink-0 truncate"
                         style={{ color: 'var(--color-text-secondary)' }}
                         title={rank.name}
                       >
                         {rank.name}
                       </span>
                       <div
-                        className="flex-1 min-w-0 h-2 rounded-full overflow-hidden"
-                        style={{
-                          backgroundColor: 'var(--color-bg-tertiary, var(--color-bg-primary))',
-                        }}
+                        className="flex-1 min-w-0 h-1.5 rounded-full overflow-hidden"
+                        style={{ backgroundColor: 'var(--color-bg-primary)' }}
                       >
                         {count > 0 && (
                           <div
@@ -283,8 +339,11 @@ export function StatsModal({
                         )}
                       </div>
                       <span
-                        className="w-5 text-right shrink-0 font-medium"
-                        style={{ color: 'var(--color-text-tertiary)' }}
+                        className="w-4 text-right shrink-0 font-semibold tabular-nums"
+                        style={{
+                          color:
+                            count > 0 ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                        }}
                       >
                         {count || ''}
                       </span>
@@ -293,51 +352,84 @@ export function StatsModal({
                 })}
               </div>
             </div>
-          </section>
+          </div>
 
-          <section
+          {/* 2. ILMAN APUJA — Distinct Hintless Card */}
+          <div
             data-stats-section="no-hint"
+            className="p-3 rounded-2xl flex flex-col gap-2 transition-all"
             style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderRadius: '0.75rem',
-              padding: '1rem',
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
             }}
           >
-            <div
-              className="text-xs font-semibold tracking-wide uppercase mb-3"
-              data-stats-heading="no-hint"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              Ilman apuja
+            <div>
+              <h3
+                className="text-xs font-bold uppercase tracking-wider m-0 leading-none"
+                data-stats-heading="no-hint"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Ilman apuja
+              </h3>
+              <p
+                className="text-[10px] m-0 mt-0.5 leading-none"
+                style={{ color: 'var(--color-text-tertiary)' }}
+              >
+                Ratkaistu ilman vihjeitä
+              </p>
             </div>
 
-            <div className="space-y-1.5" data-stats-no-hint-summary>
-              <div className="flex items-center justify-between text-xs py-0.5">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Paras tulos</span>
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            <div
+              data-stats-no-hint-summary
+              className="grid grid-cols-2 gap-1 py-1.5 px-2 rounded-xl text-center"
+              style={{
+                background: 'color-mix(in srgb, var(--color-accent) 8%, var(--color-bg-primary))',
+                border:
+                  '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+              }}
+            >
+              <div
+                className="flex flex-col items-center"
+                style={{
+                  borderRight:
+                    '1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border))',
+                }}
+              >
+                <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Paras tulos
+                </span>
+                <span
+                  className="text-xs font-bold tabular-nums"
+                  style={{ color: 'var(--color-text-primary)' }}
+                >
                   {noHintLifetime.highestPercentage.toFixed(0)} %
                 </span>
               </div>
-              <div className="flex items-center justify-between text-xs py-0.5">
-                <span style={{ color: 'var(--color-text-secondary)' }}>Ällistyttäviä pelejä</span>
-                <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Ällistyttäviä pelejä
+                </span>
+                <span
+                  className="text-xs font-bold tabular-nums"
+                  style={{ color: 'var(--color-accent)' }}
+                >
                   {noHintLifetime.topTierCount}
                 </span>
               </div>
             </div>
-          </section>
+          </div>
 
           {(hasPuzzle || onShare !== undefined) && (
             <button
               type="button"
               onClick={handleShareClick}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-semibold text-sm cursor-pointer border-none"
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl font-semibold text-xs cursor-pointer border-none transition-opacity hover:opacity-90 mt-0.5"
               style={{
                 backgroundColor: 'var(--color-accent)',
                 color: 'var(--color-on-accent)',
               }}
             >
-              <ShareIcon size={16} strokeWidth={2.5} />
+              <ShareIcon size={14} strokeWidth={2.5} />
               <span>{shareCopied ? 'Kopioitu!' : 'Jaa tulos'}</span>
             </button>
           )}

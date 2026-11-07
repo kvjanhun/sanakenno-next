@@ -131,6 +131,9 @@ export interface PlayerStatsTable {
   longest_word: string | null;
   pangrams_found: Generated<number>;
   best_no_hint_score: Generated<number>;
+  long_words_count?: Generated<number>;
+  is_daily?: Generated<number>;
+  played_at_date?: string | null;
   updated_at: Generated<string>;
 }
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STATS_STORAGE_KEY, type PlayerStats, type StatsRecord } from '@sanakenno/shared';
-import { saveToStorage } from '../../packages/web/src/features/gameplay/storage.js';
+import { puzzleStateKey, saveToStorage } from '../../packages/web/src/features/gameplay/storage.js';
 import { StatsModal } from '../../packages/web/src/features/modals/StatsModal.js';
 
 function createMockRecord(overrides: Partial<StatsRecord> = {}): StatsRecord {
@@ -23,6 +23,10 @@ function createMockRecord(overrides: Partial<StatsRecord> = {}): StatsRecord {
 describe('StatsModal Achievements & Streak UI', () => {
   beforeEach(() => {
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('renders tab buttons Yhteenveto and Saavutukset', () => {
@@ -90,6 +94,8 @@ describe('StatsModal Achievements & Streak UI', () => {
   });
 
   it('displays correct streak values in Yhteenveto derived from streak logic without archive inflation', () => {
+    vi.useFakeTimers({ now: new Date('2026-11-05T12:00:00Z') });
+
     // 2 daily puzzles on consecutive days + 5 archive puzzles
     const records = [
       createMockRecord({ puzzle_number: 10, date: '2026-11-04', is_daily: true }),
@@ -109,5 +115,46 @@ describe('StatsModal Achievements & Streak UI', () => {
     // Putki should reflect 2, not 5
     expect(screen.getByText('Putki').nextElementSibling?.textContent).toBe('2');
     expect(screen.getByText('Pisin putki').nextElementSibling?.textContent).toBe('2');
+  });
+
+  it('backfills long_words_count from saved puzzle states and evaluates Sanahirviö achievement correctly', () => {
+    // Legacy record without long_words_count
+    const legacyStats: PlayerStats = {
+      version: 1,
+      records: [
+        createMockRecord({
+          puzzle_number: 42,
+          words_found: 3,
+          longest_word: 'päivittäinen',
+          // long_words_count missing/undefined
+        }),
+      ],
+    };
+    saveToStorage(STATS_STORAGE_KEY, legacyStats);
+
+    // Save actual puzzle state containing three words with length >= 10
+    // 'sanahirviö' (10 letters), 'kansallinen' (11 letters), 'päivittäinen' (12 letters)
+    saveToStorage(puzzleStateKey(42), {
+      foundWords: ['kana', 'sanahirviö', 'kansallinen', 'päivittäinen'],
+      score: 30,
+      hintsUnlocked: [],
+      startedAt: Date.now() - 50000,
+      totalPausedMs: 0,
+      scoreBeforeHints: null,
+    });
+
+    render(<StatsModal show={true} onClose={() => {}} />);
+
+    // Switch to Saavutukset tab
+    fireEvent.click(screen.getByRole('tab', { name: 'Saavutukset' }));
+
+    const sanahirvioCard = screen.getByTestId('achievement-card-long_word');
+    expect(sanahirvioCard).toBeInTheDocument();
+    // 3 long words found out of next tier target 5
+    expect(sanahirvioCard).toHaveTextContent('3 / 5');
+
+    // Stats in localStorage should be backfilled
+    const stored = JSON.parse(window.localStorage.getItem(STATS_STORAGE_KEY)!) as PlayerStats;
+    expect(stored.records[0]?.long_words_count).toBe(3);
   });
 });

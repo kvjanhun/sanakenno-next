@@ -135,7 +135,7 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
           </div>
 
           <div
-            className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-bold"
+            className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-sans font-bold tabular-nums"
             style={{
               background: 'var(--color-bg-primary)',
               border: '1px solid var(--color-border)',
@@ -236,7 +236,7 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
               {/* Numerical progress */}
               <div className="text-right shrink-0 pl-1">
                 <div
-                  className="text-xs font-mono font-bold leading-tight"
+                  className="text-xs font-sans font-bold tabular-nums leading-tight"
                   style={{
                     color: isMaxCompleted
                       ? 'var(--color-tier-master)'
@@ -326,9 +326,9 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
                         {tier.name}
                       </span>
 
-                      {/* Target Number: clearly visible font-mono */}
+                      {/* Target Number: clearly visible tabular numbers */}
                       <span
-                        className="text-[8.5px] font-mono leading-tight mt-0.5"
+                        className="text-[9px] font-sans font-medium tabular-nums leading-tight mt-0.5"
                         style={{
                           color: isUnlocked
                             ? 'var(--color-text-primary)'

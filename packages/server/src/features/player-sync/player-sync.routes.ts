@@ -92,6 +92,11 @@ export function createPlayerSyncRoutes(db: Kysely<Database>) {
         typeof body['pangrams_found'] === 'number' ? body['pangrams_found'] : 0;
       const best_no_hint_score =
         typeof body['best_no_hint_score'] === 'number' ? body['best_no_hint_score'] : undefined;
+      const long_words_count =
+        typeof body['long_words_count'] === 'number' ? body['long_words_count'] : undefined;
+      const is_daily = typeof body['is_daily'] === 'boolean' ? body['is_daily'] : undefined;
+      const played_at_date =
+        typeof body['played_at_date'] === 'string' ? body['played_at_date'] : undefined;
 
       if (
         typeof puzzle_number !== 'number' ||
@@ -115,6 +120,9 @@ export function createPlayerSyncRoutes(db: Kysely<Database>) {
           longest_word: longest_word ?? undefined,
           pangrams_found,
           ...(typeof best_no_hint_score === 'number' ? { best_no_hint_score } : {}),
+          ...(typeof long_words_count === 'number' ? { long_words_count } : {}),
+          ...(typeof is_daily === 'boolean' ? { is_daily } : {}),
+          ...(typeof played_at_date === 'string' ? { played_at_date } : {}),
         }),
       );
 

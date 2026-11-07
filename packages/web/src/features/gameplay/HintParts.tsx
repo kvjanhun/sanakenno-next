@@ -156,6 +156,11 @@ function ClueLabel({ children }: { children: React.ReactNode }): React.JSX.Eleme
 
 /** Unlocked Pangram clues. */
 export function PangramClues({ data }: { data: DerivedHintData }): React.JSX.Element {
+  const foundItems =
+    data.foundPangramDetails && data.foundPangramDetails.length > 0
+      ? data.foundPangramDetails
+      : Array.from({ length: data.pangramStats.found }).map(() => null);
+
   return (
     <div
       data-testid="clue-section-pangrams"
@@ -166,7 +171,7 @@ export function PangramClues({ data }: { data: DerivedHintData }): React.JSX.Ele
         {data.unfoundPangrams.map((p, idx) => (
           <span
             key={`unfound-pangram-${idx}`}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] leading-tight"
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight"
             style={{
               backgroundColor: 'var(--color-bg-secondary)',
               fontVariantNumeric: 'tabular-nums',
@@ -180,16 +185,18 @@ export function PangramClues({ data }: { data: DerivedHintData }): React.JSX.Ele
             </span>
           </span>
         ))}
-        {Array.from({ length: data.pangramStats.found }).map((_, idx) => (
+        {foundItems.map((p, idx) => (
           <span
             key={`found-pangram-${idx}`}
-            className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] leading-tight"
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight"
             style={{
               backgroundColor: 'var(--color-bg-secondary)',
               color: 'var(--color-text-tertiary)',
+              fontVariantNumeric: 'tabular-nums',
             }}
           >
-            ✓ löydetty
+            {p && <span className="font-bold">{p.first_letter}</span>}
+            <span className="text-[10px] leading-none font-bold">✓</span>
           </span>
         ))}
       </div>
@@ -317,7 +324,7 @@ export function WordClues({
       </div>
 
       {/* 2. Starting Pairs */}
-      <div className="w-full flex flex-col justify-center">
+      <div className="w-full flex flex-col justify-center pt-2">
         {hasPairs ? (
           <PairClues pairs={topPairs} />
         ) : (
@@ -334,7 +341,7 @@ export function WordClues({
       {/* 3. Suffixes */}
       <div
         data-testid={hasSuffixes ? 'hint-content-tier4' : undefined}
-        className="w-full flex flex-col justify-center"
+        className="w-full flex flex-col justify-center pt-2"
       >
         {hasSuffixes ? (
           <SuffixClues suffixes={topSuffixes} />

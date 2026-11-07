@@ -128,6 +128,47 @@ describe('useGameStore Achievements & Streak Integration', () => {
     expect(stats?.records[0]?.long_words_count).toBe(1);
   });
 
+  it('loading an existing solved puzzle in loadState backfills long_words_count in stats', async () => {
+    const today = getHelsinkiDateString();
+    const puzzle = await buildTestPuzzle(25, today);
+
+    // Simulate already saved state in localStorage with 11-letter word 'kansallinen'
+    saveToStorage(`sanakenno_state_25`, {
+      foundWords: ['kana', 'kansallinen'],
+      score: 15,
+      hintsUnlocked: [],
+      startedAt: Date.now() - 10000,
+      totalPausedMs: 0,
+      scoreBeforeHints: null,
+    });
+
+    // Stats has no long_words_count initially
+    saveToStorage(STATS_STORAGE_KEY, {
+      version: 1,
+      records: [
+        {
+          puzzle_number: 25,
+          date: today,
+          best_rank: 'Onnistuja',
+          best_score: 15,
+          max_score: 50,
+          words_found: 2,
+          hints_used: 0,
+          elapsed_ms: 10000,
+          is_daily: true,
+          // long_words_count missing
+        },
+      ],
+    });
+
+    // Loading puzzle runs loadState
+    await useGameStore.getState().loadPuzzle(puzzle);
+
+    const stats = loadFromStorage<PlayerStats>(STATS_STORAGE_KEY);
+    const rec = stats?.records.find((r) => r.puzzle_number === 25);
+    expect(rec?.long_words_count).toBe(1);
+  });
+
   it('submitting a word that crosses an achievement tier boundary triggers newAchievement notification', async () => {
     const today = getHelsinkiDateString();
     // Pre-seed 99 words across previous records (1 word away from Sanasampo Pronssi = 100 words)

@@ -384,6 +384,31 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
     const hasHintsOpened = visibleHints.length > 0;
     useUiStore.getState().setHintsHidden(!hasHintsOpened);
+
+    if (validWords.length > 0) {
+      const viewingDate = useUiStore.getState().viewingPuzzleDate;
+      const isDaily =
+        viewingDate === null && (puzzle.date ? puzzle.date === getHelsinkiDateString() : true);
+      const newRank = rankForScore(score, puzzle.max_score);
+      const bestNoHintScore = visibleHints.length === 0 ? score : (saved.scoreBeforeHints ?? 0);
+
+      recordLocalStatsUpdate({
+        puzzleNumber: puzzle.puzzle_number,
+        dateStr: viewingDate ?? puzzle.date ?? getHelsinkiDateString(),
+        rank: newRank,
+        score,
+        maxScore: puzzle.max_score,
+        foundWords: new Set(validWords),
+        validLetters: allLetters,
+        hintsUsed: visibleHints.length,
+        elapsedMs: Math.max(
+          0,
+          Date.now() - (saved.startedAt || Date.now()) - (saved.totalPausedMs ?? 0),
+        ),
+        bestNoHintScore,
+        isDaily,
+      });
+    }
   },
 
   copyStatus: async () => {

@@ -79,6 +79,7 @@ export interface DerivedHintData {
   pairMap: PairEntry[];
   pangramStats: PangramStats;
   unfoundPangrams: HintPangramDetail[];
+  foundPangramDetails: HintPangramDetail[];
   matrix: HintMatrix;
   suffixMap: SuffixEntry[];
   topPairs: PairEntry[];
@@ -268,20 +269,36 @@ export function deriveHintData(
     remaining: Math.max(0, hintData.pangram_count - foundPangrams.length),
   };
 
-  // Derive remaining unfound pangram clues
+  // Derive remaining unfound pangram clues and found pangrams
   const unfoundPangrams: HintPangramDetail[] = [];
+  const foundPangramDetails: HintPangramDetail[] = [];
   if (hintData.pangram_details && hintData.pangram_details.length > 0) {
     const available = [...hintData.pangram_details];
     for (const fp of foundPangrams) {
-      const fLetter = fp[0] ?? '';
+      const fLetter = (fp[0] ?? '').toUpperCase();
       const fLen = fp.length;
-      const matchIdx = available.findIndex((p) => p.first_letter === fLetter && p.length === fLen);
+      const matchIdx = available.findIndex(
+        (p) => p.first_letter.toUpperCase() === fLetter && p.length === fLen,
+      );
       if (matchIdx !== -1) {
-        available.splice(matchIdx, 1);
+        const [matched] = available.splice(matchIdx, 1);
+        foundPangramDetails.push(matched!);
+      } else {
+        foundPangramDetails.push({ first_letter: fLetter, length: fLen });
       }
     }
     unfoundPangrams.push(...available);
+  } else {
+    for (const fp of foundPangrams) {
+      foundPangramDetails.push({
+        first_letter: (fp[0] ?? '').toUpperCase(),
+        length: fp.length,
+      });
+    }
   }
+  foundPangramDetails.sort(
+    (a, b) => compareFinnishAlphabetically(a.first_letter, b.first_letter) || a.length - b.length,
+  );
 
   // Derive Matrix (letter x length)
   const matrixLetters = letterMap.map((l) => l.letter);
@@ -348,6 +365,7 @@ export function deriveHintData(
     pairMap,
     pangramStats,
     unfoundPangrams,
+    foundPangramDetails,
     matrix: {
       letters: matrixLetters,
       lengths: matrixLengths,

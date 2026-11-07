@@ -195,6 +195,9 @@ export async function readStatsRecord(
       'longest_word',
       'pangrams_found',
       'best_no_hint_score',
+      'long_words_count',
+      'is_daily',
+      'played_at_date',
     ])
     .where('player_id', '=', playerId)
     .where('puzzle_number', '=', puzzleNumber)
@@ -214,6 +217,9 @@ export async function readStatsRecord(
     longest_word: existing.longest_word ?? undefined,
     pangrams_found: Number(existing.pangrams_found),
     best_no_hint_score: Number(existing.best_no_hint_score),
+    long_words_count: Number(existing.long_words_count ?? 0),
+    is_daily: Boolean(existing.is_daily),
+    played_at_date: existing.played_at_date ?? undefined,
   };
 }
 
@@ -253,6 +259,9 @@ export async function mergeAndStoreStatsRecord(
         longest_word: longestWordOrNull,
         pangrams_found: merged.pangrams_found ?? 0,
         best_no_hint_score: bestNoHint,
+        long_words_count: merged.long_words_count ?? 0,
+        is_daily: merged.is_daily ? 1 : 0,
+        played_at_date: merged.played_at_date ?? null,
       })
       .execute();
   } else {
@@ -269,6 +278,12 @@ export async function mergeAndStoreStatsRecord(
         longest_word: longestWordOrNull,
         pangrams_found: merged.pangrams_found ?? 0,
         best_no_hint_score: bestNoHint,
+        long_words_count: Math.max(
+          Number(existing.long_words_count ?? 0),
+          merged.long_words_count ?? 0,
+        ),
+        is_daily: existing.is_daily || merged.is_daily ? 1 : 0,
+        played_at_date: merged.played_at_date ?? existing.played_at_date ?? null,
         updated_at: sql<string>`datetime('now')`,
       })
       .where('player_id', '=', playerId)
@@ -310,6 +325,8 @@ export async function deriveStatsFromProgress(
       ? Math.max(0, Date.now() - mergedState.started_at - mergedState.total_paused_ms)
       : 0;
 
+  const longWordsCount = mergedState.found_words.filter((word) => word.length >= 10).length;
+
   return {
     puzzle_number: payload.puzzle_number,
     date: payload.date,
@@ -325,6 +342,7 @@ export async function deriveStatsFromProgress(
       payload.best_no_hint_score ?? 0,
       deriveBestNoHintScore(mergedState),
     ),
+    long_words_count: longWordsCount,
   };
 }
 
@@ -349,6 +367,9 @@ export async function fetchPlayerData(
       'longest_word',
       'pangrams_found',
       'best_no_hint_score',
+      'long_words_count',
+      'is_daily',
+      'played_at_date',
     ])
     .where('player_id', '=', playerId)
     .execute();
@@ -383,6 +404,9 @@ export async function fetchPlayerData(
         longest_word: r.longest_word ?? undefined,
         pangrams_found: Number(r.pangrams_found),
         best_no_hint_score: Number(r.best_no_hint_score),
+        long_words_count: Number(r.long_words_count ?? 0),
+        is_daily: Boolean(r.is_daily),
+        played_at_date: r.played_at_date ?? undefined,
       })),
       version: 1,
     },

@@ -121,10 +121,9 @@ export function evaluateAchievements(
   const totalWords = records.reduce((sum, r) => sum + (r.words_found ?? 0), 0);
   const totalPangrams = records.reduce((sum, r) => sum + (r.pangrams_found ?? 0), 0);
   const totalLongWords = records.reduce((sum, r) => {
-    if (typeof r.long_words_count === 'number') {
-      return sum + r.long_words_count;
-    }
-    return sum + ((r.longest_word?.length ?? 0) >= 10 ? 1 : 0);
+    const count = typeof r.long_words_count === 'number' ? r.long_words_count : 0;
+    const fallback = (r.longest_word?.length ?? 0) >= 10 ? 1 : 0;
+    return sum + Math.max(count, fallback);
   }, 0);
 
   const fullBoards = records.reduce((sum, r) => {

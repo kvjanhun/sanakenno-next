@@ -151,6 +151,9 @@ CREATE TABLE IF NOT EXISTS player_stats (
     longest_word       TEXT DEFAULT NULL,
     pangrams_found     INTEGER NOT NULL DEFAULT 0,
     best_no_hint_score INTEGER NOT NULL DEFAULT 0,
+    long_words_count   INTEGER NOT NULL DEFAULT 0,
+    is_daily           INTEGER NOT NULL DEFAULT 0,
+    played_at_date     TEXT DEFAULT NULL,
     updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(player_id, puzzle_number)
 );
@@ -184,6 +187,10 @@ function ensureColumn(
   column: string,
   decl: string,
 ): void {
+  const tableExists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?")
+    .get(table);
+  if (!tableExists) return;
   const rows = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   if (rows.some((r) => r.name === column)) return;
   db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${decl}`);
@@ -270,6 +277,15 @@ export const MIGRATIONS: readonly Migration[] = [
       for (const word of CURATED_BLOCKED_WORDS) {
         stmt.run(word);
       }
+    },
+  },
+  {
+    version: '0004-add-player-stats-long-words-and-streak-integrity',
+    description: 'Add long_words_count, is_daily, and played_at_date to player_stats table',
+    up(db) {
+      ensureColumn(db, 'player_stats', 'long_words_count', 'INTEGER NOT NULL DEFAULT 0');
+      ensureColumn(db, 'player_stats', 'is_daily', 'INTEGER NOT NULL DEFAULT 0');
+      ensureColumn(db, 'player_stats', 'played_at_date', 'TEXT DEFAULT NULL');
     },
   },
 ];
