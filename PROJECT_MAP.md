@@ -41,7 +41,7 @@ sanakenno-next/
         pwa.config.ts        # PWA manifest, service worker registration & Workbox runtime caching
         features/
           gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AchievementNotification), useMidnightRollover, and hybrid state
-          modals/            # ArchiveModal, PuzzleWordsModal, StatsModal (tabbed summary + AchievementsList, backfillStats), RulesModal, SettingsModal
+          modals/            # ArchiveModal (ArchiveCalendar, ArchiveDayPanel, archiveStatus), PuzzleWordsModal, StatsModal (tabbed summary + AchievementsList, backfillStats), RulesModal, SettingsModal
           player-sync/       # Player auth store, monotonic sync reconciliation, SyncModal, ConnectBanner
           theme/             # 6-palette CSS custom property theme system (usePaletteStore, useThemePreferenceStore, ThemeSelector, ThemeToggle)
           admin/             # Code-split admin panel (AdminLayout, LoginPage, PuzzleEditor, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)

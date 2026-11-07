@@ -41,6 +41,22 @@ export function ChevronDownIcon(props: IconProps): React.JSX.Element {
   );
 }
 
+export function ChevronLeftIcon(props: IconProps): React.JSX.Element {
+  return (
+    <SvgIcon size={16} strokeWidth={2.5} {...props}>
+      <path d="m15 18-6-6 6-6" />
+    </SvgIcon>
+  );
+}
+
+export function ChevronRightIcon(props: IconProps): React.JSX.Element {
+  return (
+    <SvgIcon size={16} strokeWidth={2.5} {...props}>
+      <path d="m9 18 6-6-6-6" />
+    </SvgIcon>
+  );
+}
+
 export function CheckIcon(props: IconProps): React.JSX.Element {
   return (
     <SvgIcon size={18} strokeWidth={2.5} {...props}>

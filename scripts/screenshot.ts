@@ -183,6 +183,26 @@ async function captureWithCdp(
       await new Promise((r) => setTimeout(r, 300));
     }
 
+    if (target.action?.startsWith('view-archive')) {
+      if (target.action.includes('light')) {
+        await send('Runtime.evaluate', {
+          expression: `document.documentElement.setAttribute('data-theme', 'light')`,
+        });
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      await send('Runtime.evaluate', {
+        expression: `
+          (async () => {
+            const archiveBtn = document.querySelector('button[aria-label="Arkisto"]');
+            if (archiveBtn) archiveBtn.click();
+            await new Promise((r) => setTimeout(r, 400));
+          })()
+        `,
+        awaitPromise: true,
+      });
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
     if (target.action?.startsWith('view-stats')) {
       const evalRes = await send('Runtime.evaluate', {
         expression: `
@@ -301,6 +321,13 @@ async function main() {
         action: 'view-clues-open',
       },
       {
+        name: 'desktop-archive',
+        width: 1280,
+        height: 800,
+        mobile: false,
+        action: 'view-archive',
+      },
+      {
         name: 'desktop-stats-achievements',
         width: 1280,
         height: 800,
@@ -317,6 +344,20 @@ async function main() {
       { name: 'mobile', width: 390, height: 844, mobile: true, action: undefined },
       { name: 'mobile-light', width: 390, height: 844, mobile: true, action: 'theme-light' },
       { name: 'mobile-matrix', width: 390, height: 844, mobile: true, action: 'unlock-matrix' },
+      {
+        name: 'mobile-archive',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-archive',
+      },
+      {
+        name: 'mobile-archive-light',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-archive-light',
+      },
       {
         name: 'mobile-stats-achievements',
         width: 390,

@@ -269,24 +269,63 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
 
     // Wait for archive entries to render using display_number (#2 and #1, NOT raw slots #10 and #5)
     await waitFor(() => {
+      expect(screen.getByTestId('archive-entry-2')).toBeInTheDocument();
+      expect(screen.getByTestId('archive-entry-1')).toBeInTheDocument();
       expect(screen.getByText('Kenno #2')).toBeInTheDocument();
-      expect(screen.getByText('Kenno #1')).toBeInTheDocument();
     });
     expect(screen.queryByText('Kenno #10')).not.toBeInTheDocument();
     expect(screen.queryByText('Kenno #5')).not.toBeInTheDocument();
 
-    // Verify completion rank and word count from localStorage on slot 5
+    // Click past puzzle (Kenno #1, slot 5) -> updates day panel with status
+    fireEvent.click(screen.getByTestId('archive-entry-1'));
+    expect(screen.getByText('Kenno #1')).toBeInTheDocument();
     expect(screen.getByText('Sanavalmis')).toBeInTheDocument();
     expect(screen.getByText('2 sanaa')).toBeInTheDocument();
-
-    // Click past puzzle (Kenno #1, slot 5) -> opens action sheet
-    fireEvent.click(screen.getByTestId('archive-entry-1'));
     expect(screen.getByRole('button', { name: 'Pelaa' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Näytä vastaukset' })).toBeInTheDocument();
 
     // Select Pelaa -> invokes onSelectPuzzle(5, '2026-04-01')
     fireEvent.click(screen.getByRole('button', { name: 'Pelaa' }));
     expect(onSelectPuzzle).toHaveBeenCalledWith(5, '2026-04-01');
+  });
+
+  it('supports day stepping, inline answer reveal confirmation, and month quick-jump in ArchiveModal', async () => {
+    const onSelectPuzzle = vi.fn();
+    const onRevealAnswers = vi.fn();
+
+    render(
+      <ArchiveModal
+        show={true}
+        onClose={() => {}}
+        onSelectPuzzle={onSelectPuzzle}
+        onRevealAnswers={onRevealAnswers}
+        currentPuzzleNumber={10}
+      />,
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Kenno #2')).toBeInTheDocument();
+    });
+
+    // Step to previous day via day stepper
+    const prevDayBtn = screen.getByRole('button', { name: 'Edellinen kenno' });
+    expect(prevDayBtn).toBeEnabled();
+    fireEvent.click(prevDayBtn);
+
+    // Now Kenno #1 is selected
+    expect(screen.getByText('Kenno #1')).toBeInTheDocument();
+
+    // Trigger reveal answers on unrevealed past puzzle -> shows inline confirmation
+    fireEvent.click(screen.getByRole('button', { name: 'Näytä vastaukset' }));
+    expect(
+      screen.getByText('Vastauksien paljastamisen jälkeen tästä kennosta ei enää kerry tilastoja.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Takaisin' })).toBeInTheDocument();
+
+    // Confirm reveal
+    fireEvent.click(screen.getByRole('button', { name: 'Paljasta vastaukset' }));
+    expect(onRevealAnswers).toHaveBeenCalledWith(5, 1);
   });
 
   it('sets revealed_<slot> = true in PuzzleWordsModal and renders found/missed words with Kotus links', async () => {
