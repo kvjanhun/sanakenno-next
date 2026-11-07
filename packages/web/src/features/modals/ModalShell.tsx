@@ -1,5 +1,5 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import { CloseIcon } from '../gameplay/icons.js';
+import { ArrowLeftIcon, CloseIcon } from '../gameplay/icons.js';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -80,6 +80,8 @@ export interface ModalShellProps {
   title: string;
   titleId: string;
   onClose: () => void;
+  onBack?: () => void;
+  backLabel?: string;
   onEscape?: () => void;
   children: ReactNode;
   className?: string;
@@ -96,6 +98,8 @@ export function ModalShell({
   title,
   titleId,
   onClose,
+  onBack,
+  backLabel = 'Takaisin arkistoon',
   onEscape,
   children,
   className = '',
@@ -130,19 +134,32 @@ export function ModalShell({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`flex items-center justify-between ${headerClassName}`}>
-          <h2
-            id={titleId}
-            className="text-lg font-semibold"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            {title}
-          </h2>
+        <div className={`flex items-center justify-between gap-2 ${headerClassName}`}>
+          <div className="flex items-center gap-1 min-w-0">
+            {onBack && (
+              <button
+                type="button"
+                aria-label={backLabel}
+                onClick={onBack}
+                className="-ml-1.5 h-8 w-8 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center shrink-0"
+                style={{ color: 'var(--color-accent)' }}
+              >
+                <ArrowLeftIcon size={18} />
+              </button>
+            )}
+            <h2
+              id={titleId}
+              className="text-lg font-semibold truncate"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              {title}
+            </h2>
+          </div>
           <button
             type="button"
             aria-label="Sulje"
             onClick={onClose}
-            className="h-8 w-8 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center"
+            className="h-8 w-8 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center shrink-0"
             style={{ color: 'var(--color-accent)' }}
           >
             <CloseIcon size={20} strokeWidth={2.5} />

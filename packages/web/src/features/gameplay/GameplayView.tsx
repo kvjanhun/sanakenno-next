@@ -290,6 +290,10 @@ export function GameplayView(): React.JSX.Element {
       <PuzzleWordsModal
         show={revealPuzzle !== null}
         onClose={() => setRevealPuzzle(null)}
+        onBack={() => {
+          setRevealPuzzle(null);
+          useUiStore.getState().setShowArchive(true);
+        }}
         puzzleNumber={revealPuzzle?.puzzleNumber ?? null}
         displayNumber={revealPuzzle?.displayNumber}
       />

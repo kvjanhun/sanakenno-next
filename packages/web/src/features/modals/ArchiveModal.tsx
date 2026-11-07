@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ArchiveEntry } from '@sanakenno/shared';
 import { isPuzzleRevealed } from '../gameplay/storage.js';
 import { ArchiveCalendar, type YearMonth } from './ArchiveCalendar.js';
@@ -27,7 +27,9 @@ export function ArchiveModal({
   const { data: entries = [], isLoading, isError } = useArchiveQuery(show);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [yearMonth, setYearMonth] = useState<YearMonth | null>(null);
-  const [confirmReveal, setConfirmReveal] = useState(false);
+  const [confirmEntry, setConfirmEntry] = useState<ArchiveEntry | null>(null);
+  const preserveSelectionRef = useRef(false);
+  const initializedForOpenRef = useRef(false);
 
   const todayEntry = useMemo(() => entries.find((e) => e.is_today) ?? null, [entries]);
 
@@ -45,9 +47,20 @@ export function ArchiveModal({
 
   // Synchronize initial selection and active yearMonth when modal opens or entries load
   useEffect(() => {
-    if (!show || entries.length === 0) return;
+    if (!show) {
+      initializedForOpenRef.current = false;
+      return;
+    }
+    if (entries.length === 0 || initializedForOpenRef.current) return;
 
-    setConfirmReveal(false);
+    initializedForOpenRef.current = true;
+    setConfirmEntry(null);
+
+    if (preserveSelectionRef.current) {
+      preserveSelectionRef.current = false;
+      return;
+    }
+
     const initial =
       (currentPuzzleNumber !== null
         ? entries.find((e) => e.puzzle_number === currentPuzzleNumber)
@@ -86,7 +99,7 @@ export function ArchiveModal({
   const canNextDay = selectedIndex !== -1 && selectedIndex < chronologicalEntries.length - 1;
 
   const handleSelectEntry = useCallback((entry: ArchiveEntry) => {
-    setConfirmReveal(false);
+    setConfirmEntry(null);
     setSelectedDate(entry.date);
     const [y, m] = entry.date.split('-').map(Number);
     if (y && m) setYearMonth({ year: y, monthIndex: m - 1 });
@@ -119,93 +132,149 @@ export function ArchiveModal({
   const handleReveal = useCallback(
     (entry: ArchiveEntry) => {
       if (isPuzzleRevealed(entry.puzzle_number)) {
+        preserveSelectionRef.current = true;
         onRevealAnswers(entry.puzzle_number, entry.display_number);
         return;
       }
-      setConfirmReveal(true);
+      setConfirmEntry(entry);
     },
     [onRevealAnswers],
   );
 
-  const handleConfirmReveal = useCallback(
-    (entry: ArchiveEntry) => {
-      setConfirmReveal(false);
-      onRevealAnswers(entry.puzzle_number, entry.display_number);
-    },
-    [onRevealAnswers],
-  );
+  const handleConfirmReveal = useCallback(() => {
+    if (!confirmEntry) return;
+    const target = confirmEntry;
+    setConfirmEntry(null);
+    preserveSelectionRef.current = true;
+    onRevealAnswers(target.puzzle_number, target.display_number);
+  }, [confirmEntry, onRevealAnswers]);
 
   const handleEscape = useCallback(() => {
-    if (confirmReveal) {
-      setConfirmReveal(false);
+    if (confirmEntry) {
+      setConfirmEntry(null);
     } else {
       onClose();
     }
-  }, [confirmReveal, onClose]);
+  }, [confirmEntry, onClose]);
 
   return (
-    <ModalShell
-      show={show}
-      title="Arkisto"
-      titleId="archive-title"
-      onClose={onClose}
-      onEscape={handleEscape}
-      className="flex flex-col"
-      style={{ height: '85vh', maxHeight: '720px', overflowY: 'hidden' }}
-      headerClassName="mb-2"
-    >
-      {isLoading ? (
-        <div
-          className="flex-1 text-sm py-8 text-center"
-          style={{ color: 'var(--color-text-tertiary)' }}
-        >
-          Ladataan...
-        </div>
-      ) : isError ? (
-        <div
-          className="flex-1 text-sm py-8 text-center"
-          style={{ color: 'var(--color-text-tertiary)' }}
-        >
-          Arkiston lataus epäonnistui.
-        </div>
-      ) : entries.length === 0 ? (
-        <div
-          className="flex-1 text-sm py-8 text-center"
-          style={{ color: 'var(--color-text-tertiary)' }}
-        >
-          Ei arkistoituja kennoja.
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-0.5">
-          <ArchiveCalendar
-            entries={entries}
-            selectedEntry={selectedEntry}
-            currentPuzzleNumber={currentPuzzleNumber}
-            onSelectEntry={handleSelectEntry}
-            yearMonth={activeYearMonth}
-            onYearMonthChange={setYearMonth}
-            onJumpToToday={handleJumpToToday}
-            availableYearMonths={availableYearMonths}
-            todayYearMonthKey={todayYearMonthKey}
-          />
-
-          {selectedEntry && (
-            <ArchiveDayPanel
-              entry={selectedEntry}
+    <>
+      <ModalShell
+        show={show}
+        title="Arkisto"
+        titleId="archive-title"
+        onClose={onClose}
+        onEscape={handleEscape}
+        className="flex flex-col"
+        headerClassName="mb-2"
+      >
+        {isLoading ? (
+          <div className="text-sm py-6 text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+            Ladataan...
+          </div>
+        ) : isError ? (
+          <div className="text-sm py-6 text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+            Arkiston lataus epäonnistui.
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="text-sm py-6 text-center" style={{ color: 'var(--color-text-tertiary)' }}>
+            Ei arkistoituja kennoja.
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <ArchiveCalendar
+              entries={entries}
+              selectedEntry={selectedEntry}
               currentPuzzleNumber={currentPuzzleNumber}
-              confirmReveal={confirmReveal}
-              onPlay={handlePlay}
-              onReveal={handleReveal}
-              onConfirmReveal={handleConfirmReveal}
-              onCancelConfirm={() => setConfirmReveal(false)}
-              onPrevDay={handlePrevDay}
-              onNextDay={handleNextDay}
-              canPrevDay={canPrevDay}
-              canNextDay={canNextDay}
+              onSelectEntry={handleSelectEntry}
+              yearMonth={activeYearMonth}
+              onYearMonthChange={setYearMonth}
+              onJumpToToday={handleJumpToToday}
+              availableYearMonths={availableYearMonths}
+              todayYearMonthKey={todayYearMonthKey}
             />
-          )}
+
+            {selectedEntry && (
+              <ArchiveDayPanel
+                entry={selectedEntry}
+                currentPuzzleNumber={currentPuzzleNumber}
+                onPlay={handlePlay}
+                onReveal={handleReveal}
+                onPrevDay={handlePrevDay}
+                onNextDay={handleNextDay}
+                canPrevDay={canPrevDay}
+                canNextDay={canNextDay}
+              />
+            )}
+          </div>
+        )}
+      </ModalShell>
+
+      {/* Pop-up selection dialog for unrevealed puzzle answer reveal */}
+      {confirmEntry && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgb(0 0 0 / 0.5)' }}
+          onClick={() => setConfirmEntry(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-reveal-title"
+            aria-describedby="confirm-reveal-desc"
+            className="w-full max-w-xs rounded-xl p-4 flex flex-col gap-3 shadow-xl"
+            style={{
+              backgroundColor: 'var(--color-bg-primary)',
+              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-1 text-center">
+              <h3
+                id="confirm-reveal-title"
+                className="text-sm font-semibold"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                Paljastetaanko vastaukset?
+              </h3>
+              <p
+                id="confirm-reveal-desc"
+                className="text-xs leading-relaxed"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Vastauksien paljastamisen jälkeen tästä kennosta ei enää kerry tilastoja.
+              </p>
+            </div>
+
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmEntry(null)}
+                className="flex-1 h-8 rounded-lg font-medium text-xs cursor-pointer border flex items-center justify-center transition-colors"
+                style={{
+                  backgroundColor: 'transparent',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                Takaisin
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmReveal}
+                className="flex-1 h-8 rounded-lg font-semibold text-xs cursor-pointer border-none flex items-center justify-center transition-opacity hover:opacity-90"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'var(--color-on-accent)',
+                }}
+              >
+                Paljasta vastaukset
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </ModalShell>
+    </>
   );
 }

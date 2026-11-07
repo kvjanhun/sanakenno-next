@@ -5,11 +5,8 @@ import { formatFinnishDate, getArchivePlayStatus } from './archiveStatus.js';
 export interface ArchiveDayPanelProps {
   entry: ArchiveEntry;
   currentPuzzleNumber: number | null;
-  confirmReveal: boolean;
   onPlay: (entry: ArchiveEntry) => void;
   onReveal: (entry: ArchiveEntry) => void;
-  onConfirmReveal: (entry: ArchiveEntry) => void;
-  onCancelConfirm: () => void;
   onPrevDay: () => void;
   onNextDay: () => void;
   canPrevDay: boolean;
@@ -19,11 +16,8 @@ export interface ArchiveDayPanelProps {
 export function ArchiveDayPanel({
   entry,
   currentPuzzleNumber,
-  confirmReveal,
   onPlay,
   onReveal,
-  onConfirmReveal,
-  onCancelConfirm,
   onPrevDay,
   onNextDay,
   canPrevDay,
@@ -35,51 +29,82 @@ export function ArchiveDayPanel({
 
   return (
     <div
-      className="rounded-xl p-3 flex flex-col gap-3"
-      style={{
-        backgroundColor: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-      }}
+      className="rounded-lg p-2.5 flex flex-col gap-2.5"
+      style={{ backgroundColor: 'var(--color-bg-secondary)' }}
     >
-      {/* Day Stepper & Header */}
-      <div className="flex items-center justify-between gap-1">
+      {/* Slim Info Header Row */}
+      <div className="h-9 flex items-center justify-between gap-2">
         <button
           type="button"
           aria-label="Edellinen kenno"
           title="Edellinen kenno"
           onClick={onPrevDay}
           disabled={!canPrevDay}
-          className="h-8 w-8 rounded-lg flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-30 transition-opacity"
+          className="h-7 w-7 -ml-1 rounded-md flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-25 shrink-0"
           style={{ color: 'var(--color-text-secondary)' }}
         >
-          <ChevronLeftIcon size={18} />
+          <ChevronLeftIcon size={16} />
         </button>
 
-        <div className="text-center min-w-0 px-1">
-          <div
-            className="text-sm font-bold truncate leading-tight"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            Kenno #{entry.display_number}
-            {entry.is_today && (
+        <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div
+              className="h-5 text-sm font-semibold leading-none truncate flex items-center gap-1.5"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              <span>{formatFinnishDate(entry.date)}</span>
+              {entry.is_today && (
+                <span
+                  className="text-[10px] font-semibold leading-none px-1.5 py-0.5 rounded"
+                  style={{
+                    backgroundColor:
+                      'color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-primary))',
+                    color: 'var(--color-accent)',
+                  }}
+                >
+                  tänään
+                </span>
+              )}
+            </div>
+            <div
+              className="h-4 text-xs leading-none flex items-center"
+              style={{ color: 'var(--color-text-tertiary)' }}
+            >
+              Kenno #{entry.display_number}
+            </div>
+          </div>
+
+          <div className="shrink-0 flex items-center justify-end gap-1.5 text-xs">
+            {status.isRevealed && (
               <span
-                className="ml-1.5 text-xs font-semibold"
+                aria-label="Vastaukset paljastettu"
+                title="Vastaukset paljastettu"
                 style={{ color: 'var(--color-accent)' }}
               >
-                tänään
+                <EyeIcon />
               </span>
             )}
-            {isCurrent && !entry.is_today && (
-              <span className="ml-1.5 text-xs font-medium" style={{ color: 'var(--color-accent)' }}>
-                avoinna
+            {status.played ? (
+              <span
+                className="min-w-0 text-right leading-tight"
+                title={`${status.wordsFound} sanaa, ${status.rank}`}
+                aria-label={`${status.rank}, ${status.wordsFound} sanaa`}
+              >
+                <span
+                  className="block truncate font-semibold"
+                  style={{ color: 'var(--color-accent)' }}
+                >
+                  {status.rank}
+                </span>
+                <span className="block" style={{ color: 'var(--color-text-tertiary)' }}>
+                  {status.wordsFound} sanaa
+                </span>
+              </span>
+            ) : (
+              <span className="text-right" style={{ color: 'var(--color-text-tertiary)' }}>
+                Ei pelattu
               </span>
             )}
-          </div>
-          <div
-            className="text-[11px] leading-tight mt-0.5"
-            style={{ color: 'var(--color-text-tertiary)' }}
-          >
-            {formatFinnishDate(entry.date)}
           </div>
         </div>
 
@@ -89,14 +114,14 @@ export function ArchiveDayPanel({
           title="Seuraava kenno"
           onClick={onNextDay}
           disabled={!canNextDay}
-          className="h-8 w-8 rounded-lg flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-30 transition-opacity"
+          className="h-7 w-7 -mr-1 rounded-md flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-25 shrink-0"
           style={{ color: 'var(--color-text-secondary)' }}
         >
-          <ChevronRightIcon size={18} />
+          <ChevronRightIcon size={16} />
         </button>
       </div>
 
-      {/* 7-Letter Hex Preview */}
+      {/* Separate 7-Letter Tiles */}
       <div className="flex items-center justify-center gap-1.5 font-[var(--font-mono)]">
         <span
           className="w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold shadow-xs"
@@ -123,157 +148,35 @@ export function ArchiveDayPanel({
         ))}
       </div>
 
-      {/* Status & Progress Summary */}
-      <div
-        className="rounded-lg p-2.5 flex flex-col gap-1.5"
-        style={{
-          backgroundColor: 'var(--color-bg-primary)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        {status.played ? (
-          <>
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-sm" style={{ color: 'var(--color-accent)' }}>
-                {status.rank}
-              </span>
-              <div className="flex items-center gap-1.5">
-                {!status.hintsUsed && (
-                  <span
-                    className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
-                    style={{
-                      backgroundColor:
-                        'color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-primary))',
-                      color: 'var(--color-accent)',
-                    }}
-                  >
-                    Avuitta
-                  </span>
-                )}
-                <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                  {status.wordsFound} sanaa
-                </span>
-              </div>
-            </div>
+      {/* Slim Action Buttons */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onPlay(entry)}
+          className="flex-1 h-8 rounded-lg font-semibold text-xs flex items-center justify-center cursor-pointer border-none transition-opacity hover:opacity-90"
+          style={{
+            backgroundColor: 'var(--color-accent)',
+            color: 'var(--color-on-accent)',
+          }}
+        >
+          {isCurrent ? 'Jatka peliä' : 'Pelaa'}
+        </button>
 
-            <div className="flex items-center justify-between text-[11px]">
-              <span style={{ color: 'var(--color-text-tertiary)' }}>Pisteet</span>
-              <span
-                className="font-semibold tabular-nums"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                {status.score} / {status.maxScore} p ({status.percentage} %)
-              </span>
-            </div>
-
-            <div
-              className="w-full h-1.5 rounded-full overflow-hidden border border-solid"
-              style={{
-                backgroundColor: 'var(--color-bg-secondary)',
-                borderColor: 'var(--color-border)',
-              }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{
-                  width: `${status.percentage}%`,
-                  backgroundColor: 'var(--color-accent)',
-                }}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-between text-xs py-1">
-            <span style={{ color: 'var(--color-text-tertiary)' }}>Ei vielä pelattu</span>
-            <span className="tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
-              Enimmäispisteet: {entry.max_score} p
-            </span>
-          </div>
-        )}
-
-        {status.isRevealed && (
-          <div
-            className="flex items-center gap-1.5 text-xs pt-1 border-t"
-            style={{
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-accent)',
-            }}
-          >
-            <EyeIcon size={14} />
-            <span>Vastaukset paljastettu</span>
-          </div>
-        )}
-      </div>
-
-      {/* Action Buttons & Inline Reveal Confirmation */}
-      {confirmReveal ? (
-        <div className="flex flex-col gap-2">
-          <div
-            className="rounded-lg p-2 text-xs text-center leading-normal"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              color: 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            Vastauksien paljastamisen jälkeen tästä kennosta ei enää kerry tilastoja.
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={onCancelConfirm}
-              className="w-1/2 py-2.5 rounded-lg font-medium text-sm cursor-pointer border"
-              style={{
-                backgroundColor: 'transparent',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              Takaisin
-            </button>
-            <button
-              type="button"
-              onClick={() => onConfirmReveal(entry)}
-              className="w-1/2 py-2.5 rounded-lg font-semibold text-sm cursor-pointer border-none"
-              style={{
-                backgroundColor: 'var(--color-accent)',
-                color: 'var(--color-on-accent)',
-              }}
-            >
-              Paljasta vastaukset
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
+        {!entry.is_today && (
           <button
             type="button"
-            onClick={() => onPlay(entry)}
-            className="w-full py-2.5 rounded-lg font-semibold text-sm cursor-pointer border-none shadow-xs transition-opacity hover:opacity-95"
+            onClick={() => onReveal(entry)}
+            className="flex-1 h-8 rounded-lg font-medium text-xs flex items-center justify-center cursor-pointer border transition-colors"
             style={{
-              backgroundColor: 'var(--color-accent)',
-              color: 'var(--color-on-accent)',
+              backgroundColor: 'var(--color-bg-primary)',
+              borderColor: 'var(--color-border)',
+              color: 'var(--color-text-primary)',
             }}
           >
-            {isCurrent ? 'Jatka peliä' : 'Pelaa'}
+            Näytä vastaukset
           </button>
-
-          {!entry.is_today && (
-            <button
-              type="button"
-              onClick={() => onReveal(entry)}
-              className="w-full py-2 rounded-lg font-medium text-xs cursor-pointer border transition-colors"
-              style={{
-                backgroundColor: 'transparent',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              Näytä vastaukset
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { ArchiveEntry } from '@sanakenno/shared';
-import { ChevronLeftIcon, ChevronRightIcon, EyeIcon } from '../gameplay/icons.js';
+import { ChevronLeftIcon, ChevronRightIcon } from '../gameplay/icons.js';
 import {
   formatFinnishMonth,
   getArchivePlayStatus,
@@ -22,7 +22,7 @@ export interface ArchiveCalendarProps {
   yearMonth: YearMonth;
   onYearMonthChange: (ym: YearMonth) => void;
   onJumpToToday: () => void;
-  availableYearMonths: string[]; // sorted "YYYY-MM"
+  availableYearMonths: string[];
   todayYearMonthKey: string;
 }
 
@@ -50,29 +50,17 @@ export function ArchiveCalendar({
     return map;
   }, [entries]);
 
-  // Derive days in month and Monday-first offset
-  const { daysInMonth, leadingEmptyCount } = useMemo(() => {
+  const { daysInMonth, leadingEmptyCount, trailingEmptyCount } = useMemo(() => {
     const count = new Date(yearMonth.year, yearMonth.monthIndex + 1, 0).getDate();
     const firstDay = new Date(yearMonth.year, yearMonth.monthIndex, 1).getDay();
     const mondayFirst = (firstDay + 6) % 7;
-    return { daysInMonth: count, leadingEmptyCount: mondayFirst };
+    const trailing = Math.max(0, 42 - mondayFirst - count);
+    return {
+      daysInMonth: count,
+      leadingEmptyCount: mondayFirst,
+      trailingEmptyCount: trailing,
+    };
   }, [yearMonth]);
-
-  // Count played puzzles in current month
-  const monthStats = useMemo(() => {
-    let totalInMonth = 0;
-    let playedInMonth = 0;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${yearMonth.year}-${String(yearMonth.monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const entry = entryByDate.get(dateStr);
-      if (entry) {
-        totalInMonth++;
-        const status = getArchivePlayStatus(entry.puzzle_number, entry.max_score);
-        if (status.played) playedInMonth++;
-      }
-    }
-    return { totalInMonth, playedInMonth };
-  }, [daysInMonth, entryByDate, yearMonth]);
 
   const handlePrev = () => {
     if (!canGoPrev) return;
@@ -91,69 +79,55 @@ export function ArchiveCalendar({
   };
 
   const isViewingTodayMonth = currentKey === todayYearMonthKey;
+  const showJumpToToday =
+    !isViewingTodayMonth || (selectedEntry !== null && !selectedEntry.is_today);
 
   return (
-    <div
-      className="rounded-xl p-3 flex flex-col gap-2"
-      style={{
-        backgroundColor: 'var(--color-bg-secondary)',
-        border: '1px solid var(--color-border)',
-      }}
-    >
-      {/* Month Navigator Header */}
-      <div className="flex items-center justify-between gap-1">
+    <div className="w-full max-w-[272px] mx-auto flex flex-col gap-1">
+      {/* Slim Month Header */}
+      <div className="h-7 flex items-center justify-between">
         <button
           type="button"
           aria-label="Edellinen kuukausi"
           onClick={handlePrev}
           disabled={!canGoPrev}
-          className="h-8 w-8 rounded-lg flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-30 transition-opacity"
-          style={{ color: 'var(--color-text-primary)' }}
+          className="h-7 w-7 rounded-md flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-25"
+          style={{ color: 'var(--color-text-secondary)' }}
         >
-          <ChevronLeftIcon size={18} />
+          <ChevronLeftIcon size={16} />
         </button>
 
-        <div className="flex flex-col items-center min-w-0">
-          <span
-            className="text-sm font-semibold truncate leading-tight"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
             {formatFinnishMonth(yearMonth.year, yearMonth.monthIndex)}
           </span>
-          <span
-            className="text-[11px] leading-tight mt-0.5"
-            style={{ color: 'var(--color-text-tertiary)' }}
-          >
-            {monthStats.playedInMonth} / {monthStats.totalInMonth} pelattu
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {!isViewingTodayMonth && (
+          {showJumpToToday && (
             <button
               type="button"
               onClick={onJumpToToday}
-              className="text-xs px-2 py-1 rounded-md border cursor-pointer font-medium"
+              className="text-[11px] px-2.5 py-0.5 rounded-full border cursor-pointer font-semibold transition-opacity hover:opacity-90"
               style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-secondary))',
+                borderColor: 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border))',
                 color: 'var(--color-accent)',
               }}
             >
               Tänään
             </button>
           )}
-          <button
-            type="button"
-            aria-label="Seuraava kuukausi"
-            onClick={handleNext}
-            disabled={!canGoNext}
-            className="h-8 w-8 rounded-lg flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-30 transition-opacity"
-            style={{ color: 'var(--color-text-primary)' }}
-          >
-            <ChevronRightIcon size={18} />
-          </button>
         </div>
+
+        <button
+          type="button"
+          aria-label="Seuraava kuukausi"
+          onClick={handleNext}
+          disabled={!canGoNext}
+          className="h-7 w-7 rounded-md flex items-center justify-center bg-transparent border-none cursor-pointer disabled:cursor-default disabled:opacity-25"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
+          <ChevronRightIcon size={16} />
+        </button>
       </div>
 
       {/* Weekdays Row */}
@@ -161,7 +135,7 @@ export function ArchiveCalendar({
         {WEEKDAYS.map((day) => (
           <div
             key={day}
-            className="text-[11px] font-semibold py-0.5"
+            className="text-[10px] font-medium py-0.5"
             style={{ color: 'var(--color-text-tertiary)' }}
           >
             {day}
@@ -169,10 +143,10 @@ export function ArchiveCalendar({
         ))}
       </div>
 
-      {/* Days Grid */}
+      {/* Square Days Grid */}
       <div className="grid grid-cols-7 gap-1" role="grid" aria-label="Arkiston kalenteripäivät">
         {Array.from({ length: leadingEmptyCount }).map((_, i) => (
-          <div key={`empty-${i}`} className="h-9 sm:h-10" aria-hidden="true" />
+          <div key={`empty-${i}`} className="aspect-square" aria-hidden="true" />
         ))}
 
         {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -184,11 +158,12 @@ export function ArchiveCalendar({
             return (
               <div
                 key={dateStr}
-                className="h-9 sm:h-10 flex items-center justify-center text-xs opacity-25 rounded-md"
+                className="aspect-square flex flex-col items-center justify-center text-xs opacity-25 rounded-lg"
                 style={{ color: 'var(--color-text-tertiary)' }}
                 aria-hidden="true"
               >
-                {d}
+                <span className="leading-none tabular-nums">{d}</span>
+                <span className="h-2 mt-0.5" />
               </div>
             );
           }
@@ -209,68 +184,50 @@ export function ArchiveCalendar({
               aria-pressed={isSelected}
               aria-label={`${d}. ${formatFinnishMonth(yearMonth.year, yearMonth.monthIndex)}, Kenno #${entry.display_number}${entry.is_today ? ', tänään' : ''}${status.played ? `, ${status.rank}, ${status.wordsFound} sanaa` : ', ei pelattu'}`}
               onClick={() => onSelectEntry(entry)}
-              className="h-9 sm:h-10 rounded-lg p-0.5 flex flex-col items-center justify-center relative cursor-pointer border-none transition-all"
+              className="aspect-square rounded-lg flex flex-col items-center justify-center relative cursor-pointer border-none transition-colors"
               style={{
                 backgroundColor: isSelected
-                  ? 'var(--color-bg-primary)'
-                  : status.isTopRank
-                    ? 'color-mix(in srgb, var(--color-accent) 18%, var(--color-bg-primary))'
-                    : 'var(--color-bg-primary)',
+                  ? 'color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-secondary))'
+                  : 'var(--color-bg-secondary)',
                 boxShadow: isSelected
-                  ? '0 0 0 2px var(--color-accent)'
-                  : isCurrent
-                    ? 'inset 0 0 0 1.5px var(--color-accent)'
-                    : undefined,
+                  ? 'inset 0 0 0 1.5px var(--color-accent)'
+                  : entry.is_today
+                    ? 'inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 60%, transparent)'
+                    : isCurrent
+                      ? 'inset 0 0 0 1px var(--color-border)'
+                      : undefined,
               }}
             >
-              <div className="flex items-center gap-0.5 leading-none">
-                <span
-                  className="text-xs font-semibold"
-                  style={{
-                    color: isSelected
-                      ? 'var(--color-accent)'
-                      : entry.is_today
-                        ? 'var(--color-accent)'
-                        : 'var(--color-text-primary)',
-                  }}
-                >
-                  {d}
-                </span>
-                {status.isRevealed && (
-                  <span
-                    className="inline-block scale-75"
-                    style={{ color: 'var(--color-accent)' }}
-                    title="Paljastettu"
-                  >
-                    <EyeIcon size={12} />
-                  </span>
-                )}
-              </div>
+              <span
+                className="text-xs leading-none tabular-nums"
+                style={{
+                  fontWeight: isSelected || entry.is_today ? 700 : 500,
+                  color: entry.is_today ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                }}
+              >
+                {d}
+              </span>
 
-              {/* Day Status Indicators */}
-              <div className="h-2 flex items-center justify-center mt-0.5 gap-0.5">
-                {entry.is_today && (
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ backgroundColor: 'var(--color-accent)' }}
-                    title="Tämän päivän kenno"
-                  />
-                )}
-                {status.played && !entry.is_today && (
+              <span className="h-2 flex items-center justify-center mt-0.5">
+                {status.played && (
                   <span
                     className="w-1.5 h-1.5 rounded-full"
                     style={{
-                      backgroundColor: status.isTopRank
+                      backgroundColor: status.isFullBoard
                         ? 'var(--color-accent)'
                         : 'var(--color-text-tertiary)',
                     }}
                     title={status.rank ?? undefined}
                   />
                 )}
-              </div>
+              </span>
             </button>
           );
         })}
+
+        {Array.from({ length: trailingEmptyCount }).map((_, i) => (
+          <div key={`trailing-empty-${i}`} className="aspect-square" aria-hidden="true" />
+        ))}
       </div>
     </div>
   );

@@ -273,6 +273,9 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
       expect(screen.getByTestId('archive-entry-1')).toBeInTheDocument();
       expect(screen.getByText('Kenno #2')).toBeInTheDocument();
     });
+    // Calendar grid always reserves 6 weeks (42 cells) so month changes never shift modal size
+    const calendarGrid = screen.getByRole('grid', { name: 'Arkiston kalenteripäivät' });
+    expect(calendarGrid.children).toHaveLength(42);
     expect(screen.queryByText('Kenno #10')).not.toBeInTheDocument();
     expect(screen.queryByText('Kenno #5')).not.toBeInTheDocument();
 
@@ -280,7 +283,7 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     fireEvent.click(screen.getByTestId('archive-entry-1'));
     expect(screen.getByText('Kenno #1')).toBeInTheDocument();
     expect(screen.getByText('Sanavalmis')).toBeInTheDocument();
-    expect(screen.getByText('2 sanaa')).toBeInTheDocument();
+    expect(screen.getByText(/2 sanaa/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pelaa' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Näytä vastaukset' })).toBeInTheDocument();
 
@@ -339,14 +342,29 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     });
 
     expect(getRawStorage(revealedKey(5))).toBeNull();
+    const onBack = vi.fn();
 
-    render(<PuzzleWordsModal show={true} onClose={() => {}} puzzleNumber={5} displayNumber={1} />, {
-      wrapper: createWrapper(),
-    });
+    render(
+      <PuzzleWordsModal
+        show={true}
+        onClose={() => {}}
+        onBack={onBack}
+        puzzleNumber={5}
+        displayNumber={1}
+      />,
+      {
+        wrapper: createWrapper(),
+      },
+    );
 
     await waitFor(() => {
       expect(screen.getByText('2/4 löydetty')).toBeInTheDocument();
     });
+
+    const backBtn = screen.getByRole('button', { name: 'Takaisin arkistoon' });
+    expect(backBtn).toBeInTheDocument();
+    fireEvent.click(backBtn);
+    expect(onBack).toHaveBeenCalledTimes(1);
 
     expect(getRawStorage(revealedKey(5))).toBe('true');
 

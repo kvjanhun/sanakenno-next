@@ -16,6 +16,7 @@ interface SavedGameState {
 export interface PuzzleWordsModalProps {
   show: boolean;
   onClose: () => void;
+  onBack?: () => void;
   puzzleNumber: number | null;
   displayNumber?: number | null;
 }
@@ -27,6 +28,7 @@ export interface PuzzleWordsModalProps {
 export function PuzzleWordsModal({
   show,
   onClose,
+  onBack,
   puzzleNumber,
   displayNumber,
 }: PuzzleWordsModalProps): React.JSX.Element | null {
@@ -65,8 +67,10 @@ export function PuzzleWordsModal({
       title={`Kenno #${shownDisplayNumber}`}
       titleId="puzzle-words-title"
       onClose={onClose}
+      onBack={onBack}
+      onEscape={onBack ?? onClose}
       className="flex flex-col"
-      style={{ height: '80vh', overflowY: 'hidden' }}
+      style={{ maxHeight: '80vh', overflowY: 'hidden' }}
     >
       {!isLoading && !isError && (
         <div className="text-xs mb-3" style={{ color: 'var(--color-text-tertiary)' }}>

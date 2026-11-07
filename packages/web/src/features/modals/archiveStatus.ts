@@ -10,6 +10,7 @@ export interface ArchivePlayStatus {
   wordsFound: number;
   hintsUsed: boolean;
   isTopRank: boolean;
+  isFullBoard: boolean;
   isRevealed: boolean;
 }
 
@@ -40,6 +41,7 @@ export function getArchivePlayStatus(puzzleNumber: number, maxScore: number): Ar
     const percentage = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 0;
     const hintsUsed = (state.hintsUnlocked?.length ?? 0) > 0;
     const isTopRank = percentage >= 70;
+    const isFullBoard = maxScore > 0 && score >= maxScore;
 
     return {
       played: true,
@@ -50,6 +52,7 @@ export function getArchivePlayStatus(puzzleNumber: number, maxScore: number): Ar
       wordsFound: state.foundWords.length,
       hintsUsed,
       isTopRank,
+      isFullBoard,
       isRevealed,
     };
   }
@@ -62,6 +65,7 @@ export function getArchivePlayStatus(puzzleNumber: number, maxScore: number): Ar
     const percentage = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 0;
     const hintsUsed = record.hints_used > 0;
     const isTopRank = percentage >= 70;
+    const isFullBoard = maxScore > 0 && score >= maxScore;
 
     return {
       played: true,
@@ -72,6 +76,7 @@ export function getArchivePlayStatus(puzzleNumber: number, maxScore: number): Ar
       wordsFound: record.words_found,
       hintsUsed,
       isTopRank,
+      isFullBoard,
       isRevealed,
     };
   }
@@ -85,6 +90,7 @@ export function getArchivePlayStatus(puzzleNumber: number, maxScore: number): Ar
     wordsFound: 0,
     hintsUsed: false,
     isTopRank: false,
+    isFullBoard: false,
     isRevealed,
   };
 }
