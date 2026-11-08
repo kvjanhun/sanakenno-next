@@ -157,6 +157,12 @@ export function ArchiveModal({
     }
   }, [confirmEntry, onClose]);
 
+  const activeYearMonthKey = `${activeYearMonth.year}-${String(activeYearMonth.monthIndex + 1).padStart(2, '0')}`;
+  const showJumpToToday =
+    entries.length > 0 &&
+    ((todayYearMonthKey !== '' && activeYearMonthKey !== todayYearMonthKey) ||
+      (selectedEntry !== null && !selectedEntry.is_today));
+
   return (
     <>
       <ModalShell
@@ -165,8 +171,23 @@ export function ArchiveModal({
         titleId="archive-title"
         onClose={onClose}
         onEscape={handleEscape}
-        className="flex flex-col"
-        headerClassName="mb-2"
+        headerMeta={
+          showJumpToToday ? (
+            <button
+              type="button"
+              onClick={handleJumpToToday}
+              className="text-[11px] px-2.5 py-0.5 rounded-full border cursor-pointer font-semibold transition-opacity hover:opacity-90"
+              style={{
+                backgroundColor:
+                  'color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-primary))',
+                borderColor: 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border))',
+                color: 'var(--color-accent)',
+              }}
+            >
+              Tänään
+            </button>
+          ) : undefined
+        }
       >
         {isLoading ? (
           <div className="text-sm py-6 text-center" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -189,9 +210,7 @@ export function ArchiveModal({
               onSelectEntry={handleSelectEntry}
               yearMonth={activeYearMonth}
               onYearMonthChange={setYearMonth}
-              onJumpToToday={handleJumpToToday}
               availableYearMonths={availableYearMonths}
-              todayYearMonthKey={todayYearMonthKey}
             />
 
             {selectedEntry && (

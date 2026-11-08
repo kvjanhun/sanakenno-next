@@ -84,15 +84,18 @@ export function SettingsModal({
       title="Asetukset"
       titleId="settings-modal-title"
       onClose={onClose}
-      headerClassName="mb-3"
-      className="flex flex-col"
-      style={{ maxHeight: '85vh', overflowY: 'hidden' }}
-    >
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
-        <div className="text-xs text-right" style={{ color: 'var(--color-text-tertiary)' }}>
+      headerMeta={
+        <div
+          className="text-[11px] leading-none px-2 py-1 rounded-md border"
+          style={{
+            backgroundColor: 'var(--color-bg-primary)',
+            borderColor: 'var(--color-border)',
+            color: 'var(--color-text-secondary)',
+          }}
+        >
           Seuraava kenno:{' '}
           <span
-            className="font-bold font-mono"
+            className="font-bold font-mono tabular-nums"
             style={{
               color:
                 msRemaining < 30 * 60 * 1000 ? 'var(--color-accent)' : 'var(--color-text-primary)',
@@ -101,7 +104,9 @@ export function SettingsModal({
             {timeRemaining}
           </span>
         </div>
-
+      }
+    >
+      <div className="space-y-4">
         <div className="space-y-1.5">
           <h3
             className="text-xs font-semibold tracking-wide uppercase"

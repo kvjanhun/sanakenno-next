@@ -70,51 +70,63 @@ export function StatsModal({
   };
 
   return (
-    <ModalShell show={show} title="Tilastot" titleId="stats-title" onClose={onClose}>
-      <div
-        className="flex rounded-lg p-1 mb-4 gap-1"
-        style={{
-          background: 'var(--color-bg-secondary)',
-          border: '1px solid var(--color-border)',
-        }}
-        role="tablist"
-        aria-label="Tilastojen välilehdet"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'summary'}
-          onClick={() => setActiveTab('summary')}
-          className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer border-none"
-          style={{
-            background: activeTab === 'summary' ? 'var(--color-bg-primary)' : 'transparent',
-            color:
-              activeTab === 'summary' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-            boxShadow: activeTab === 'summary' ? '0 1px 3px var(--color-button-shadow)' : 'none',
-          }}
-        >
-          Yhteenveto
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'achievements'}
-          onClick={() => setActiveTab('achievements')}
-          className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer border-none"
-          style={{
-            background: activeTab === 'achievements' ? 'var(--color-bg-primary)' : 'transparent',
-            color:
-              activeTab === 'achievements'
-                ? 'var(--color-text-primary)'
-                : 'var(--color-text-secondary)',
-            boxShadow:
-              activeTab === 'achievements' ? '0 1px 3px var(--color-button-shadow)' : 'none',
-          }}
-        >
-          Saavutukset
-        </button>
-      </div>
-
+    <ModalShell
+      show={show}
+      title="Tilastot"
+      titleId="stats-title"
+      onClose={onClose}
+      subHeader={
+        <div className="px-4 pt-2.5 pb-2.5">
+          <div
+            className="flex rounded-lg p-1 gap-1"
+            style={{
+              background: 'var(--color-bg-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+            role="tablist"
+            aria-label="Tilastojen välilehdet"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'summary'}
+              onClick={() => setActiveTab('summary')}
+              className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer border-none"
+              style={{
+                background: activeTab === 'summary' ? 'var(--color-bg-primary)' : 'transparent',
+                color:
+                  activeTab === 'summary'
+                    ? 'var(--color-text-primary)'
+                    : 'var(--color-text-secondary)',
+                boxShadow:
+                  activeTab === 'summary' ? '0 1px 3px var(--color-button-shadow)' : 'none',
+              }}
+            >
+              Yhteenveto
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'achievements'}
+              onClick={() => setActiveTab('achievements')}
+              className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold transition-all cursor-pointer border-none"
+              style={{
+                background:
+                  activeTab === 'achievements' ? 'var(--color-bg-primary)' : 'transparent',
+                color:
+                  activeTab === 'achievements'
+                    ? 'var(--color-text-primary)'
+                    : 'var(--color-text-secondary)',
+                boxShadow:
+                  activeTab === 'achievements' ? '0 1px 3px var(--color-button-shadow)' : 'none',
+              }}
+            >
+              Saavutukset
+            </button>
+          </div>
+        </div>
+      }
+    >
       {activeTab === 'achievements' ? (
         <AchievementsList stats={stats} streak={{ current: currentStreak, best: bestStreak }} />
       ) : records.length === 0 ? (

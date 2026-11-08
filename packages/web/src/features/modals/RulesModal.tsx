@@ -11,19 +11,11 @@ export interface RulesModalProps {
  */
 export function RulesModal({ show, onClose }: RulesModalProps): React.JSX.Element {
   return (
-    <ModalShell
-      show={show}
-      title="Pelin säännöt"
-      titleId="rules-modal-title"
-      onClose={onClose}
-      className="flex flex-col"
-      style={{ maxHeight: '85vh', overflowY: 'hidden' }}
-    >
-      <div
-        className="flex-1 min-h-0 overflow-y-auto text-sm space-y-4 mt-2 pr-1"
-        style={{ color: 'var(--color-text-secondary)' }}
-      >
-        <p>Tavoitteenasi on löytää mahdollisimman monta sanaa seitsemästä annetusta kirjaimesta.</p>
+    <ModalShell show={show} title="Pelin säännöt" titleId="rules-modal-title" onClose={onClose}>
+      <div className="text-sm space-y-3.5" style={{ color: 'var(--color-text-secondary)' }}>
+        <p className="m-0">
+          Tavoitteenasi on löytää mahdollisimman monta sanaa seitsemästä annetusta kirjaimesta.
+        </p>
 
         <div
           className="rounded-xl p-3 space-y-2"

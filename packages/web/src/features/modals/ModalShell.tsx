@@ -18,6 +18,8 @@ function focusableChildren(root: HTMLElement): HTMLElement[] {
 
 /**
  * Trap keyboard focus inside an active dialog and restore focus on close.
+ * Moves initial focus to the dialog container so opening a modal does not
+ * draw an automatic focus ring around the close button.
  */
 export function useDialogFocusTrap(
   dialogRef: RefObject<HTMLElement | null>,
@@ -32,8 +34,7 @@ export function useDialogFocusTrap(
 
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = requestAnimationFrame(() => {
-      const target = focusableChildren(dialog)[0] ?? dialog;
-      target.focus({ preventScroll: true });
+      dialog.focus({ preventScroll: true });
     });
 
     const handleKey = (e: KeyboardEvent) => {
@@ -55,10 +56,13 @@ export function useDialogFocusTrap(
       const last = focusable[focusable.length - 1]!;
       const active = document.activeElement;
 
-      if (e.shiftKey && (active === first || !dialog.contains(active))) {
+      if (e.shiftKey && (active === first || active === dialog || !dialog.contains(active))) {
         e.preventDefault();
         last.focus({ preventScroll: true });
-      } else if (!e.shiftKey && active === last) {
+      } else if (
+        !e.shiftKey &&
+        (active === last || active === dialog || !dialog.contains(active))
+      ) {
         e.preventDefault();
         first.focus({ preventScroll: true });
       }
@@ -83,15 +87,18 @@ export interface ModalShellProps {
   onBack?: () => void;
   backLabel?: string;
   onEscape?: () => void;
+  headerMeta?: ReactNode;
+  subHeader?: ReactNode;
   children: ReactNode;
   className?: string;
+  bodyClassName?: string;
   style?: CSSProperties;
-  headerClassName?: string;
   trapFocus?: boolean;
 }
 
 /**
- * Render a consistent centered modal with shared close affordance.
+ * Render a consistent centered modal with an edge-to-edge structured header bar,
+ * optional inline header metadata and pinned sub-header slots, and a scrollable body.
  */
 export function ModalShell({
   show = true,
@@ -101,10 +108,12 @@ export function ModalShell({
   onBack,
   backLabel = 'Takaisin arkistoon',
   onEscape,
+  headerMeta,
+  subHeader,
   children,
   className = '',
+  bodyClassName = '',
   style,
-  headerClassName = 'mb-1',
   trapFocus = true,
 }: ModalShellProps): React.JSX.Element | null {
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -121,7 +130,7 @@ export function ModalShell({
     >
       <div
         ref={dialogRef}
-        className={`w-full max-w-sm rounded-xl p-4 overflow-y-auto max-h-[90vh] ${className}`}
+        className={`w-full max-w-sm rounded-2xl overflow-hidden flex flex-col max-h-[88vh] shadow-xl outline-none ${className}`}
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           border: '1px solid var(--color-border)',
@@ -134,14 +143,21 @@ export function ModalShell({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`flex items-center justify-between gap-2 ${headerClassName}`}>
-          <div className="flex items-center gap-1 min-w-0">
+        <div
+          data-modal-header
+          className="px-4 py-2.5 border-b flex items-center justify-between gap-2 shrink-0"
+          style={{
+            backgroundColor: 'var(--color-bg-secondary)',
+            borderColor: 'var(--color-border)',
+          }}
+        >
+          <div className="flex items-center gap-1.5 min-w-0">
             {onBack && (
               <button
                 type="button"
                 aria-label={backLabel}
                 onClick={onBack}
-                className="-ml-1.5 h-8 w-8 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center shrink-0"
+                className="-ml-1.5 h-7 w-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center shrink-0 transition-colors hover:bg-[var(--color-bg-primary)] active:scale-95 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
                 style={{ color: 'var(--color-accent)' }}
               >
                 <ArrowLeftIcon size={18} />
@@ -149,23 +165,39 @@ export function ModalShell({
             )}
             <h2
               id={titleId}
-              className="text-lg font-semibold truncate"
+              className="text-base font-semibold leading-tight truncate m-0"
               style={{ color: 'var(--color-text-primary)' }}
             >
               {title}
             </h2>
           </div>
-          <button
-            type="button"
-            aria-label="Sulje"
-            onClick={onClose}
-            className="h-8 w-8 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center shrink-0"
-            style={{ color: 'var(--color-accent)' }}
-          >
-            <CloseIcon size={20} strokeWidth={2.5} />
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {headerMeta}
+            <button
+              type="button"
+              aria-label="Sulje"
+              onClick={onClose}
+              className="-mr-1 h-7 w-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center shrink-0 transition-colors hover:bg-[var(--color-bg-primary)] active:scale-95 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)]"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              <CloseIcon size={18} strokeWidth={2.25} />
+            </button>
+          </div>
         </div>
-        {children}
+
+        {subHeader && (
+          <div data-modal-subheader className="shrink-0">
+            {subHeader}
+          </div>
+        )}
+
+        <div
+          data-modal-body
+          className={`flex-1 min-h-0 overflow-y-auto px-4 ${subHeader ? 'pt-1 pb-3.5' : 'py-3.5'} ${bodyClassName}`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

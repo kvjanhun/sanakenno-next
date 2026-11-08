@@ -316,8 +316,13 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     expect(prevDayBtn).toBeEnabled();
     fireEvent.click(prevDayBtn);
 
-    // Now Kenno #1 is selected
+    // Now Kenno #1 is selected; Tänään quick-jump pill appears in the modal header bar
     expect(screen.getByText('Kenno #1')).toBeInTheDocument();
+    const todayBtn = screen.getByRole('button', { name: 'Tänään' });
+    expect(todayBtn.closest('[data-modal-header]')).not.toBeNull();
+    fireEvent.click(todayBtn);
+    expect(screen.getByText('Kenno #2')).toBeInTheDocument();
+    fireEvent.click(prevDayBtn);
 
     // Trigger reveal answers on unrevealed past puzzle -> shows inline confirmation
     fireEvent.click(screen.getByRole('button', { name: 'Näytä vastaukset' }));
@@ -358,7 +363,9 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     );
 
     await waitFor(() => {
-      expect(screen.getByText('2/4 löydetty')).toBeInTheDocument();
+      const counter = screen.getByText('2/4 löydetty');
+      expect(counter).toBeInTheDocument();
+      expect(counter.closest('[data-modal-header]')).not.toBeNull();
     });
 
     const backBtn = screen.getByRole('button', { name: 'Takaisin arkistoon' });
@@ -435,6 +442,11 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     );
 
     expect(screen.getByText('Pelattuja pelejä')).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('tablist', { name: 'Tilastojen välilehdet' })
+        .closest('[data-modal-subheader]'),
+    ).not.toBeNull();
     expect(screen.getByText('Pisin putki')).toBeInTheDocument();
     expect(screen.getByText('kansallinen')).toBeInTheDocument();
     expect(screen.getByText('14')).toBeInTheDocument(); // 5 + 9 words found
@@ -452,8 +464,14 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     expect(screen.queryByText(/Yleiskuva/)).not.toBeInTheDocument();
   });
 
-  it('renders SettingsModal open licenses accordion and lists Kotus, Zod, and core libraries', () => {
+  it('renders SettingsModal open licenses accordion and lists Kotus, Zod, and core libraries', async () => {
     render(<SettingsModal show={true} onClose={() => {}} />);
+
+    // Initial focus moves to dialog container rather than the Sulje button, and headerMeta shows Seuraava kenno
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('dialog'));
+    });
+    expect(screen.getByText(/Seuraava kenno:/).closest('[data-modal-header]')).not.toBeNull();
 
     const licensesTrigger = screen.getByRole('button', { name: 'Lisenssit' });
     expect(licensesTrigger).toBeInTheDocument();

@@ -87,11 +87,10 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
       title="Tallennus ja synkronointi"
       titleId="sync-modal-title"
       onClose={onClose}
-      headerClassName="mb-4"
     >
       {mode === 'options' && (
         <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-          <p style={{ color: 'var(--color-text-secondary)' }}>
+          <p className="m-0" style={{ color: 'var(--color-text-secondary)' }}>
             Pelitilanteesi tallentuu pilveen. Voit yhdistää toisen laitteen jakamalla koodin tai
             linkin.
           </p>

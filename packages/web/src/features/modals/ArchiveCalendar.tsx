@@ -21,9 +21,7 @@ export interface ArchiveCalendarProps {
   onSelectEntry: (entry: ArchiveEntry) => void;
   yearMonth: YearMonth;
   onYearMonthChange: (ym: YearMonth) => void;
-  onJumpToToday: () => void;
   availableYearMonths: string[];
-  todayYearMonthKey: string;
 }
 
 export function ArchiveCalendar({
@@ -33,9 +31,7 @@ export function ArchiveCalendar({
   onSelectEntry,
   yearMonth,
   onYearMonthChange,
-  onJumpToToday,
   availableYearMonths,
-  todayYearMonthKey,
 }: ArchiveCalendarProps): React.JSX.Element {
   const currentKey = `${yearMonth.year}-${String(yearMonth.monthIndex + 1).padStart(2, '0')}`;
   const currentIndex = availableYearMonths.indexOf(currentKey);
@@ -78,12 +74,8 @@ export function ArchiveCalendar({
     if (y && m) onYearMonthChange({ year: y, monthIndex: m - 1 });
   };
 
-  const isViewingTodayMonth = currentKey === todayYearMonthKey;
-  const showJumpToToday =
-    !isViewingTodayMonth || (selectedEntry !== null && !selectedEntry.is_today);
-
   return (
-    <div className="w-full max-w-[272px] mx-auto flex flex-col gap-1">
+    <div className="w-full flex flex-col gap-1.5">
       {/* Slim Month Header */}
       <div className="h-7 flex items-center justify-between">
         <button
@@ -97,26 +89,9 @@ export function ArchiveCalendar({
           <ChevronLeftIcon size={16} />
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            {formatFinnishMonth(yearMonth.year, yearMonth.monthIndex)}
-          </span>
-          {showJumpToToday && (
-            <button
-              type="button"
-              onClick={onJumpToToday}
-              className="text-[11px] px-2.5 py-0.5 rounded-full border cursor-pointer font-semibold transition-opacity hover:opacity-90"
-              style={{
-                backgroundColor:
-                  'color-mix(in srgb, var(--color-accent) 15%, var(--color-bg-secondary))',
-                borderColor: 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border))',
-                color: 'var(--color-accent)',
-              }}
-            >
-              Tänään
-            </button>
-          )}
-        </div>
+        <span className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+          {formatFinnishMonth(yearMonth.year, yearMonth.monthIndex)}
+        </span>
 
         <button
           type="button"
@@ -143,10 +118,10 @@ export function ArchiveCalendar({
         ))}
       </div>
 
-      {/* Square Days Grid */}
+      {/* 6-Week Days Grid */}
       <div className="grid grid-cols-7 gap-1" role="grid" aria-label="Arkiston kalenteripäivät">
         {Array.from({ length: leadingEmptyCount }).map((_, i) => (
-          <div key={`empty-${i}`} className="aspect-square" aria-hidden="true" />
+          <div key={`empty-${i}`} className="h-9" aria-hidden="true" />
         ))}
 
         {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -158,7 +133,7 @@ export function ArchiveCalendar({
             return (
               <div
                 key={dateStr}
-                className="aspect-square flex flex-col items-center justify-center text-xs opacity-25 rounded-lg"
+                className="h-9 flex flex-col items-center justify-center text-xs opacity-25 rounded-lg"
                 style={{ color: 'var(--color-text-tertiary)' }}
                 aria-hidden="true"
               >
@@ -184,7 +159,7 @@ export function ArchiveCalendar({
               aria-pressed={isSelected}
               aria-label={`${d}. ${formatFinnishMonth(yearMonth.year, yearMonth.monthIndex)}, Kenno #${entry.display_number}${entry.is_today ? ', tänään' : ''}${status.played ? `, ${status.rank}, ${status.wordsFound} sanaa` : ', ei pelattu'}`}
               onClick={() => onSelectEntry(entry)}
-              className="aspect-square rounded-lg flex flex-col items-center justify-center relative cursor-pointer border-none transition-colors"
+              className="h-9 rounded-lg flex flex-col items-center justify-center relative cursor-pointer border-none transition-colors"
               style={{
                 backgroundColor: isSelected
                   ? 'color-mix(in srgb, var(--color-accent) 16%, var(--color-bg-secondary))'
@@ -226,7 +201,7 @@ export function ArchiveCalendar({
         })}
 
         {Array.from({ length: trailingEmptyCount }).map((_, i) => (
-          <div key={`trailing-empty-${i}`} className="aspect-square" aria-hidden="true" />
+          <div key={`trailing-empty-${i}`} className="h-9" aria-hidden="true" />
         ))}
       </div>
     </div>
