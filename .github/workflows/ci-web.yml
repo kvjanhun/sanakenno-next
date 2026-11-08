@@ -60,7 +60,7 @@ jobs:
             --memory 512Mi \
             --cpu 1 \
             --max-instances 1 \
-            --set-env-vars "LITESTREAM_BUCKET=sanakenno-db-712588936092,BASE_URL=https://sanakenno.fi,SEED_ON_BOOT=false,RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}"
+            --set-env-vars LITESTREAM_BUCKET=sanakenno-db-712588936092,BASE_URL=https://sanakenno.fi,SEED_ON_BOOT=false
 
       - name: Verify Live Deployment
         run: |

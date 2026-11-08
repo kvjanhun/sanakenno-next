@@ -70,7 +70,7 @@ Prepare `sanakenno-next` to serve as the primary production site at `https://san
   - `BASE_URL=https://sanakenno.fi`
   - `LITESTREAM_BUCKET=sanakenno-db-712588936092`
   - `SEED_ON_BOOT=false`
-  - `RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}`
+  - (`RESEND_API_KEY` is already mounted as a GCP Secret Manager secret on the Cloud Run service, so it must not be overwritten as a string literal in `--set-env-vars`.)
 
 ## 4. Acceptance Criteria (Test Catalog)
 
