@@ -16,15 +16,17 @@ sanakenno-next/
     deploy-sanakenno.sh      # Server deployment & verification pipeline
     entrypoint.sh            # Container init & Litestream restore
     filter-kotus-wordlist.ts # Kotus dictionary filtering & hyphenated lemma extractor
+    migrate-v1-db.ts         # Standalone 1.0 -> 2.0 SQLite snapshot & backfill migration CLI
     screenshot.ts            # Headless Chrome mobile & desktop screenshot capture utility
-  .github/workflows/ci-web.yml# GitHub Actions CI & webhook deploy workflow
+  .github/workflows/ci-web.yml# GitHub Actions CI & Cloud Run deploy workflow
   specs/                     # Sequenced specs driving autonomous implementation
     archive/                 # Shipped historical specs (superseded point-in-time slices)
   packages/
     shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, achievements, sync-merge, kotus lemma links, share-text, honeycomb-theme, auth-types) & Zod schemas
-    server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer
+    server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer + Cloud Run edge middleware
       src/
-        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0003 migration runner, deterministic seed
+        edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), Google security headers & PWA static serving
+        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0004 migration runner, 1.0 backfill helper, deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
           puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
@@ -48,7 +50,7 @@ sanakenno-next/
         styles/              # CSS custom property design tokens (--color-*, --font-*)
   tests/
     architecture.test.ts     # Mechanical boundary & monolith guardrails
-    integration/             # In-memory Kysely SQLite + Hono testClient specs + production snapshot tests
+    integration/             # In-memory Kysely SQLite + Hono testClient specs + edge middleware + production snapshot tests
     unit/                    # Fast Vitest + React Testing Library component & gameplay flow specs
 ```
 

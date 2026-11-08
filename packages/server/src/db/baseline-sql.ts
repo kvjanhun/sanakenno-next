@@ -1,3 +1,4 @@
+import { getHelsinkiDateString } from '@sanakenno/shared';
 import type BetterSqlite3 from 'better-sqlite3';
 import { computePuzzle } from '../features/puzzle/wordlist.js';
 
@@ -225,6 +226,160 @@ export const CURATED_BLOCKED_WORDS: readonly string[] = [
   'ryssäviha',
 ];
 
+function hasTable(db: BetterSqlite3.Database, table: string): boolean {
+  return (
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?").get(table) !==
+    undefined
+  );
+}
+
+function seedCuratedBlockedWords(db: BetterSqlite3.Database): void {
+  if (!hasTable(db, 'blocked_words')) return;
+  const stmt = db.prepare('INSERT OR IGNORE INTO blocked_words (word) VALUES (?)');
+  for (const word of CURATED_BLOCKED_WORDS) {
+    stmt.run(word);
+  }
+}
+
+export function recomputePuzzleMaxScores(db: BetterSqlite3.Database, onlyNull = false): number {
+  if (!hasTable(db, 'puzzles')) return 0;
+  seedCuratedBlockedWords(db);
+
+  const query = onlyNull
+    ? 'SELECT slot, letters, center FROM puzzles WHERE max_score IS NULL'
+    : 'SELECT slot, letters, center FROM puzzles';
+  const rows = db.prepare(query).all() as Array<{
+    slot: number;
+    letters: string;
+    center: string;
+  }>;
+  if (rows.length === 0) return 0;
+
+  let blockedWords: string[] = [];
+  if (hasTable(db, 'blocked_words')) {
+    try {
+      const blockedRows = db.prepare('SELECT word FROM blocked_words').all() as Array<{
+        word: string;
+      }>;
+      blockedWords = blockedRows.map((r) => r.word);
+    } catch {
+      blockedWords = [];
+    }
+  }
+
+  const updateStmt = db.prepare('UPDATE puzzles SET max_score = ? WHERE slot = ?');
+  let updated = 0;
+  for (const row of rows) {
+    try {
+      const data = computePuzzle(row.letters, row.center, blockedWords);
+      if (data && typeof data.max_score === 'number') {
+        updateStmt.run(data.max_score, row.slot);
+        updated += 1;
+      }
+    } catch {
+      // Opportunistic query backfill handles missing wordlist environments
+    }
+  }
+  return updated;
+}
+
+export interface BackfillStatsSummary {
+  statsBackfilled: number;
+  dailyStatsCount: number;
+  longWordsBackfilledCount: number;
+}
+
+export function backfillPlayerStatsInDb(db: BetterSqlite3.Database): BackfillStatsSummary {
+  if (!hasTable(db, 'player_stats')) {
+    return { statsBackfilled: 0, dailyStatsCount: 0, longWordsBackfilledCount: 0 };
+  }
+
+  const stateMap = new Map<string, { foundWords: string[]; startedAt: number }>();
+  if (hasTable(db, 'player_puzzle_states')) {
+    const stateRows = db
+      .prepare('SELECT player_id, puzzle_number, found_words, started_at FROM player_puzzle_states')
+      .all() as Array<{
+      player_id: number;
+      puzzle_number: number;
+      found_words: string;
+      started_at: number;
+    }>;
+    for (const st of stateRows) {
+      let parsedWords: string[] = [];
+      try {
+        const raw = JSON.parse(st.found_words) as unknown;
+        if (Array.isArray(raw)) {
+          parsedWords = raw.filter((w): w is string => typeof w === 'string');
+        }
+      } catch {
+        parsedWords = [];
+      }
+      stateMap.set(`${st.player_id}:${st.puzzle_number}`, {
+        foundWords: parsedWords,
+        startedAt: Number(st.started_at ?? 0),
+      });
+    }
+  }
+
+  const statRows = db
+    .prepare(
+      'SELECT id, player_id, puzzle_number, date, updated_at, is_daily, played_at_date, long_words_count FROM player_stats',
+    )
+    .all() as Array<{
+    id: number;
+    player_id: number;
+    puzzle_number: number;
+    date: string;
+    updated_at: string | null;
+    is_daily: number | null;
+    played_at_date: string | null;
+    long_words_count: number | null;
+  }>;
+
+  const updateStmt = db.prepare(
+    'UPDATE player_stats SET is_daily = ?, played_at_date = ?, long_words_count = ? WHERE id = ?',
+  );
+
+  let statsBackfilled = 0;
+  let dailyStatsCount = 0;
+  let longWordsBackfilledCount = 0;
+
+  for (const row of statRows) {
+    const state = stateMap.get(`${row.player_id}:${row.puzzle_number}`);
+    const computedLongWords = state ? state.foundWords.filter((w) => w.length >= 10).length : 0;
+    const nextLongWords = Math.max(Number(row.long_words_count ?? 0), computedLongWords);
+
+    const updatedAtDate =
+      typeof row.updated_at === 'string' && row.updated_at.length >= 10
+        ? row.updated_at.slice(0, 10)
+        : '';
+    const startedAtDate =
+      state && state.startedAt > 0 ? getHelsinkiDateString(new Date(state.startedAt)) : '';
+
+    let nextIsDaily = Number(row.is_daily ?? 0);
+    let nextPlayedAtDate = row.played_at_date;
+
+    if (row.played_at_date === null) {
+      const wasDaily = updatedAtDate === row.date || startedAtDate === row.date;
+      nextIsDaily = wasDaily || nextIsDaily === 1 ? 1 : 0;
+      nextPlayedAtDate = wasDaily ? row.date : updatedAtDate || startedAtDate || row.date;
+    }
+
+    if (
+      nextIsDaily !== Number(row.is_daily ?? 0) ||
+      nextPlayedAtDate !== row.played_at_date ||
+      nextLongWords !== Number(row.long_words_count ?? 0)
+    ) {
+      updateStmt.run(nextIsDaily, nextPlayedAtDate, nextLongWords, row.id);
+      statsBackfilled += 1;
+    }
+    if (nextIsDaily === 1) dailyStatsCount += 1;
+    if (nextLongWords > 0) longWordsBackfilledCount += 1;
+  }
+
+  return { statsBackfilled, dailyStatsCount, longWordsBackfilledCount };
+}
+
 export const MIGRATIONS: readonly Migration[] = [
   {
     version: '0001-baseline',
@@ -242,50 +397,26 @@ export const MIGRATIONS: readonly Migration[] = [
     description: 'Add max_score to puzzles table and backfill existing puzzles',
     up(db) {
       ensureColumn(db, 'puzzles', 'max_score', 'INTEGER');
-      const rows = db
-        .prepare('SELECT slot, letters, center FROM puzzles WHERE max_score IS NULL')
-        .all() as Array<{ slot: number; letters: string; center: string }>;
-      if (rows.length > 0) {
-        let blockedWords: string[] = [];
-        try {
-          const blockedRows = db.prepare('SELECT word FROM blocked_words').all() as Array<{
-            word: string;
-          }>;
-          blockedWords = blockedRows.map((r) => r.word);
-        } catch {
-          blockedWords = [];
-        }
-        const updateStmt = db.prepare('UPDATE puzzles SET max_score = ? WHERE slot = ?');
-        for (const row of rows) {
-          try {
-            const data = computePuzzle(row.letters, row.center, blockedWords);
-            if (data && typeof data.max_score === 'number') {
-              updateStmt.run(data.max_score, row.slot);
-            }
-          } catch {
-            // If words cannot be loaded during migration, opportunistic query backfill will handle it
-          }
-        }
-      }
+      recomputePuzzleMaxScores(db, true);
     },
   },
   {
     version: '0003-seed-curated-blocked-words',
     description: 'Seed curated slurs, hate speech, and explicit violence into blocked_words',
     up(db) {
-      const stmt = db.prepare('INSERT OR IGNORE INTO blocked_words (word) VALUES (?)');
-      for (const word of CURATED_BLOCKED_WORDS) {
-        stmt.run(word);
-      }
+      seedCuratedBlockedWords(db);
+      recomputePuzzleMaxScores(db, false);
     },
   },
   {
     version: '0004-add-player-stats-long-words-and-streak-integrity',
-    description: 'Add long_words_count, is_daily, and played_at_date to player_stats table',
+    description:
+      'Add long_words_count, is_daily, and played_at_date to player_stats table and backfill historical rows',
     up(db) {
       ensureColumn(db, 'player_stats', 'long_words_count', 'INTEGER NOT NULL DEFAULT 0');
       ensureColumn(db, 'player_stats', 'is_daily', 'INTEGER NOT NULL DEFAULT 0');
       ensureColumn(db, 'player_stats', 'played_at_date', 'TEXT DEFAULT NULL');
+      backfillPlayerStatsInDb(db);
     },
   },
 ];

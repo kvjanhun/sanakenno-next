@@ -13,7 +13,7 @@ export function RulesModal({ show, onClose }: RulesModalProps): React.JSX.Elemen
   return (
     <ModalShell show={show} title="Pelin säännöt" titleId="rules-modal-title" onClose={onClose}>
       <div className="text-sm space-y-3.5" style={{ color: 'var(--color-text-secondary)' }}>
-        <p className="m-0">
+        <p className="m-b-10" style={{ color: 'var(--color-text-primary)' }}>
           Tavoitteenasi on löytää mahdollisimman monta sanaa seitsemästä annetusta kirjaimesta.
         </p>
 
