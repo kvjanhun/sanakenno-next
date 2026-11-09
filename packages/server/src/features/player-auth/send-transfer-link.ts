@@ -8,7 +8,7 @@ export async function sendTransferLink(
   token: string,
   baseUrl: string,
 ): Promise<void> {
-  const link = `${baseUrl}/connect?connect=${encodeURIComponent(token)}`;
+  const link = `${baseUrl}/?connect=${encodeURIComponent(token)}`;
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey || apiKey === 'test') {

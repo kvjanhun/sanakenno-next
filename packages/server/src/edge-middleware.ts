@@ -106,6 +106,11 @@ export function createServerApp(
         c.header('Cache-Control', 'no-cache');
         return c.html(indexHtml);
       });
+      app.get('/connect', (c) => {
+        c.header('Cache-Control', 'no-store');
+        const reqUrl = new URL(c.req.url, CANONICAL_ORIGIN);
+        return c.redirect(`/${reqUrl.search}`, 302);
+      });
     }
 
     const relativeRoot = path.relative(process.cwd(), staticDir) || '.';

@@ -118,6 +118,15 @@ describe('Cloud Run Edge Middleware & Static Serving', () => {
     expect(manifestRes.headers.get('content-type')).toContain('application/manifest+json');
   });
 
+  it('302-redirects /connect preserving query parameters to / for legacy device transfer links', async () => {
+    const connectRes = await app.request('https://sanakenno.fi/connect?connect=legacy123', {
+      headers: { Host: 'sanakenno.fi' },
+    });
+    expect(connectRes.status).toBe(302);
+    expect(connectRes.headers.get('location')).toBe('/?connect=legacy123');
+    expect(connectRes.headers.get('cache-control')).toBe('no-store');
+  });
+
   it('returns 404 (with security headers) for unknown non-asset paths instead of SPA 200 fallback', async () => {
     for (const probePath of ['/.env', '/wp-admin', '/login.php', '/unknown-route']) {
       const res = await app.request(`https://sanakenno.fi${probePath}`, {
