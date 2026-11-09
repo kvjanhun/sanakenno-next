@@ -129,7 +129,7 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
               >
                 {completedCount === 6
                   ? 'Kaikki saavutukset suoritettu!'
-                  : `${totalUnlockedTiers} / ${totalPossibleTiers} tasoa ansaittu`}
+                  : `${totalUnlockedTiers} / ${totalPossibleTiers} saavutettu`}
               </p>
             </div>
           </div>
@@ -143,12 +143,6 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
             }}
           >
             <span style={{ color: 'var(--color-accent)' }}>{overallPercentage}%</span>
-            <span
-              className="text-[10px] font-sans font-normal"
-              style={{ color: 'var(--color-text-tertiary)' }}
-            >
-              valmiina
-            </span>
           </div>
         </div>
 
