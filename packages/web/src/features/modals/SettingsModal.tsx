@@ -13,6 +13,7 @@ import {
 import { msUntilMidnight } from '../gameplay/useMidnightRollover.js';
 import { PALETTE_LABELS, paletteAccent, usePaletteStore } from '../theme/usePaletteStore.js';
 import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
+import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { OPEN_LICENSES } from './licenses.js';
 import { ModalShell } from './ModalShell.js';
 
@@ -50,7 +51,7 @@ export function SettingsModal({
   show,
   onClose,
   onOpenSync,
-  isLinked = false,
+  isLinked: _isLinked = false,
   sessionCount = 1,
   syncSlot,
 }: SettingsModalProps): React.JSX.Element {
@@ -66,6 +67,8 @@ export function SettingsModal({
 
   useEffect(() => {
     if (!show) return;
+
+    void useAuthStore.getState().refreshSessionCount();
 
     const updateTimer = () => {
       const ms = msUntilMidnight();
@@ -232,15 +235,13 @@ export function SettingsModal({
                       size={14}
                       style={{
                         color:
-                          isLinked || sessionCount > 1
-                            ? 'var(--color-accent)'
-                            : 'var(--color-text-tertiary)',
+                          sessionCount > 1 ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                       }}
                     />
                   </div>
                   <span>
-                    {isLinked || sessionCount > 1
-                      ? `Synkronoitu (${Math.max(sessionCount, 2)} laitetta)`
+                    {sessionCount > 1
+                      ? `Synkronoitu (${sessionCount} laitetta)`
                       : 'Käytössä vain tällä laitteella'}
                   </span>
                 </div>
@@ -253,7 +254,7 @@ export function SettingsModal({
                   lineHeight: '1.35',
                 }}
               >
-                {isLinked || sessionCount > 1
+                {sessionCount > 1
                   ? 'Pelitilanteesi ja tilastosi synkronoituvat automaattisesti yhdistettyjen laitteidesi välillä.'
                   : 'Pelitilanteesi tallentuu pilveen. Voit synkronoida edistymisesi toiselle laitteelle jakamalla koodin tai linkin.'}
               </p>

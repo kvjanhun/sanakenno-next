@@ -47,6 +47,7 @@ export type TransferUsePayload = z.infer<typeof TransferUsePayloadSchema>;
 export const TransferUseResponseSchema = SyncPayloadSchema.extend({
   token: z.string().min(1),
   player_id: z.number().int().positive(),
+  session_count: z.number().int().positive(),
 });
 
 export type TransferUseResponse = z.infer<typeof TransferUseResponseSchema>;

@@ -13,7 +13,6 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
   const playerKey = useAuthStore((s) => s.playerKey);
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
-  const isLinked = useAuthStore((s) => s.isLinked);
   const sessionCount = useAuthStore((s) => s.sessionCount);
   const [mode, setMode] = useState<ViewMode>('options');
   const [codeInput, setCodeInput] = useState('');
@@ -26,7 +25,9 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
   }, [playerKey]);
 
   useEffect(() => {
-    if (!show) {
+    if (show) {
+      void useAuthStore.getState().refreshSessionCount();
+    } else {
       setMode('options');
       setCodeInput('');
       setEmailInput('');
@@ -236,7 +237,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
           </div>
 
           <div className="pt-2 flex justify-between items-center text-xs">
-            {isLinked || sessionCount > 1 ? (
+            {sessionCount > 1 ? (
               <button
                 type="button"
                 onClick={() => setMode('confirmUnlink')}

@@ -116,10 +116,21 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
       const stats = body['stats'] as PlayerStats | undefined;
       const puzzleStates = body['puzzle_states'] as SyncPuzzleState[] | undefined;
 
-      const token = await runImmediateTransactionWithRetry(db, async (trx) => {
+      const authHeader = c.req.header('Authorization');
+      let existingSessionToken: string | null = null;
+      if (authHeader?.startsWith('Bearer ')) {
+        existingSessionToken = authHeader.slice(7).trim();
+      }
+
+      const { token, sessionCount } = await runImmediateTransactionWithRetry(db, async (trx) => {
         await bulkUpsertLocalData(trx, playerId, stats, puzzleStates);
         await cleanupExpiredPlayerSessions(trx);
-        return createPlayerSession(trx, playerId);
+        if (existingSessionToken) {
+          await deletePlayerSession(trx, existingSessionToken);
+        }
+        const newToken = await createPlayerSession(trx, playerId);
+        const count = await countActivePlayerSessions(trx, playerId);
+        return { token: newToken, sessionCount: count };
       });
 
       const playerData = await fetchPlayerData(db, playerId);
@@ -127,6 +138,7 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
         {
           token,
           player_id: playerId,
+          session_count: sessionCount,
           ...playerData,
         },
         200,

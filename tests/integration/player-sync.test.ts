@@ -208,6 +208,43 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       expect(pairedData.puzzle_states[0]?.found_words).toContain('aasi');
     });
 
+    it('deduplicates sessions when transferring with an existing Bearer token', async () => {
+      const originalPlayer = await createPlayer();
+      const secondDevice = await createPlayer();
+
+      const res1 = await harness.client.api.player.auth.transfer.use.$post(
+        { json: { token: originalPlayer.player_key } },
+        { headers: { Authorization: `Bearer ${secondDevice.token}` } },
+      );
+      expect(res1.status).toBe(200);
+      const data1 = (await res1.json()) as { session_count: number; token: string };
+      expect(data1.session_count).toBe(2);
+
+      const res2 = await harness.client.api.player.auth.transfer.use.$post(
+        { json: { token: originalPlayer.player_key } },
+        { headers: { Authorization: `Bearer ${data1.token}` } },
+      );
+      expect(res2.status).toBe(200);
+      const data2 = (await res2.json()) as { session_count: number; token: string };
+      expect(data2.session_count).toBe(2);
+
+      // Verify superseded data1.token was deleted from player_sessions
+      const staleRes = await harness.client.api.player.me.$get(
+        {},
+        { headers: { Authorization: `Bearer ${data1.token}` } },
+      );
+      expect(staleRes.status).toBe(401);
+
+      // Verify new data2.token is active and returns session_count: 2
+      const activeRes = await harness.client.api.player.me.$get(
+        {},
+        { headers: { Authorization: `Bearer ${data2.token}` } },
+      );
+      expect(activeRes.status).toBe(200);
+      const activeData = (await activeRes.json()) as { session_count: number };
+      expect(activeData.session_count).toBe(2);
+    });
+
     it('rejects an invalid transfer token with 400', async () => {
       const res = await harness.client.api.player.auth.transfer.use.$post({
         json: { token: 'invalid-nonexistent-key' },

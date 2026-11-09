@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConnectBanner } from '../../packages/web/src/features/player-sync/ConnectBanner.js';
+import { SettingsModal } from '../../packages/web/src/features/modals/SettingsModal.js';
 import { SyncModal } from '../../packages/web/src/features/player-sync/SyncModal.js';
 import { useAuthStore } from '../../packages/web/src/features/player-sync/useAuthStore.js';
 
@@ -181,6 +182,22 @@ describe('Player Sync UI Components', () => {
         expect(mockLogout).toHaveBeenCalledWith({ clearLocalProgress: true });
         expect(onClose).toHaveBeenCalled();
       });
+    });
+
+    it('refreshes session count when SettingsModal or SyncModal is opened with show: true', () => {
+      const mockRefresh = vi.fn().mockResolvedValue(undefined);
+      useAuthStore.setState({
+        refreshSessionCount: mockRefresh,
+      } as unknown as Partial<ReturnType<typeof useAuthStore.getState>>);
+
+      const { unmount } = render(<SyncModal show={true} onClose={() => {}} />);
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
+
+      unmount();
+      mockRefresh.mockClear();
+
+      render(<SettingsModal show={true} onClose={() => {}} />);
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
   });
 });

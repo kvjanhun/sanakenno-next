@@ -73,14 +73,19 @@ export async function postPlayerTransferCreate(
   }
 }
 
-export async function postPlayerTransferUse(payload: {
-  token: string;
-  stats: PlayerStats;
-  puzzle_states: SyncPuzzleState[];
-}): Promise<TransferUseResponse> {
+export async function postPlayerTransferUse(
+  payload: {
+    token: string;
+    stats?: PlayerStats;
+    puzzle_states?: SyncPuzzleState[];
+  },
+  currentToken?: string | null,
+): Promise<TransferUseResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
   const res = await fetch('/api/player/auth/transfer/use', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
   if (!res.ok) {

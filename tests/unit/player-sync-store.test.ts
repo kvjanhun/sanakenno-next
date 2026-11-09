@@ -1,5 +1,7 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
+  AUTH_TOKEN_STORAGE_KEY,
+  LINKED_STATE_STORAGE_KEY,
   applyServerPreferences,
   buildLocalPreferences,
   gatherLocalData,
@@ -312,5 +314,49 @@ describe('Player Sync & Reconcile (Web Store)', () => {
     expect(useAuthStore.getState().isLinked).toBe(false);
     expect(useAuthStore.getState().sessionCount).toBe(1);
     expect(initSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshSessionCount fetches latest /me and updates sessionCount and isLinked', async () => {
+    saveToStorage(AUTH_TOKEN_STORAGE_KEY, 'valid-token');
+    const clientModule = await import('../../packages/web/src/api/client.js');
+    const mockMe = vi.spyOn(clientModule, 'fetchPlayerMe');
+    mockMe.mockResolvedValueOnce({ player_id: 1, session_count: 3 });
+
+    await useAuthStore.getState().refreshSessionCount();
+
+    expect(useAuthStore.getState().sessionCount).toBe(3);
+    expect(useAuthStore.getState().isLinked).toBe(true);
+    expect(loadFromStorage(LINKED_STATE_STORAGE_KEY)).toBe('true');
+
+    // When session_count drops back to 1
+    mockMe.mockResolvedValueOnce({ player_id: 1, session_count: 1 });
+    await useAuthStore.getState().refreshSessionCount();
+
+    expect(useAuthStore.getState().sessionCount).toBe(1);
+    expect(useAuthStore.getState().isLinked).toBe(false);
+    expect(loadFromStorage(LINKED_STATE_STORAGE_KEY)).toBeNull();
+  });
+
+  it('useTransfer updates sessionCount from server response and bypasses if token matches', async () => {
+    const clientModule = await import('../../packages/web/src/api/client.js');
+    const mockTransfer = vi.spyOn(clientModule, 'postPlayerTransferUse');
+    mockTransfer.mockResolvedValueOnce({
+      token: 'new-token',
+      player_id: 42,
+      session_count: 5,
+      stats: { version: 1, records: [] },
+      puzzle_states: [],
+    });
+
+    await useAuthStore.getState().useTransfer('new-player-key');
+
+    expect(useAuthStore.getState().sessionCount).toBe(5);
+    expect(useAuthStore.getState().isLinked).toBe(true);
+    expect(useAuthStore.getState().playerKey).toBe('new-player-key');
+
+    // Calling again with the same playerKey should bypass postPlayerTransferUse
+    mockTransfer.mockClear();
+    await useAuthStore.getState().useTransfer('new-player-key');
+    expect(mockTransfer).not.toHaveBeenCalled();
   });
 });

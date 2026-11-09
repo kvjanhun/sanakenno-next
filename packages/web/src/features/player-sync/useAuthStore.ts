@@ -43,6 +43,7 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
   initialize: () => Promise<void>;
+  refreshSessionCount: () => Promise<void>;
   initPlayer: () => Promise<void>;
   revealShareOptions: () => void;
   sendTransferEmail: (email: string) => Promise<void>;
@@ -93,9 +94,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const sessionCount = me.session_count ?? 1;
-      const isLinked = storedIsLinked || sessionCount > 1;
-      if (isLinked && !storedIsLinked) {
+      const isLinked = sessionCount > 1;
+      if (isLinked) {
         saveToStorage(LINKED_STATE_STORAGE_KEY, 'true');
+      } else {
+        removeFromStorage(LINKED_STATE_STORAGE_KEY);
       }
 
       set({
@@ -143,17 +146,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Upload local data to initialize the player on server
       const local = gatherLocalData();
       if (local.stats.records.length > 0 || local.puzzle_states.length > 0) {
-        await postPlayerTransferUse({
-          token: player_key,
-          stats: local.stats,
-          puzzle_states: local.puzzle_states,
-        }).catch(() => undefined);
+        const res = await postPlayerTransferUse(
+          {
+            token: player_key,
+            stats: local.stats,
+            puzzle_states: local.puzzle_states,
+          },
+          token,
+        ).catch(() => undefined);
+        if (res?.token) {
+          saveToStorage(AUTH_TOKEN_STORAGE_KEY, res.token);
+        }
       }
     } catch (err: unknown) {
       set({
         isLoading: false,
         error: err instanceof Error ? err.message : 'Alustus epäonnistui',
       });
+    }
+  },
+
+  refreshSessionCount: async () => {
+    const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
+    if (!token) return;
+    try {
+      const me = await fetchPlayerMe(token);
+      if (me) {
+        const count = me.session_count ?? 1;
+        if (count > 1) {
+          saveToStorage(LINKED_STATE_STORAGE_KEY, 'true');
+        } else {
+          removeFromStorage(LINKED_STATE_STORAGE_KEY);
+        }
+        set({ sessionCount: count, isLinked: count > 1 });
+      }
+    } catch {
+      // ignore network errors
     }
   },
 
@@ -179,25 +207,39 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   useTransfer: async (token: string) => {
+    if (get().playerKey === token) {
+      await get().refreshSessionCount();
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
+      const currentToken = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
       const local = gatherLocalData();
-      const res = await postPlayerTransferUse({
-        token,
-        stats: local.stats,
-        puzzle_states: local.puzzle_states,
-      });
+      const res = await postPlayerTransferUse(
+        {
+          token,
+          stats: local.stats,
+          puzzle_states: local.puzzle_states,
+        },
+        currentToken,
+      );
 
       saveToStorage(AUTH_TOKEN_STORAGE_KEY, res.token);
       saveToStorage(PLAYER_KEY_STORAGE_KEY, token);
-      saveToStorage(LINKED_STATE_STORAGE_KEY, 'true');
+      const count = res.session_count ?? 1;
+      if (count > 1) {
+        saveToStorage(LINKED_STATE_STORAGE_KEY, 'true');
+      } else {
+        removeFromStorage(LINKED_STATE_STORAGE_KEY);
+      }
 
       set({
         isLoggedIn: true,
         playerId: res.player_id,
         playerKey: token,
-        sessionCount: 2,
-        isLinked: true,
+        sessionCount: count,
+        isLinked: count > 1,
         isLoading: false,
       });
 
