@@ -336,7 +336,7 @@ export function SettingsModal({
             ·
           </span>
           <a
-            href="https://github.com/kvjanhun/sanakenno"
+            href="https://github.com/kvjanhun/sanakenno-next"
             target="_blank"
             rel="noopener noreferrer"
             className="hover:underline"
