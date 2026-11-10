@@ -38,7 +38,7 @@ export function UpgradeButton({ onClick }: { onClick: () => void }): React.JSX.E
         boxShadow: '0 1px 2px var(--color-button-shadow)',
       }}
     >
-      Avaa seuraava taso →
+      Näytä pituudet kirjaimittain →
     </button>
   );
 }

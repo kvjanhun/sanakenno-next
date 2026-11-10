@@ -92,7 +92,7 @@ describe('Gameplay UI Components', () => {
     const matrixTier1Content = screen.getByTestId('hint-content-tier1');
     expect(matrixTier1Content).toBeInTheDocument();
     const matrixUpgradeBtn = screen.getByTestId('upgrade-tier-button');
-    expect(matrixUpgradeBtn).toHaveTextContent('Avaa seuraava taso');
+    expect(matrixUpgradeBtn).toHaveTextContent('Näytä pituudet kirjaimittain');
     expect(matrixTier1Content).toContainElement(matrixUpgradeBtn);
 
     // Upgrade to Matrix Step 2 (tier3)

@@ -125,7 +125,7 @@ export function RulesModal({ show, onClose }: RulesModalProps): React.JSX.Elemen
                 <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                   Matriisi:
                 </span>{' '}
-                sanojen määrä alkukirjaimittain (taso 1) ja pituudet kirjaimittain (taso 2).
+                sanojen määrä alkukirjaimittain ja pituudet alkukirjaimittain.
               </span>
             </li>
             <li className="flex items-start gap-2 text-xs">
@@ -137,7 +137,8 @@ export function RulesModal({ show, onClose }: RulesModalProps): React.JSX.Elemen
                   Vihjeet:
                 </span>{' '}
                 erikseen avattavat osiot pangrammeille (alkukirjaimet ja pituudet), alkupareille (7
-                yleisintä alkua) sekä sananpäätteille (7 yleisintä päätettä).
+                yleisintä jäljellä olevaa alkuparia) sekä sananpäätteille (7 yleisintä jäljellä
+                olevaa päätettä).
               </span>
             </li>
           </ul>
