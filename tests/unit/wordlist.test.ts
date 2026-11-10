@@ -160,10 +160,10 @@ describe('wordlist engine (unit)', () => {
     });
     expect(result.hint_data.pangram_details).toEqual([{ length: 11, first_letter: 'k' }]);
     expect(result.hint_data.suffixes).toEqual({
-      llinen: 1,
-      na: 2,
+      inen: 1,
       ka: 1,
-      sa: 1,
+      na: 2,
+      nsa: 1,
       si: 1,
     });
   });

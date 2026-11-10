@@ -119,8 +119,8 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
           { length: 11, first_letter: 'k' },
         ],
         suffixes: {
-          llinen: 1,
           inen: 1,
+          tar: 1,
         },
       };
 
@@ -138,12 +138,12 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
 
       // Suffixes derived accurately (sorted remaining desc)
       expect(derived.suffixMap).toEqual([
-        { suffix: 'inen', total: 1, found: 0, remaining: 1 },
-        { suffix: 'llinen', total: 1, found: 1, remaining: 0 },
+        { suffix: 'tar', total: 1, found: 0, remaining: 1 },
+        { suffix: 'inen', total: 1, found: 1, remaining: 0 },
       ]);
 
       // Top suffixes and top pairs derived deterministically (remaining desc, Finnish alpha asc)
-      expect(derived.topSuffixes).toEqual([{ suffix: 'inen', total: 1, found: 0, remaining: 1 }]);
+      expect(derived.topSuffixes).toEqual([{ suffix: 'tar', total: 1, found: 0, remaining: 1 }]);
     });
 
     it('getTopPairs and getTopSuffixes sort by remaining descending then Finnish alphabetical ascending with limit', async () => {
