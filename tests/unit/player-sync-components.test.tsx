@@ -15,6 +15,11 @@ describe('Player Sync UI Components', () => {
       isLinked: false,
       isLoading: false,
       error: null,
+      requestTransferTicket: vi.fn().mockResolvedValue({
+        ticket: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        code: '123-456',
+        expires_at: new Date(Date.now() + 900_000).toISOString(),
+      }),
     });
   });
 
@@ -70,13 +75,13 @@ describe('Player Sync UI Components', () => {
       expect(screen.queryByText('Tämän laitteen yhdistämiskoodi')).not.toBeInTheDocument();
     });
 
-    it('renders modal options and displays player key code', () => {
+    it('renders modal options and displays player key code', async () => {
       render(<SyncModal show={true} onClose={vi.fn()} />);
 
       expect(screen.getByText('Tämän laitteen yhdistämiskoodi')).toBeInTheDocument();
-      expect(
-        screen.getByText('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'),
-      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('123-456')).toBeInTheDocument();
+      });
       expect(screen.getByRole('button', { name: 'Kopioi koodi' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Kopioi linkki' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Lähetä sähköpostitse' })).toBeInTheDocument();
@@ -91,7 +96,7 @@ describe('Player Sync UI Components', () => {
 
       render(<SyncModal show={true} onClose={onClose} />);
 
-      const input = screen.getByPlaceholderText('Liitä yhdistämiskoodi tähän');
+      const input = screen.getByPlaceholderText('Esim. 123-456');
       fireEvent.change(input, { target: { value: 'target-code-999' } });
 
       const submitBtn = screen.getByRole('button', { name: 'Yhdistä' });
@@ -110,6 +115,10 @@ describe('Player Sync UI Components', () => {
       });
 
       render(<SyncModal show={true} onClose={vi.fn()} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('123-456')).toBeInTheDocument();
+      });
 
       const copyCodeBtn = screen.getByRole('button', { name: 'Kopioi koodi' });
       const copyLinkBtn = screen.getByRole('button', { name: 'Kopioi linkki' });
@@ -198,6 +207,29 @@ describe('Player Sync UI Components', () => {
 
       render(<SettingsModal show={true} onClose={() => {}} />);
       expect(mockRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('renders privacy disclosure section in SettingsModal and expands GDPR details on click', () => {
+      render(<SettingsModal show={true} onClose={() => {}} />);
+
+      expect(screen.getByText('Tietosuoja ja evästeet')).toBeInTheDocument();
+      expect(screen.queryByText('Rekisterinpitäjä ja tarkoitus')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Tietosuoja ja evästeet'));
+
+      expect(screen.getByText('Rekisterinpitäjä ja tarkoitus')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Tietoja käsitellään ainoastaan pelitilanteen tallentamiseen/),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Resend-palvelu/)).toBeInTheDocument();
+      expect(screen.getByText(/30 päivää/)).toBeInTheDocument();
+      const resendLink = screen.getByRole('link', { name: /Resendin tietosuojaseloste/i });
+      expect(resendLink).toHaveAttribute('href', 'https://resend.com/legal/privacy-policy');
+      expect(resendLink).toHaveAttribute('target', '_blank');
+      expect(resendLink).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(screen.getByText(/Selaimen paikallinen muisti/)).toBeInTheDocument();
+      expect(screen.getAllByText(/localStorage/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText(/Tietojen poisto ja omat oikeutesi/)).toBeInTheDocument();
     });
   });
 });

@@ -3,6 +3,9 @@ import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import { validatePlayerToken, type PlayerSessionData } from './player-auth.queries.js';
+import { getClientIp, getRateLimitKey, SlidingWindowRateLimiter } from './rate-limiter.js';
+
+export { getClientIp, getRateLimitKey };
 
 export type PlayerVariables = {
   player: PlayerSessionData;
@@ -39,8 +42,12 @@ export function requirePlayerAuth(
   };
 }
 
-const transferCreateRateLimitMap = new Map<string, number>();
 const TRANSFER_CREATE_RATE_LIMIT = 3;
+const TRANSFER_CREATE_WINDOW_MS = 15 * 60 * 1000;
+export const transferCreateLimiter = new SlidingWindowRateLimiter({
+  windowMs: TRANSFER_CREATE_WINDOW_MS,
+  maxRequests: TRANSFER_CREATE_RATE_LIMIT,
+});
 
 interface EmailRateEntry {
   lastSentMs: number;
@@ -53,7 +60,7 @@ const EMAIL_COOLDOWN_MS = 10 * 60 * 1000;
 const EMAIL_DAILY_LIMIT = 10;
 
 export function resetTransferCreateRateLimit(): void {
-  transferCreateRateLimitMap.clear();
+  transferCreateLimiter.reset();
 }
 
 export function resetEmailRateLimit(): void {
@@ -64,19 +71,11 @@ export function setEmailRateLimitEntry(email: string, entry: EmailRateEntry): vo
   emailRateLimitMap.set(createHash('sha256').update(email.toLowerCase()).digest('hex'), entry);
 }
 
-export function getClientIp(c: Context): string {
-  return (
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown'
-  );
-}
-
 export function transferCreateRateLimit(c: Context, next: Next) {
   const ip = getClientIp(c);
-  const count = transferCreateRateLimitMap.get(ip) ?? 0;
-  if (count >= TRANSFER_CREATE_RATE_LIMIT) {
+  if (!transferCreateLimiter.isAllowed(ip)) {
     return c.json({ error: 'Liian monta yritystä, odota hetki' }, 429);
   }
-  transferCreateRateLimitMap.set(ip, count + 1);
   return next();
 }
 

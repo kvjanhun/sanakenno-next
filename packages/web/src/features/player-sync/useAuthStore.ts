@@ -2,6 +2,7 @@ import {
   type StatsRecord,
   type SyncProgressPayload,
   type SyncPuzzleState,
+  type TransferTicketResponse,
 } from '@sanakenno/shared';
 import { create } from 'zustand';
 import {
@@ -11,6 +12,7 @@ import {
   postPlayerLogout,
   postPlayerRotate,
   postPlayerTransferCreate,
+  postPlayerTransferTicket,
   postPlayerTransferUse,
   postSyncPreferences,
   postSyncProgress,
@@ -54,8 +56,15 @@ export interface AuthState {
   syncStatsRecord: (record: StatsRecord) => Promise<void>;
   syncPuzzleState: (state: SyncPuzzleState) => Promise<void>;
   syncProgress: (payload: SyncProgressPayload) => Promise<void>;
+  syncProgressDebounced: (payload: SyncProgressPayload) => void;
+  flushPendingSync: () => Promise<void>;
+  requestTransferTicket: () => Promise<TransferTicketResponse>;
   syncPreferences: () => Promise<void>;
 }
+
+const pendingSyncQueue = new Map<number, SyncProgressPayload>();
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+const DEBOUNCE_DELAY_MS = 1500;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   isLoggedIn: false,
@@ -188,14 +197,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   sendTransferEmail: async (email: string) => {
     const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
     const playerKey = get().playerKey;
-    if (!token || !playerKey) {
+    if (!token) {
       set({ error: 'Kirjautuminen puuttuu' });
       return;
     }
 
     set({ isLoading: true, error: null });
     try {
-      await postPlayerTransferCreate(token, { email, player_key: playerKey });
+      await postPlayerTransferCreate(token, { email, player_key: playerKey ?? undefined });
       get().revealShareOptions();
       set({ isLoading: false });
     } catch (err: unknown) {
@@ -339,6 +348,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await postSyncProgress(token, payload);
   },
 
+  syncProgressDebounced: (payload: SyncProgressPayload) => {
+    pendingSyncQueue.set(payload.puzzle_number, payload);
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      void get().flushPendingSync();
+    }, DEBOUNCE_DELAY_MS);
+  },
+
+  flushPendingSync: async () => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    if (pendingSyncQueue.size === 0) return;
+    const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
+    if (!token) return;
+
+    const entries = Array.from(pendingSyncQueue.entries());
+    for (const [slot, payload] of entries) {
+      try {
+        await postSyncProgress(token, payload);
+        pendingSyncQueue.delete(slot);
+      } catch {
+        // Keep in queue for next flush attempt
+      }
+    }
+  },
+
+  requestTransferTicket: async () => {
+    const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
+    if (!token) throw new Error('Kirjautuminen puuttuu');
+    return await postPlayerTransferTicket(token);
+  },
+
   syncPreferences: async () => {
     const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
     if (!token) return;
@@ -346,3 +389,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await postSyncPreferences(token, prefs);
   },
 }));
+
+if (typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void useAuthStore.getState().flushPendingSync();
+    }
+  });
+
+  window.addEventListener('pagehide', () => {
+    void useAuthStore.getState().flushPendingSync();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    void useAuthStore.getState().flushPendingSync();
+  });
+}

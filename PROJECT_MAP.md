@@ -26,25 +26,25 @@ sanakenno-next/
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer + Cloud Run edge middleware
       src/
         edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), Google security headers & PWA static serving
-        db/                  # 16-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0004 migration runner, 1.0 backfill helper, deterministic seed
+        db/                  # 17-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0005 migration runner (player_transfer_tickets), 1.0 backfill helper (backfill-stats.ts), deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
           puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
-          player-auth/       # Passwordless player Bearer auth, session TTL, pairing-code email delivery, active device count (POST /api/player/auth/*, GET /api/player/me)
+          player-auth/       # Passwordless player Bearer auth, session TTL, 15-min transfer tickets & 6-digit PIN pairing (POST /api/player/auth/transfer/ticket), Resend EU support, sliding-window rate limiters, active device count (POST /api/player/auth/*, GET /api/player/me)
           player-sync/       # Monotonic cross-device progress sync (GET /api/player/sync, POST /api/player/sync/*)
-          telemetry/         # Public gameplay telemetry (POST /api/achievement, /api/failed-guess, /api/word-find)
+          telemetry/         # Hardened public gameplay telemetry with sliding-window rate limiters & wordlist validation (POST /api/achievement, /api/failed-guess, /api/word-find)
           admin-auth/        # Argon2id admin cookie session auth & CSRF guardrails (POST /api/auth/*)
           admin-puzzles/     # Puzzle CRUD, swap, center override, preview, blocked words & 14-day schedule (POST/GET/DELETE /api/admin/*)
           admin-suggestions/ # No-spoiler puzzle suggestion engine, curated pangram quality, combinations browser & rejections (GET/POST/DELETE /api/admin/*)
           admin-analytics/   # Achievement, failed-guess & per-puzzle word-find telemetry aggregations (GET /api/admin/*)
     web/                     # @sanakenno/web — React 19 + TanStack Query + Hono RPC client
       src/
-        api/                 # Typed Hono RPC client (hc<AppType>)
+        api/                 # Typed Hono RPC client (hc<AppType>), split into client.ts and admin-client.ts
         pwa.config.ts        # PWA manifest, service worker registration & Workbox runtime caching
         features/
-          gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AchievementNotification), useMidnightRollover, and hybrid state
-          modals/            # ModalShell, ArchiveModal (ArchiveCalendar, ArchiveDayPanel, archiveStatus), PuzzleWordsModal, StatsModal (tabbed summary + AchievementsList, backfillStats), RulesModal, SettingsModal
-          player-sync/       # Player auth store, monotonic sync reconciliation, SyncModal, ConnectBanner
+          gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AchievementNotification), gameplay-effects.ts, useMidnightRollover, and hybrid state
+          modals/            # Code-split modals via React.lazy() (ModalShell, ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal) and PrivacySection (GDPR Art. 13 & localStorage disclosure)
+          player-sync/       # Player auth store with debounced sync queue and keepalive, monotonic sync reconciliation, 6-digit PIN SyncModal, ConnectBanner
           theme/             # 6-palette CSS custom property theme system (usePaletteStore, useThemePreferenceStore, ThemeSelector, ThemeToggle)
           admin/             # Code-split admin panel (AdminLayout, LoginPage, PuzzleEditor, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
         styles/              # CSS custom property design tokens (--color-*, --font-*)

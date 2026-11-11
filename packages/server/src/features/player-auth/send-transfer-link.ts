@@ -10,12 +10,13 @@ export async function sendTransferLink(
 ): Promise<void> {
   const link = `${baseUrl}/?connect=${encodeURIComponent(token)}`;
   const apiKey = process.env.RESEND_API_KEY;
+  const resendApiUrl = process.env.RESEND_API_URL || 'https://api.resend.com';
 
   if (!apiKey || apiKey === 'test') {
     return;
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
+  const res = await fetch(`${resendApiUrl}/emails`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -43,15 +44,15 @@ export async function sendTransferLink(
           </a>
         </p>
         <p style="font-size: 14px; color: #666; line-height: 1.5; margin: 0;">
-          Linkki toimii kaikilla laitteilla kunnes vaihdat tunnisteen.
+          Linkki on kertakäyttöinen ja voimassa 15 minuuttia.
         </p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0 20px 0;" />
         <p style="font-size: 12px; color: #999; line-height: 1.6; margin: 0;">
-          Sähköpostiosoitettasi ei tallenneta. Jos et pyytänyt tätä viestiä, voit jättää sen huomiotta.
+          Sähköpostiosoitettasi ei tallenneta Sanakennon tietokantaan. Sähköpostipalveluntarjoajamme (Resend) säilyttää toimituslokeja 30 päivää toimituksen varmistamiseksi (<a href="https://resend.com/legal/privacy-policy" style="color: #999; text-decoration: underline;">Resendin tietosuojaseloste</a>). Jos et pyytänyt tätä viestiä, voit jättää sen huomiotta.
         </p>
       </div>
     `,
-      text: `Sanakenno\n\nKlikkaa alla olevaa linkkiä yhdistääksesi tilisi tähän laitteeseen:\n\n${link}\n\nLinkki toimii kaikilla laitteilla kunnes vaihdat tunnisteen.\n\n—\nSähköpostiosoitettasi ei tallenneta. Jos et pyytänyt tätä viestiä, voit jättää sen huomiotta.`,
+      text: `Sanakenno\n\nKlikkaa alla olevaa linkkiä yhdistääksesi tilisi tähän laitteeseen:\n\n${link}\n\nLinkki on kertakäyttöinen ja voimassa 15 minuuttia.\n\n—\nSähköpostiosoitettasi ei tallenneta Sanakennon tietokantaan. Sähköpostipalveluntarjoajamme (Resend) säilyttää toimituslokeja 30 päivää toimituksen varmistamiseksi (https://resend.com/legal/privacy-policy). Jos et pyytänyt tätä viestiä, voit jättää sen huomiotta.`,
     }),
   });
 

@@ -212,3 +212,117 @@ export async function rotatePlayerKeyAndInvalidateOtherSessions(
 
   return newKey;
 }
+
+/** 15-minute transfer ticket lifetime. */
+export const TRANSFER_TICKET_TTL_MS = 15 * 60 * 1000;
+
+function generatePairingCode(): string {
+  const num = Math.floor(100000 + Math.random() * 900000).toString();
+  return `${num.slice(0, 3)}-${num.slice(3)}`;
+}
+
+export function normalizePairingCode(code: string): string {
+  const digits = code.replace(/\D/g, '');
+  if (digits.length === 6) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  }
+  return code.trim();
+}
+
+/**
+ * Mint a new single-use 15-minute transfer ticket and 6-digit pairing code for a player.
+ */
+export async function createTransferTicket(
+  db: Kysely<Database>,
+  playerId: number,
+  ttlMs = TRANSFER_TICKET_TTL_MS,
+): Promise<{ ticket: string; code: string; expiresAt: string }> {
+  const ticket = randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+
+  // Clean up expired tickets
+  const nowIso = new Date().toISOString();
+  await db
+    .deleteFrom('player_transfer_tickets')
+    .where('expires_at', '<=', nowIso)
+    .execute()
+    .catch(() => undefined);
+
+  let code = generatePairingCode();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await db
+        .insertInto('player_transfer_tickets')
+        .values({
+          id: ticket,
+          player_id: playerId,
+          code,
+          expires_at: expiresAt,
+        })
+        .execute();
+      return { ticket, code, expiresAt };
+    } catch {
+      code = generatePairingCode();
+    }
+  }
+
+  throw new Error('Yhdistämiskoodin luominen epäonnistui');
+}
+
+export interface TransferTicketRow {
+  id: string;
+  player_id: number;
+  code: string;
+  expires_at: string;
+  used_at: string | null;
+}
+
+/**
+ * Find a transfer ticket by 32-hex ID or 6-digit pairing code (with or without hyphen).
+ */
+export async function getTransferTicket(
+  db: Kysely<Database>,
+  tokenOrCode: string,
+): Promise<TransferTicketRow | undefined> {
+  const trimmed = tokenOrCode.trim();
+  const normalizedCode = normalizePairingCode(trimmed);
+  const unhyphenatedCode = trimmed.replace(/\D/g, '');
+
+  const row = await db
+    .selectFrom('player_transfer_tickets')
+    .select(['id', 'player_id', 'code', 'expires_at', 'used_at'])
+    .where((eb) =>
+      eb.or([
+        eb('id', '=', trimmed),
+        eb('code', '=', trimmed),
+        eb('code', '=', normalizedCode),
+        ...(unhyphenatedCode.length === 6 ? [eb('code', '=', unhyphenatedCode)] : []),
+      ]),
+    )
+    .executeTakeFirst();
+
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    player_id: Number(row.player_id),
+    code: row.code,
+    expires_at: row.expires_at,
+    used_at: row.used_at,
+  };
+}
+
+/**
+ * Mark a transfer ticket as consumed.
+ */
+export async function markTransferTicketUsed(
+  db: Kysely<Database>,
+  ticketId: string,
+): Promise<void> {
+  await db
+    .updateTable('player_transfer_tickets')
+    .set({
+      used_at: sql<string>`datetime('now')`,
+    })
+    .where('id', '=', ticketId)
+    .execute();
+}

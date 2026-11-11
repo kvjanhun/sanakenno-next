@@ -81,22 +81,31 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
   describe('POST /api/failed-guess', () => {
     it('records a failed guess and increments count on duplicate', async () => {
       const res1 = await harness.client.api['failed-guess'].$post({
-        json: { word: 'kissa', date: '2026-04-10' },
+        json: { word: 'kasas', date: '2026-04-10' },
       });
       expect(res1.status).toBe(200);
 
       const res2 = await harness.client.api['failed-guess'].$post({
-        json: { word: 'kissa', date: '2026-04-10' },
+        json: { word: 'kasas', date: '2026-04-10' },
       });
       expect(res2.status).toBe(200);
 
       const row = await harness.db
         .selectFrom('failed_guesses')
         .selectAll()
-        .where('word', '=', 'kissa')
+        .where('word', '=', 'kasas')
         .where('puzzle_date', '=', '2026-04-10')
         .executeTakeFirst();
       expect(row?.count).toBe(2);
+    });
+
+    it('rejects failed guesses that are actually on the puzzle solution list', async () => {
+      const res = await harness.client.api['failed-guess'].$post({
+        json: { word: 'kissa', date: '2026-04-10' },
+      });
+      expect(res.status).toBe(400);
+      const data = (await res.json()) as { error: string };
+      expect(data.error).toBe('Sana on jo ratkaisulistalla');
     });
 
     it('rejects words longer than 20 characters', async () => {
@@ -105,27 +114,59 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('rejects failed guesses with future dates', async () => {
+      const res = await harness.client.api['failed-guess'].$post({
+        json: { word: 'kissa', date: '2099-01-01' },
+      });
+      expect(res.status).toBe(400);
+      const data = (await res.json()) as { error: string };
+      expect(data.error).toBe('Invalid date');
+    });
+
+    it('rejects words missing center letter or with illegal letters', async () => {
+      // Missing center 'a'
+      const res1 = await harness.client.api['failed-guess'].$post({
+        json: { word: 'eli', date: '2026-04-10' },
+      });
+      expect(res1.status).toBe(400);
+
+      // Contains letters not in puzzle (e.g. 'o')
+      const res2 = await harness.client.api['failed-guess'].$post({
+        json: { word: 'koira', date: '2026-04-10' },
+      });
+      expect(res2.status).toBe(400);
+    });
   });
 
   describe('POST /api/word-find', () => {
     it('records a word find and increments count on duplicate', async () => {
       const res1 = await harness.client.api['word-find'].$post({
-        json: { word: 'kenno', puzzle_number: 1 },
+        json: { word: 'kana', puzzle_number: 1 },
       });
       expect(res1.status).toBe(200);
 
       const res2 = await harness.client.api['word-find'].$post({
-        json: { word: 'kenno', puzzle_number: 1 },
+        json: { word: 'kana', puzzle_number: 1 },
       });
       expect(res2.status).toBe(200);
 
       const row = await harness.db
         .selectFrom('word_finds')
         .selectAll()
-        .where('word', '=', 'kenno')
+        .where('word', '=', 'kana')
         .where('puzzle_number', '=', 1)
         .executeTakeFirst();
       expect(row?.count).toBe(2);
+    });
+
+    it('rejects word not present in puzzle solution list', async () => {
+      const res = await harness.client.api['word-find'].$post({
+        json: { word: 'kenno', puzzle_number: 1 },
+      });
+      expect(res.status).toBe(400);
+      const data = (await res.json()) as { error: string };
+      expect(data.error).toBe('Sana ei kuulu peliin');
     });
 
     it('rejects invalid puzzle_number or word', async () => {

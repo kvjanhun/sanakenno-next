@@ -117,6 +117,15 @@ export interface PlayerSessionsTable {
   created_at: Generated<string>;
 }
 
+export interface PlayerTransferTicketsTable {
+  id: string;
+  player_id: number;
+  code: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: Generated<string>;
+}
+
 export interface PlayerStatsTable {
   id: Generated<number>;
   player_id: number;
@@ -170,6 +179,7 @@ export interface Database {
   word_finds: WordFindsTable;
   players: PlayersTable;
   player_sessions: PlayerSessionsTable;
+  player_transfer_tickets: PlayerTransferTicketsTable;
   player_stats: PlayerStatsTable;
   player_puzzle_states: PlayerPuzzleStatesTable;
   schema_migrations: SchemaMigrationsTable;

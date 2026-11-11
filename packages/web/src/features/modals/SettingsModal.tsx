@@ -16,6 +16,7 @@ import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePrefere
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { OPEN_LICENSES } from './licenses.js';
 import { ModalShell } from './ModalShell.js';
+import { PrivacySection } from './PrivacySection.js';
 
 export interface SettingsModalProps {
   show: boolean;
@@ -315,6 +316,8 @@ export function SettingsModal({
             </ul>
           </div>
         </div>
+
+        <PrivacySection />
 
         <div
           className="flex items-center justify-center gap-2 text-[11px] pt-3 border-t"

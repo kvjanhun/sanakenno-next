@@ -18,10 +18,13 @@ import {
   countActivePlayerSessions,
   createPlayerIdentity,
   createPlayerSession,
+  createTransferTicket,
   deletePlayerSession,
   getPlayerById,
   getPlayerByKeyHash,
+  getTransferTicket,
   hashPlayerKey,
+  markTransferTicketUsed,
   rotatePlayerKeyAndInvalidateOtherSessions,
 } from './player-auth.queries.js';
 import { sendTransferLink } from './send-transfer-link.js';
@@ -43,13 +46,15 @@ async function handleTransferEmail(
   const email = typeof body['email'] === 'string' ? body['email'].trim() : '';
   const playerKey = typeof body['player_key'] === 'string' ? body['player_key'].trim() : '';
 
-  if (!playerKey) {
+  if (body['player_key'] !== undefined && !playerKey) {
     return c.json({ error: 'Tunniste puuttuu' }, 400);
   }
 
-  const row = await getPlayerById(db, player.playerId);
-  if (!row || row.player_key_hash !== hashPlayerKey(playerKey)) {
-    return c.json({ error: 'Virheellinen tunniste' }, 400);
+  if (playerKey) {
+    const row = await getPlayerById(db, player.playerId);
+    if (!row || row.player_key_hash !== hashPlayerKey(playerKey)) {
+      return c.json({ error: 'Virheellinen tunniste' }, 400);
+    }
   }
 
   if (!email) {
@@ -61,8 +66,12 @@ async function handleTransferEmail(
     return c.json({ error: error ?? 'Liian monta yritystä' }, 429);
   }
 
+  const ticket = await runImmediateTransactionWithRetry(db, (trx) =>
+    createTransferTicket(trx, player.playerId),
+  );
+
   const baseUrl = process.env.BASE_URL || 'https://sanakenno.fi';
-  await sendTransferLink(email, playerKey, baseUrl).catch((err: unknown) => {
+  await sendTransferLink(email, ticket.ticket, baseUrl).catch((err: unknown) => {
     console.error(
       JSON.stringify({
         level: 'error',
@@ -88,6 +97,20 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
       );
       return c.json({ player_key: playerKey, token, player_id: playerId }, 200);
     })
+    .post('/auth/transfer/ticket', authMiddleware, async (c) => {
+      const player = c.get('player');
+      const ticket = await runImmediateTransactionWithRetry(db, (trx) =>
+        createTransferTicket(trx, player.playerId),
+      );
+      return c.json(
+        {
+          ticket: ticket.ticket,
+          code: ticket.code,
+          expires_at: ticket.expiresAt,
+        },
+        200,
+      );
+    })
     .post('/auth/transfer/create', authMiddleware, transferCreateRateLimit, (c) =>
       handleTransferEmail(db, c),
     )
@@ -107,12 +130,25 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Tunniste puuttuu' }, 400);
       }
 
-      const row = await getPlayerByKeyHash(db, hashPlayerKey(rawToken));
-      if (!row) {
-        return c.json({ error: 'Virheellinen tunniste' }, 400);
+      const ticket = await getTransferTicket(db, rawToken);
+      let playerId: number;
+
+      if (ticket) {
+        if (ticket.used_at !== null) {
+          return c.json({ error: 'Tunniste on jo käytetty' }, 400);
+        }
+        if (Date.parse(ticket.expires_at) <= Date.now()) {
+          return c.json({ error: 'Tunniste on vanhentunut' }, 400);
+        }
+        playerId = ticket.player_id;
+      } else {
+        const row = await getPlayerByKeyHash(db, hashPlayerKey(rawToken));
+        if (!row) {
+          return c.json({ error: 'Virheellinen tunniste' }, 400);
+        }
+        playerId = row.id;
       }
 
-      const playerId = row.id;
       const stats = body['stats'] as PlayerStats | undefined;
       const puzzleStates = body['puzzle_states'] as SyncPuzzleState[] | undefined;
 
@@ -123,6 +159,9 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
       }
 
       const { token, sessionCount } = await runImmediateTransactionWithRetry(db, async (trx) => {
+        if (ticket) {
+          await markTransferTicketUsed(trx, ticket.id);
+        }
         await bulkUpsertLocalData(trx, playerId, stats, puzzleStates);
         await cleanupExpiredPlayerSessions(trx);
         if (existingSessionToken) {

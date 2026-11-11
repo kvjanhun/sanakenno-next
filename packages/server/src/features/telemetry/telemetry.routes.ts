@@ -1,8 +1,10 @@
-import { RANK_NAMES, type RankName } from '@sanakenno/shared';
+import { getHelsinkiDateString, RANK_NAMES, type RankName } from '@sanakenno/shared';
 import { Hono, type Context, type Next } from 'hono';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
+import { getRateLimitKey, SlidingWindowRateLimiter } from '../player-auth/rate-limiter.js';
+import { getFullPuzzleBySlot, getFullPuzzleForDate } from '../puzzle/puzzle.queries.js';
 import {
   insertAchievement,
   isActivePuzzleSlot,
@@ -13,34 +15,36 @@ import {
 const MAX_WORD_LENGTH = 20;
 const VALID_RANKS: readonly string[] = RANK_NAMES;
 
-const achievementRateLimitMap = new Map<string, number>();
-const failedGuessRateLimitMap = new Map<string, number>();
-const wordFindRateLimitMap = new Map<string, number>();
-
 const ACHIEVEMENT_RATE_LIMIT = 10;
 const FAILED_GUESS_RATE_LIMIT = 30;
 const WORD_FIND_RATE_LIMIT = 60;
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+
+export const achievementLimiter = new SlidingWindowRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  maxRequests: ACHIEVEMENT_RATE_LIMIT,
+});
+export const failedGuessLimiter = new SlidingWindowRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  maxRequests: FAILED_GUESS_RATE_LIMIT,
+});
+export const wordFindLimiter = new SlidingWindowRateLimiter({
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  maxRequests: WORD_FIND_RATE_LIMIT,
+});
 
 export function resetTelemetryRateLimits(): void {
-  achievementRateLimitMap.clear();
-  failedGuessRateLimitMap.clear();
-  wordFindRateLimitMap.clear();
+  achievementLimiter.reset();
+  failedGuessLimiter.reset();
+  wordFindLimiter.reset();
 }
 
-function getClientIp(c: Context): string {
-  return (
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown'
-  );
-}
-
-function createIpRateLimiter(map: Map<string, number>, limit: number, errorMessage: string) {
+function createRateLimiterMiddleware(limiter: SlidingWindowRateLimiter, errorMessage: string) {
   return (c: Context, next: Next) => {
-    const ip = getClientIp(c);
-    const count = map.get(ip) ?? 0;
-    if (count >= limit) {
+    const key = getRateLimitKey(c);
+    if (!limiter.isAllowed(key)) {
       return c.json({ error: errorMessage }, 429);
     }
-    map.set(ip, count + 1);
     return next();
   };
 }
@@ -49,21 +53,12 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }
 
-const achievementRateLimiter = createIpRateLimiter(
-  achievementRateLimitMap,
-  ACHIEVEMENT_RATE_LIMIT,
+const achievementRateLimiter = createRateLimiterMiddleware(
+  achievementLimiter,
   'Rate limit exceeded',
 );
-const failedGuessRateLimiter = createIpRateLimiter(
-  failedGuessRateLimitMap,
-  FAILED_GUESS_RATE_LIMIT,
-  'Too many requests',
-);
-const wordFindRateLimiter = createIpRateLimiter(
-  wordFindRateLimitMap,
-  WORD_FIND_RATE_LIMIT,
-  'Too many requests',
-);
+const failedGuessRateLimiter = createRateLimiterMiddleware(failedGuessLimiter, 'Too many requests');
+const wordFindRateLimiter = createRateLimiterMiddleware(wordFindLimiter, 'Too many requests');
 
 /**
  * Mount `POST /api/achievement`.
@@ -156,9 +151,34 @@ export function createFailedGuessRoutes(db: Kysely<Database>) {
       return c.json({ error: 'Invalid date' }, 400);
     }
 
+    const todayHelsinki = getHelsinkiDateString();
+    if (date > todayHelsinki) {
+      return c.json({ error: 'Invalid date' }, 400);
+    }
+
     const normalized = word.toLowerCase().replace(/-/g, '');
-    if (normalized.length === 0) {
+    if (normalized.length < 4 || normalized.length > MAX_WORD_LENGTH) {
       return c.json({ error: 'Invalid word' }, 400);
+    }
+
+    const puzzleData = await getFullPuzzleForDate(db, date);
+    if (!puzzleData) {
+      return c.json({ error: 'Peliä ei löydy' }, 400);
+    }
+
+    if (!normalized.includes(puzzleData.center)) {
+      return c.json({ error: 'Keskuskirjain puuttuu' }, 400);
+    }
+
+    const allowed = new Set([puzzleData.center, ...puzzleData.letters]);
+    for (const ch of normalized) {
+      if (!allowed.has(ch)) {
+        return c.json({ error: 'Sana sisältää virheellisiä kirjaimia' }, 400);
+      }
+    }
+
+    if (puzzleData.words.includes(normalized)) {
+      return c.json({ error: 'Sana on jo ratkaisulistalla' }, 400);
     }
 
     await runImmediateTransactionWithRetry(db, (trx) => upsertFailedGuess(trx, normalized, date));
@@ -193,6 +213,16 @@ export function createWordFindRoutes(db: Kysely<Database>) {
     const normalized = word.toLowerCase().replace(/-/g, '');
     if (normalized.length === 0) {
       return c.json({ error: 'Invalid word' }, 400);
+    }
+
+    const active = await isActivePuzzleSlot(db, puzzle_number);
+    if (!active) {
+      return c.json({ error: 'Valittua peliä ei löydy tai se ei ole aktiivinen' }, 400);
+    }
+
+    const puzzleData = await getFullPuzzleBySlot(db, puzzle_number);
+    if (!puzzleData || !puzzleData.words.includes(normalized)) {
+      return c.json({ error: 'Sana ei kuulu peliin' }, 400);
     }
 
     await runImmediateTransactionWithRetry(db, (trx) =>

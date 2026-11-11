@@ -18,20 +18,38 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
   const [codeInput, setCodeInput] = useState('');
   const [emailInput, setEmailInput] = useState('');
   const [copiedTarget, setCopiedTarget] = useState<'code' | 'link' | null>(null);
+  const [ticketData, setTicketData] = useState<{ ticket: string; code: string } | null>(null);
+  const [isTicketLoading, setIsTicketLoading] = useState(false);
 
   const connectUrl = useMemo(() => {
-    if (!playerKey || typeof window === 'undefined') return '';
-    return `${window.location.origin}/?connect=${encodeURIComponent(playerKey)}`;
-  }, [playerKey]);
+    if (typeof window === 'undefined') return '';
+    const codeOrTicket = ticketData?.ticket || playerKey;
+    if (!codeOrTicket) return '';
+    return `${window.location.origin}/?connect=${encodeURIComponent(codeOrTicket)}`;
+  }, [ticketData, playerKey]);
 
   useEffect(() => {
     if (show) {
       void useAuthStore.getState().refreshSessionCount();
+      setIsTicketLoading(true);
+      void useAuthStore
+        .getState()
+        .requestTransferTicket()
+        .then((res) => {
+          setTicketData({ ticket: res.ticket, code: res.code });
+        })
+        .catch(() => {
+          setTicketData(null);
+        })
+        .finally(() => {
+          setIsTicketLoading(false);
+        });
     } else {
       setMode('options');
       setCodeInput('');
       setEmailInput('');
       setCopiedTarget(null);
+      setTicketData(null);
       useAuthStore.getState().clearError();
     }
   }, [show]);
@@ -108,42 +126,74 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
             </div>
           )}
 
-          {playerKey && (
-            <div
-              className="p-3 rounded-lg space-y-2.5"
-              style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+          <div
+            className="p-3 rounded-lg space-y-2.5"
+            style={{ backgroundColor: 'var(--color-bg-secondary)' }}
+          >
+            <span
+              className="text-xs font-semibold uppercase tracking-wider block"
+              style={{ color: 'var(--color-text-tertiary)' }}
             >
-              <span
-                className="text-xs font-semibold uppercase tracking-wider block"
-                style={{ color: 'var(--color-text-tertiary)' }}
+              Tämän laitteen yhdistämiskoodi
+            </span>
+            <div className="flex gap-2 items-center">
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Tämän laitteen yhdistämiskoodi"
+                className="flex-1 min-w-0 h-10 px-3 rounded text-sm font-mono font-bold tracking-widest border overflow-x-auto whitespace-nowrap flex items-center justify-center select-all cursor-text focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
+                style={{
+                  backgroundColor: 'var(--color-bg-primary)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-accent)',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'var(--color-border) transparent',
+                  WebkitOverflowScrolling: 'touch',
+                }}
               >
-                Tämän laitteen yhdistämiskoodi
-              </span>
-              <div className="flex gap-2 items-center">
-                <div
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Tämän laitteen yhdistämiskoodi"
-                  className="flex-1 min-w-0 h-9 px-2.5 rounded text-xs font-mono border overflow-x-auto whitespace-nowrap flex items-center select-all cursor-text focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
-                  style={{
-                    backgroundColor: 'var(--color-bg-primary)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text-primary)',
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: 'var(--color-border) transparent',
-                    WebkitOverflowScrolling: 'touch',
-                  }}
-                >
-                  {playerKey}
-                </div>
+                {isTicketLoading ? (
+                  <span className="text-xs font-normal opacity-60">Luodaan koodia...</span>
+                ) : (
+                  ticketData?.code || playerKey || '—'
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => copyText(ticketData?.code || playerKey || '', 'code')}
+                disabled={isTicketLoading || (!ticketData && !playerKey)}
+                aria-label={copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
+                className="h-10 px-3 rounded text-xs font-medium cursor-pointer shrink-0 transition-opacity disabled:opacity-50"
+                style={{
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'var(--color-on-accent)',
+                }}
+              >
+                <span className="inline-grid [grid-template-areas:'stack'] items-center justify-center">
+                  <span
+                    aria-hidden="true"
+                    className="invisible [grid-area:stack] select-none pointer-events-none"
+                  >
+                    Kopioitu!
+                  </span>
+                  <span className="[grid-area:stack]">
+                    {copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi'}
+                  </span>
+                </span>
+              </button>
+            </div>
+            <p className="text-[11px] m-0" style={{ color: 'var(--color-text-tertiary)' }}>
+              Kertakäyttöinen koodi ja linkki ovat voimassa 15 minuuttia.
+            </p>
+            <div className="flex gap-2 pt-0.5">
+              {connectUrl && (
                 <button
                   type="button"
-                  onClick={() => copyText(playerKey, 'code')}
-                  aria-label={copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi koodi'}
-                  className="h-9 px-3 rounded text-xs font-medium cursor-pointer shrink-0 transition-opacity"
+                  onClick={() => copyText(connectUrl, 'link')}
+                  disabled={isTicketLoading}
+                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-opacity disabled:opacity-50"
                   style={{
-                    backgroundColor: 'var(--color-accent)',
-                    color: 'var(--color-bg-primary)',
+                    backgroundColor: 'var(--color-bg-tertiary)',
+                    color: 'var(--color-text-primary)',
                   }}
                 >
                   <span className="inline-grid [grid-template-areas:'stack'] items-center justify-center">
@@ -151,52 +201,27 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                       aria-hidden="true"
                       className="invisible [grid-area:stack] select-none pointer-events-none"
                     >
-                      Kopioitu!
+                      Linkki kopioitu!
                     </span>
                     <span className="[grid-area:stack]">
-                      {copiedTarget === 'code' ? 'Kopioitu!' : 'Kopioi'}
+                      {copiedTarget === 'link' ? 'Linkki kopioitu!' : 'Kopioi linkki'}
                     </span>
                   </span>
                 </button>
-              </div>
-              <div className="flex gap-2 pt-0.5">
-                {connectUrl && (
-                  <button
-                    type="button"
-                    onClick={() => copyText(connectUrl, 'link')}
-                    className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-opacity"
-                    style={{
-                      backgroundColor: 'var(--color-bg-tertiary)',
-                      color: 'var(--color-text-primary)',
-                    }}
-                  >
-                    <span className="inline-grid [grid-template-areas:'stack'] items-center justify-center">
-                      <span
-                        aria-hidden="true"
-                        className="invisible [grid-area:stack] select-none pointer-events-none"
-                      >
-                        Linkki kopioitu!
-                      </span>
-                      <span className="[grid-area:stack]">
-                        {copiedTarget === 'link' ? 'Linkki kopioitu!' : 'Kopioi linkki'}
-                      </span>
-                    </span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setMode('email')}
-                  className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer"
-                  style={{
-                    backgroundColor: 'var(--color-bg-tertiary)',
-                    color: 'var(--color-text-primary)',
-                  }}
-                >
-                  Lähetä sähköpostitse
-                </button>
-              </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setMode('email')}
+                className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--color-bg-tertiary)',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
+                Lähetä sähköpostitse
+              </button>
             </div>
-          )}
+          </div>
 
           <div
             className="p-3 rounded-lg space-y-2"
@@ -209,12 +234,12 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
               Yhdistä toinen laite
             </span>
             <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-              Syötä toisen laitteen yhdistämiskoodi siirtääksesi edistymisesi tähän laitteeseen:
+              Syötä toisen laitteen 6-numeroinen koodi tai liitä yhdistämistunniste tähän:
             </p>
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Liitä yhdistämiskoodi tähän"
+                placeholder="Esim. 123-456"
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value)}
                 className="flex-1 px-3 py-1.5 rounded text-xs font-mono outline-none border"
@@ -229,7 +254,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                 onClick={handleUseCode}
                 disabled={isLoading || !codeInput.trim()}
                 className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer disabled:opacity-50"
-                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-bg-primary)' }}
+                style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-on-accent)' }}
               >
                 {isLoading ? 'Yhdistetään...' : 'Yhdistä'}
               </button>

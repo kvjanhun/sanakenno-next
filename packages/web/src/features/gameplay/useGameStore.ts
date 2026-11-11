@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import {
   buildShareText,
-  computeStreak,
-  evaluateAchievements,
   getHelsinkiDateString,
   isPangram,
   rankForScore,
@@ -10,10 +8,10 @@ import {
   scoreWord,
   type HintData,
   type PuzzleResponse,
-  type RankName,
 } from '@sanakenno/shared';
-import { postAchievement, postFailedGuess, postWordFind } from '../../api/client.js';
+import { postFailedGuess } from '../../api/client.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
+import { handleAcceptedWordEffects } from './gameplay-effects.js';
 import { hashWord } from './hash.js';
 import { filterVisibleHintIds, isVisibleHintId } from './hints.js';
 import {
@@ -116,6 +114,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
   sortedFoundWords: () => [...get().foundWords].sort((a, b) => a.localeCompare(b, 'fi')),
 
   loadPuzzle: async (data: Puzzle) => {
+    void useAuthStore.getState().flushPendingSync();
     useUiStore.getState().setCelebration(null);
     useUiStore.getState().clearWordRejection();
     useUiStore.getState().setHintsHidden(true);
@@ -194,121 +193,28 @@ export const useGameStore = create<GameState>()((set, get) => ({
     const bestNoHintScore =
       visibleHintsUnlocked.length === 0 ? newScore : (state.scoreBeforeHints ?? 0);
 
-    postWordFind({ word: normalized, puzzle_number: puzzle.puzzle_number });
-
     useUiStore.getState().clearWordRejection();
     set({ foundWords: newFoundWords, score: newScore, currentWord: '' });
     get().saveState();
 
-    if (newRank !== previousRank) {
-      postAchievement({
-        puzzle_number: puzzle.puzzle_number,
-        rank: newRank as RankName,
-        score: newScore,
-        max_score: puzzle.max_score,
-        words_found: newFoundWords.size,
-        elapsed_ms: Math.max(0, Date.now() - state.startedAt - state.totalPausedMs),
-      });
-
-      if (newRank === 'Täysi kenno') {
-        useUiStore.getState().setCelebration('taysikenno');
-      } else if (newRank === 'Ällistyttävä') {
-        useUiStore
-          .getState()
-          .setCelebration(
-            visibleHintsUnlocked.length === 0 ? 'nohint-allistyttava' : 'allistyttava',
-          );
-      }
-    }
-
-    const viewingDate = useUiStore.getState().viewingPuzzleDate;
-    const isDaily =
-      viewingDate === null && (puzzle.date ? puzzle.date === getHelsinkiDateString() : true);
-
-    const statsResult = recordLocalStatsUpdate({
-      puzzleNumber: puzzle.puzzle_number,
-      dateStr: viewingDate ?? getHelsinkiDateString(),
-      rank: newRank,
-      score: newScore,
-      maxScore: puzzle.max_score,
-      foundWords: newFoundWords,
-      validLetters,
-      hintsUsed: visibleHintsUnlocked.length,
-      elapsedMs: Math.max(0, Date.now() - state.startedAt - state.totalPausedMs),
+    handleAcceptedWordEffects({
+      normalized,
+      pts,
+      pangram,
+      newFoundWords,
+      newScore,
+      previousRank,
+      newRank,
+      visibleHintsUnlocked,
       bestNoHintScore,
-      isDaily,
+      validLetters,
+      puzzle,
+      startedAt: state.startedAt,
+      totalPausedMs: state.totalPausedMs,
+      scoreBeforeHints: state.scoreBeforeHints,
+      foundWords,
+      onNewAchievement: (newAchievement) => set({ newAchievement }),
     });
-
-    if (statsResult) {
-      const prevStreak = computeStreak(statsResult.previous.records);
-      const newStreak = computeStreak(statsResult.updated.records);
-      const prevEvals = evaluateAchievements(statsResult.previous, prevStreak);
-      const newEvals = evaluateAchievements(statsResult.updated, newStreak);
-
-      for (const newProg of newEvals) {
-        const oldProg = prevEvals.find((p) => p.id === newProg.id);
-        const oldTier = oldProg?.unlockedTier ?? 0;
-        if (newProg.unlockedTier > oldTier && newProg.currentTier) {
-          const tier = newProg.currentTier;
-          set({
-            newAchievement: {
-              id: newProg.id,
-              title: newProg.title,
-              tierName: tier.name,
-              target: tier.target,
-              unit: newProg.unit,
-            },
-          });
-          break;
-        }
-      }
-    }
-
-    void useAuthStore.getState().syncProgress({
-      puzzle_number: puzzle.puzzle_number,
-      date: useUiStore.getState().viewingPuzzleDate ?? getHelsinkiDateString(),
-      found_words: [...newFoundWords],
-      score: newScore,
-      hints_unlocked: visibleHintsUnlocked,
-      started_at: state.startedAt,
-      total_paused_ms: state.totalPausedMs,
-      score_before_hints: state.scoreBeforeHints,
-      max_score: puzzle.max_score,
-      best_no_hint_score: bestNoHintScore,
-    });
-
-    const firstLetter = normalized[0];
-    let letterCleared = false;
-    if (firstLetter && puzzle.hint_data.by_letter[firstLetter]) {
-      const totalForLetter = puzzle.hint_data.by_letter[firstLetter];
-      let foundWithLetter = 0;
-      for (const w of foundWords) {
-        if (w[0] === firstLetter) foundWithLetter += 1;
-      }
-      if (foundWithLetter + 1 === totalForLetter) {
-        letterCleared = true;
-      }
-    }
-
-    if (pangram) {
-      useUiStore.getState().triggerPangramRipple();
-      const secondary = letterCleared
-        ? `Pangrammi! · Kaikki ${firstLetter?.toUpperCase()}-sanat!`
-        : 'Pangrammi!';
-      useUiStore.getState().showToast(`+${pts}`, 'ok', 2500, secondary, 'special');
-    } else if (letterCleared) {
-      useUiStore
-        .getState()
-        .showToast(
-          `+${pts}`,
-          'ok',
-          2500,
-          `Kaikki ${firstLetter?.toUpperCase()}-alkuiset löydetty!`,
-          'special',
-        );
-    } else {
-      useUiStore.getState().showToast(`+${pts}`, 'ok', 2000);
-    }
   },
 
   unlockHint: (id: string) => {

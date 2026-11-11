@@ -31,10 +31,18 @@ export type PlayerMeResponse = z.infer<typeof PlayerMeResponseSchema>;
 
 export const TransferCreatePayloadSchema = z.object({
   email: z.string().trim().min(1),
-  player_key: z.string().trim().min(1),
+  player_key: z.string().trim().min(1).optional(),
 });
 
 export type TransferCreatePayload = z.infer<typeof TransferCreatePayloadSchema>;
+
+export const TransferTicketResponseSchema = z.object({
+  ticket: z.string().min(1),
+  code: z.string().min(1),
+  expires_at: z.string().min(1),
+});
+
+export type TransferTicketResponse = z.infer<typeof TransferTicketResponseSchema>;
 
 export const TransferUsePayloadSchema = z.object({
   token: z.string().trim().min(1),
