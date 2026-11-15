@@ -1,30 +1,40 @@
 import { useState } from 'react';
 import type { AdminSuggestionResponse } from '@sanakenno/shared';
 import { adminGetSuggestion, adminRejectSuggestion } from '../../api/client.js';
+import {
+  ADMIN_CARD_CLASS,
+  ADMIN_CARD_STYLE,
+  ADMIN_SUBCARD_CLASS,
+  ADMIN_SUBCARD_STYLE,
+  AdminAlert,
+  LetterTile,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 
 interface SuggestionPanelProps {
   csrfToken: string | null;
-  onSelectSuggestion: (letters: string, center: string) => void;
+  onAddSuggestion: (letters: string, center: string) => Promise<void>;
+  onPreviewSuggestion?: (letters: string, center: string) => void;
 }
 
 export function SuggestionPanel({
   csrfToken,
-  onSelectSuggestion,
+  onAddSuggestion,
+  onPreviewSuggestion,
 }: SuggestionPanelProps): React.JSX.Element {
   const [suggestion, setSuggestion] = useState<AdminSuggestionResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [spoilers, setSpoilers] = useState(false);
   const [declined, setDeclined] = useState<string[]>([]);
 
-  const fetchSuggestion = async (includeSpoilers = spoilers, declinedList = declined) => {
+  const fetchSuggestion = async (declinedList = declined) => {
     if (!csrfToken) return;
     setLoading(true);
     setError(null);
     try {
       const res = (await adminGetSuggestion(csrfToken, {
         declined: declinedList,
-        include_pangrams: includeSpoilers,
       })) as AdminSuggestionResponse;
       setSuggestion(res);
     } catch (err: unknown) {
@@ -45,7 +55,22 @@ export function SuggestionPanel({
 
   const handleSuggestClick = async () => {
     const nextDeclined = suggestion ? appendDeclined(suggestion) : declined;
-    await fetchSuggestion(spoilers, nextDeclined);
+    await fetchSuggestion(nextDeclined);
+  };
+
+  const handleAdd = async () => {
+    if (!csrfToken || !suggestion) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await onAddSuggestion(suggestion.letters.join(','), suggestion.center);
+      appendDeclined(suggestion);
+      setSuggestion(null);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Pelin lisäys epäonnistui');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReject = async () => {
@@ -55,123 +80,85 @@ export function SuggestionPanel({
       await adminRejectSuggestion(csrfToken, suggestion.letters, suggestion.center);
       const nextDeclined = appendDeclined(suggestion);
       setSuggestion(null);
-      await fetchSuggestion(spoilers, nextDeclined);
+      await fetchSuggestion(nextDeclined);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ehdotuksen hylkäys epäonnistui');
       setLoading(false);
     }
   };
 
-  const toggleSpoilers = async () => {
-    const next = !spoilers;
-    setSpoilers(next);
-    if (next && suggestion && !suggestion.pangrams) {
-      await fetchSuggestion(true, declined);
-    }
-  };
-
   return (
-    <div
-      className="p-5 rounded-2xl border space-y-4"
-      style={{
-        backgroundColor: 'var(--color-bg-secondary)',
-        borderColor: 'var(--color-border)',
-      }}
-    >
+    <div className={`${ADMIN_CARD_CLASS} space-y-4`} style={ADMIN_CARD_STYLE}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="font-bold text-base tracking-tight">Peliavustaja</h3>
-          <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            Ehdota automaattisesti laadukkaita pelejä kiertoon ilman ratkaisupaljastuksia
+          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+            Ehdota automaattisesti laadukkaita pelejä kiertoon
           </p>
         </div>
         <button
           type="button"
           onClick={() => void handleSuggestClick()}
           disabled={loading}
-          className="px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition-opacity"
-          style={{
-            backgroundColor: 'var(--color-accent)',
-            color: 'var(--color-bg-primary)',
-          }}
+          className={adminButtonClass('md')}
+          style={adminButtonStyle('primary')}
         >
           {loading ? 'Haetaan...' : suggestion ? 'Ehdota toista' : 'Ehdota peliä'}
         </button>
       </div>
 
-      {error && (
-        <div
-          className="p-3 rounded-lg text-xs font-medium"
-          style={{
-            backgroundColor: 'var(--color-bg-primary)',
-            color: 'var(--color-error)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
       {suggestion && (
-        <div
-          className="p-4 rounded-xl space-y-4 border"
-          style={{
-            backgroundColor: 'var(--color-bg-primary)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
+        <div className={`${ADMIN_SUBCARD_CLASS} space-y-4`} style={ADMIN_SUBCARD_STYLE}>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span
-                className="text-xs uppercase font-bold"
+                className="text-[11px] uppercase font-semibold tracking-wide"
                 style={{ color: 'var(--color-text-secondary)' }}
               >
                 Kirjaimet:
               </span>
               <div className="flex gap-1">
-                {suggestion.letters.map((ch) => {
-                  const isCenter = ch.toLowerCase() === suggestion.center.toLowerCase();
-                  return (
-                    <span
-                      key={ch}
-                      className="inline-flex items-center justify-center w-7 h-7 rounded text-xs font-bold uppercase border"
-                      style={{
-                        backgroundColor: isCenter
-                          ? 'var(--color-accent)'
-                          : 'var(--color-bg-secondary)',
-                        color: isCenter ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                        borderColor: 'var(--color-border)',
-                      }}
-                    >
-                      {ch}
-                    </span>
-                  );
-                })}
+                {suggestion.letters.map((ch) => (
+                  <LetterTile
+                    key={ch}
+                    letter={ch}
+                    isCenter={ch.toLowerCase() === suggestion.center.toLowerCase()}
+                  />
+                ))}
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => onSelectSuggestion(suggestion.letters.join(','), suggestion.center)}
-                className="px-3 py-1.5 rounded text-xs font-semibold cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--color-accent)',
-                  color: 'var(--color-bg-primary)',
-                }}
+                onClick={() => void handleAdd()}
+                disabled={loading}
+                className={adminButtonClass('sm')}
+                style={adminButtonStyle('primary')}
               >
-                Käytä ehdotusta
+                Lisää peli
               </button>
+              {onPreviewSuggestion && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onPreviewSuggestion(suggestion.letters.join(','), suggestion.center)
+                  }
+                  disabled={loading}
+                  className={adminButtonClass('sm')}
+                  style={adminButtonStyle('secondary', 'secondary')}
+                >
+                  Esikatsele ehdotus
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleReject}
                 disabled={loading}
-                className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer border"
-                style={{
-                  backgroundColor: 'var(--color-bg-secondary)',
-                  color: 'var(--color-error)',
-                  borderColor: 'var(--color-border)',
-                }}
+                className={adminButtonClass('sm')}
+                style={adminButtonStyle('danger')}
               >
                 Hylkää pysyvästi
               </button>
@@ -179,19 +166,43 @@ export function SuggestionPanel({
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className="p-2 rounded border" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="p-2.5 rounded-lg border"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderColor: 'var(--color-border)',
+              }}
+            >
               <div style={{ color: 'var(--color-text-secondary)' }}>Sanoja</div>
-              <div className="font-bold text-sm">{suggestion.word_count}</div>
+              <div className="font-bold text-sm tabular-nums">{suggestion.word_count}</div>
             </div>
-            <div className="p-2 rounded border" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="p-2.5 rounded-lg border"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderColor: 'var(--color-border)',
+              }}
+            >
               <div style={{ color: 'var(--color-text-secondary)' }}>Maksimipisteet</div>
-              <div className="font-bold text-sm">{suggestion.max_score}</div>
+              <div className="font-bold text-sm tabular-nums">{suggestion.max_score}</div>
             </div>
-            <div className="p-2 rounded border" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="p-2.5 rounded-lg border"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderColor: 'var(--color-border)',
+              }}
+            >
               <div style={{ color: 'var(--color-text-secondary)' }}>Pangrammeja</div>
-              <div className="font-bold text-sm">{suggestion.pangram_count}</div>
+              <div className="font-bold text-sm tabular-nums">{suggestion.pangram_count}</div>
             </div>
-            <div className="p-2 rounded border" style={{ borderColor: 'var(--color-border)' }}>
+            <div
+              className="p-2.5 rounded-lg border"
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderColor: 'var(--color-border)',
+              }}
+            >
               <div style={{ color: 'var(--color-text-secondary)' }}>Laatu</div>
               <div className="font-bold text-xs">{suggestion.quality_label}</div>
             </div>
@@ -216,24 +227,22 @@ export function SuggestionPanel({
             </div>
           )}
 
-          <div className="pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
-            <button
-              type="button"
-              onClick={toggleSpoilers}
-              className="text-xs font-medium cursor-pointer underline"
-              style={{ color: 'var(--color-text-secondary)' }}
+          {suggestion.pangrams && suggestion.pangrams.length > 0 && (
+            <div
+              className="pt-2.5 border-t space-y-1"
+              style={{ borderColor: 'var(--color-border)' }}
             >
-              {spoilers ? 'Piilota pangrammit' : 'Näytä pangrammit (Spoileri)'}
-            </button>
-            {spoilers && suggestion.pangrams && (
-              <div
-                className="mt-2 text-xs font-mono font-medium"
-                style={{ color: 'var(--color-accent)' }}
+              <span
+                className="text-xs font-semibold"
+                style={{ color: 'var(--color-text-secondary)' }}
               >
+                Pangrammit:
+              </span>
+              <div className="text-sm font-bold" style={{ color: 'var(--color-accent)' }}>
                 {suggestion.pangrams.join(', ')}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

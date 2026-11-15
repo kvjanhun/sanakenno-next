@@ -162,12 +162,14 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
       );
       const slotsData = (await slotsRes.json()) as {
         slots: Array<{ slot: number; display_number: number }>;
+        today_slot: number | null;
       };
 
       expect(slotsData.slots).toEqual([
         { slot: 1, display_number: 1 },
         { slot: 3, display_number: 2 }, // gap closed
       ]);
+      expect([1, 3]).toContain(slotsData.today_slot);
     });
 
     it('swaps two puzzle slots', async () => {

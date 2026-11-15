@@ -37,23 +37,26 @@ export function WordList({ words, letters, loading, onBlock }: WordListProps): R
 
   return (
     <div>
-      <div className="text-xs mb-2 font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+      <div
+        className="text-xs mb-3 font-medium tabular-nums"
+        style={{ color: 'var(--color-text-secondary)' }}
+      >
         {words.length} sanaa, {pangramCount} pangrammia
       </div>
       <div
-        className="grid gap-x-4 gap-y-1 text-xs"
+        className="grid gap-x-3 gap-y-1 text-xs"
         style={{
-          gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))',
         }}
       >
         {sorted.map((word) => {
           const pg = isPangramWord(word, letters);
           return (
-            <div key={word} className="flex items-center gap-1.5 group py-0.5">
+            <div key={word} className="flex items-center gap-1.5 group py-0.5 min-w-0">
               <button
                 type="button"
                 onClick={() => onBlock(word)}
-                className="inline-flex h-4 w-4 items-center justify-center rounded opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-md opacity-35 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer transition-opacity shrink-0"
                 style={{
                   color: 'var(--color-error)',
                   background: 'none',

@@ -35,7 +35,6 @@ export interface SuggestPuzzleOptions {
   declined?: string[];
   minWords?: number;
   maxWords?: number;
-  includePangrams?: boolean;
 }
 
 const DEFAULT_MIN_WORDS = 18;
@@ -71,7 +70,6 @@ export async function suggestPuzzle(
 ): Promise<AdminSuggestionResponse | null> {
   const minWords = options.minWords ?? DEFAULT_MIN_WORDS;
   const maxWords = options.maxWords ?? DEFAULT_MAX_WORDS;
-  const includePangrams = options.includePangrams === true;
 
   const curatedQuality = loadCuratedPangramQuality();
   const declined = new Set(
@@ -162,7 +160,6 @@ export async function suggestPuzzle(
     nextPuzzle && nextLetters ? shortWordSet(nextLetters, nextPuzzle.center, blockedWords) : null;
 
   let best: AdminSuggestionResponse | null = null;
-  let bestPangramsList: string[] = [];
 
   for (const candidate of eligible) {
     const candidateShorts = shortWordSet(candidate.letters, candidate.center, blockedWords);
@@ -209,12 +206,6 @@ export async function suggestPuzzle(
 
     if (!best || suggestion.score > best.score) {
       best = suggestion;
-      if (includePangrams) {
-        const words = puzzleWords(candidate.letters, candidate.center, blockedWords, {
-          pangramOnly: true,
-        });
-        bestPangramsList = words;
-      }
     }
   }
 
@@ -227,8 +218,10 @@ export async function suggestPuzzle(
     best.reasons = candidateReasons(best, preferredBand, preferredPangrams);
   }
 
-  if (best && includePangrams) {
-    best.pangrams = bestPangramsList;
+  if (best) {
+    best.pangrams = puzzleWords(best.letters, best.center, blockedWords, {
+      pangramOnly: true,
+    });
   }
 
   return best;

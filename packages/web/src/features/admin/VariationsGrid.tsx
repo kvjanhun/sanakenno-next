@@ -14,7 +14,7 @@ export function VariationsGrid({
   if (variations.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-7 gap-2">
+    <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
       {variations.map((v) => {
         const isActive = v.center.toLowerCase() === activeCenter.toLowerCase();
         return (
@@ -22,7 +22,7 @@ export function VariationsGrid({
             key={v.center}
             type="button"
             onClick={() => onSelect(v.center)}
-            className="flex flex-col w-full rounded-xl overflow-hidden shadow-xs hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border select-none group"
+            className="flex flex-col w-full rounded-xl overflow-hidden shadow-xs hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer border select-none"
             style={{
               borderColor: isActive ? 'var(--color-accent)' : 'var(--color-border)',
             }}
@@ -33,10 +33,11 @@ export function VariationsGrid({
             }
           >
             <div
-              className="w-full flex items-center justify-center py-2 font-mono text-xl sm:text-2xl font-black uppercase border-b transition-colors duration-200"
+              className="w-full flex items-center justify-center py-2 text-lg sm:text-xl font-bold uppercase border-b transition-colors duration-200"
               style={{
+                fontFamily: 'var(--font-game)',
                 backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
-                color: isActive ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
+                color: isActive ? 'var(--color-on-accent)' : 'var(--color-text-primary)',
                 borderColor: isActive ? 'var(--color-accent)' : 'var(--color-border)',
               }}
             >
@@ -44,7 +45,7 @@ export function VariationsGrid({
             </div>
 
             <div
-              className="w-full flex-[1_0_auto] flex flex-col gap-0.5 justify-center py-2 text-center transition-colors duration-200"
+              className="w-full flex-[1_0_auto] flex flex-col gap-0.5 justify-center py-2 text-center tabular-nums transition-colors duration-200"
               style={{
                 backgroundColor: isActive
                   ? 'color-mix(in srgb, var(--color-accent) 12%, var(--color-bg-primary))'
@@ -54,7 +55,7 @@ export function VariationsGrid({
             >
               <div className="text-xs font-semibold">{v.word_count} sanaa</div>
               <div className="text-[11px] opacity-90">{v.max_score} p</div>
-              <div className="text-[10px] font-mono opacity-75">{v.pangram_count} pg</div>
+              <div className="text-[10px] font-medium opacity-75">{v.pangram_count} pg</div>
             </div>
           </button>
         );

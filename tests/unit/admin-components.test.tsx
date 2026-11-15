@@ -227,6 +227,7 @@ describe('Admin UI Components', () => {
       },
       variations: [],
       reasons: ['sanamäärä tuo vaihtelua (tavallinen)'],
+      pangrams: ['kaamoksen'],
     };
 
     const secondSuggestion = {
@@ -237,47 +238,51 @@ describe('Admin UI Components', () => {
       word_count: 45,
       pangram_count: 2,
       max_score: 160,
+      pangrams: ['reilomies', 'mielisero'],
     };
 
-    it('fetches suggestion, advances declined list on "Ehdota toista", and reveals spoilers for current item', async () => {
+    it('renders pangrams directly, advances declined list on "Ehdota toista", and supports adding/previewing', async () => {
       mockAdminGetSuggestion
         .mockResolvedValueOnce(firstSuggestion)
-        .mockResolvedValueOnce(secondSuggestion)
-        .mockResolvedValueOnce({ ...secondSuggestion, pangrams: ['mielisero'] });
+        .mockResolvedValueOnce(secondSuggestion);
 
-      const onSelectSuggestion = vi.fn();
+      const onAddSuggestion = vi.fn().mockResolvedValue(undefined);
+      const onPreviewSuggestion = vi.fn();
       render(
-        <SuggestionPanel csrfToken="test-csrf-token" onSelectSuggestion={onSelectSuggestion} />,
+        <SuggestionPanel
+          csrfToken="test-csrf-token"
+          onAddSuggestion={onAddSuggestion}
+          onPreviewSuggestion={onPreviewSuggestion}
+        />,
       );
 
       fireEvent.click(screen.getByRole('button', { name: 'Ehdota peliä' }));
 
       await waitFor(() => {
         expect(screen.getByText('30')).toBeInTheDocument();
+        expect(screen.getByText('kaamoksen')).toBeInTheDocument();
       });
+      expect(screen.queryByRole('button', { name: /Spoileri/i })).not.toBeInTheDocument();
       expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(1, 'test-csrf-token', {
         declined: [],
-        include_pangrams: false,
       });
 
       fireEvent.click(screen.getByRole('button', { name: 'Ehdota toista' }));
 
       await waitFor(() => {
         expect(screen.getByText('45')).toBeInTheDocument();
+        expect(screen.getByText('reilomies, mielisero')).toBeInTheDocument();
       });
       expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(2, 'test-csrf-token', {
         declined: ['aekmnos:a'],
-        include_pangrams: false,
       });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Näytä pangrammit (Spoileri)' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Esikatsele ehdotus' }));
+      expect(onPreviewSuggestion).toHaveBeenCalledWith('e,i,l,m,o,r,s', 'e');
 
+      fireEvent.click(screen.getByRole('button', { name: 'Lisää peli' }));
       await waitFor(() => {
-        expect(screen.getByText('mielisero')).toBeInTheDocument();
-      });
-      expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(3, 'test-csrf-token', {
-        declined: ['aekmnos:a'],
-        include_pangrams: true,
+        expect(onAddSuggestion).toHaveBeenCalledWith('e,i,l,m,o,r,s', 'e');
       });
     });
 
@@ -287,7 +292,12 @@ describe('Admin UI Components', () => {
         .mockResolvedValueOnce(secondSuggestion);
       mockAdminRejectSuggestion.mockResolvedValueOnce({ id: 1 });
 
-      render(<SuggestionPanel csrfToken="test-csrf-token" onSelectSuggestion={vi.fn()} />);
+      render(
+        <SuggestionPanel
+          csrfToken="test-csrf-token"
+          onAddSuggestion={vi.fn().mockResolvedValue(undefined)}
+        />,
+      );
 
       fireEvent.click(screen.getByRole('button', { name: 'Ehdota peliä' }));
       await waitFor(() => {
@@ -306,7 +316,6 @@ describe('Admin UI Components', () => {
       });
       expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(2, 'test-csrf-token', {
         declined: ['aekmnos:a'],
-        include_pangrams: false,
       });
     });
   });

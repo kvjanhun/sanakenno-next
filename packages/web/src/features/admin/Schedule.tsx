@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { adminGetSchedule } from '../../api/client.js';
+import {
+  ADMIN_CARD_STYLE,
+  ADMIN_TABLE_HEAD_ROW_CLASS,
+  ADMIN_TABLE_HEAD_ROW_STYLE,
+  ADMIN_TABLE_ROW_CLASS,
+  ADMIN_TABLE_WRAPPER_CLASS,
+  AdminPageHeader,
+  LetterTile,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 import { useAdminStore } from './useAdminStore.js';
 
 export function Schedule(): React.JSX.Element {
@@ -38,73 +49,86 @@ export function Schedule(): React.JSX.Element {
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold">14 päivän kierrosaikataulu</h2>
-        <button
-          type="button"
-          onClick={loadSchedule}
-          disabled={loading}
-          className="px-3 py-1.5 rounded text-xs border cursor-pointer"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          {loading ? 'Päivitetään...' : 'Päivitä'}
-        </button>
-      </div>
+      <AdminPageHeader
+        title="14 päivän kierrosaikataulu"
+        subtitle="Seuraavan kahden viikon aktiiviset päivän pelit"
+        actions={
+          <button
+            type="button"
+            onClick={loadSchedule}
+            disabled={loading}
+            className={adminButtonClass('md')}
+            style={adminButtonStyle('secondary', 'secondary')}
+          >
+            {loading ? 'Päivitetään...' : 'Päivitä'}
+          </button>
+        }
+      />
 
-      <div
-        className="rounded-xl border overflow-x-auto"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        <table className="w-full text-left text-xs border-collapse">
+      <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+        <table className="w-full text-left text-xs border-collapse tabular-nums">
           <thead>
-            <tr className="border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
               <th className="p-3">Päivämäärä</th>
               <th className="p-3">Peli (#)</th>
               <th className="p-3">Slotti</th>
-              <th className="p-3">Keskus</th>
               <th className="p-3">Kirjaimet</th>
-              <th className="p-3">Sanoja</th>
-              <th className="p-3">Pisteet</th>
-              <th className="p-3">Pangrammit</th>
+              <th className="p-3 text-right">Sanoja</th>
+              <th className="p-3 text-right">Pisteet</th>
+              <th className="p-3 text-right">Pangrammit</th>
             </tr>
           </thead>
-          <tbody className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+          <tbody>
             {schedule.map((entry) => (
               <tr
                 key={entry.date}
+                className={ADMIN_TABLE_ROW_CLASS}
                 style={{
-                  backgroundColor: entry.is_today ? 'var(--color-bg-tertiary)' : 'transparent',
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: entry.is_today
+                    ? 'color-mix(in srgb, var(--color-accent) 10%, transparent)'
+                    : 'transparent',
                 }}
               >
-                <td className="p-3 font-mono font-medium">
+                <td className="p-3 font-medium whitespace-nowrap">
                   {entry.date}{' '}
                   {entry.is_today && (
                     <span
-                      className="ml-1 text-xs font-bold"
-                      style={{ color: 'var(--color-accent)' }}
+                      className="ml-1.5 px-1.5 py-0.5 rounded-full text-[11px] font-semibold"
+                      style={{
+                        backgroundColor: 'var(--color-accent)',
+                        color: 'var(--color-on-accent)',
+                      }}
                     >
                       (Tänään)
                     </span>
                   )}
                 </td>
                 <td className="p-3 font-semibold">#{entry.display_number}</td>
-                <td className="p-3 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+                <td className="p-3" style={{ color: 'var(--color-text-secondary)' }}>
                   {entry.slot}
                 </td>
-                <td className="p-3 font-bold uppercase" style={{ color: 'var(--color-accent)' }}>
-                  {entry.center ?? '—'}
+                <td className="p-3">
+                  {entry.letters ? (
+                    <div className="flex items-center gap-1">
+                      {entry.letters.map((ch) => (
+                        <LetterTile
+                          key={ch}
+                          letter={ch}
+                          size="sm"
+                          isCenter={
+                            entry.center !== null && ch.toLowerCase() === entry.center.toLowerCase()
+                          }
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    '—'
+                  )}
                 </td>
-                <td className="p-3 font-mono">{entry.letters ? entry.letters.join(', ') : '—'}</td>
-                <td className="p-3">{entry.word_count}</td>
-                <td className="p-3">{entry.max_score}</td>
-                <td className="p-3">{entry.pangram_count}</td>
+                <td className="p-3 text-right font-medium">{entry.word_count}</td>
+                <td className="p-3 text-right">{entry.max_score}</td>
+                <td className="p-3 text-right">{entry.pangram_count}</td>
               </tr>
             ))}
           </tbody>

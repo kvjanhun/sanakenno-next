@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AdminSuggestionRejection } from '@sanakenno/shared';
 import { adminDeleteSuggestionRejection, adminGetSuggestionRejections } from '../../api/client.js';
+import {
+  ADMIN_CARD_STYLE,
+  ADMIN_TABLE_HEAD_ROW_CLASS,
+  ADMIN_TABLE_HEAD_ROW_STYLE,
+  ADMIN_TABLE_ROW_CLASS,
+  ADMIN_TABLE_WRAPPER_CLASS,
+  AdminAlert,
+  AdminPageHeader,
+  LetterTile,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 
 interface SuggestionRejectionsProps {
   csrfToken: string | null;
@@ -48,52 +60,28 @@ export function SuggestionRejections({ csrfToken }: SuggestionRejectionsProps): 
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-lg font-bold">Hylätyt peliehdotukset</h2>
-          <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            Pelit, jotka on hylätty pysyvästi automaattisesta ehdotusjonosta ({rejections.length}{' '}
-            kpl)
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={loadRejections}
-          disabled={loading}
-          className="px-3 py-1.5 rounded text-xs border cursor-pointer"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          {loading ? 'Päivitetään...' : 'Päivitä'}
-        </button>
-      </div>
+      <AdminPageHeader
+        title="Hylätyt peliehdotukset"
+        subtitle={`Pelit, jotka on hylätty pysyvästi automaattisesta ehdotusjonosta (${rejections.length} kpl)`}
+        actions={
+          <button
+            type="button"
+            onClick={loadRejections}
+            disabled={loading}
+            className={adminButtonClass('md')}
+            style={adminButtonStyle('secondary', 'secondary')}
+          >
+            {loading ? 'Päivitetään...' : 'Päivitä'}
+          </button>
+        }
+      />
 
-      {error && (
-        <div
-          className="p-3 rounded-lg text-xs font-medium"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-error)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
-      <div
-        className="rounded-xl border overflow-x-auto"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        <table className="w-full text-left text-xs border-collapse">
+      <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+        <table className="w-full text-left text-xs border-collapse tabular-nums">
           <thead>
-            <tr className="border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
               <th className="p-3">Kirjaimet</th>
               <th className="p-3">Keskuskirjain</th>
               <th className="p-3">Hylätty</th>
@@ -115,23 +103,12 @@ export function SuggestionRejections({ csrfToken }: SuggestionRejectionsProps): 
               rejections.map((r) => (
                 <tr
                   key={r.id}
-                  className="border-b transition-colors hover:bg-black/5"
+                  className={ADMIN_TABLE_ROW_CLASS}
                   style={{ borderColor: 'var(--color-border)' }}
                 >
-                  <td className="p-3 font-mono font-bold tracking-wider uppercase">
-                    {r.letters_key}
-                  </td>
+                  <td className="p-3 font-bold tracking-widest uppercase">{r.letters_key}</td>
                   <td className="p-3">
-                    <span
-                      className="inline-flex items-center justify-center w-6 h-6 rounded text-xs font-bold uppercase border"
-                      style={{
-                        backgroundColor: 'var(--color-accent)',
-                        color: 'var(--color-bg-primary)',
-                        borderColor: 'var(--color-border)',
-                      }}
-                    >
-                      {r.center}
-                    </span>
+                    <LetterTile letter={r.center} isCenter size="sm" />
                   </td>
                   <td className="p-3" style={{ color: 'var(--color-text-secondary)' }}>
                     {r.rejected_at.slice(0, 10)}
@@ -141,12 +118,8 @@ export function SuggestionRejections({ csrfToken }: SuggestionRejectionsProps): 
                       type="button"
                       onClick={() => handleRestore(r.id)}
                       disabled={restoringId === r.id}
-                      className="px-3 py-1 rounded text-xs font-medium cursor-pointer border disabled:opacity-50"
-                      style={{
-                        backgroundColor: 'var(--color-bg-primary)',
-                        borderColor: 'var(--color-border)',
-                        color: 'var(--color-text-primary)',
-                      }}
+                      className={adminButtonClass('sm')}
+                      style={adminButtonStyle('secondary', 'primary')}
                     >
                       {restoringId === r.id ? 'Palautetaan...' : 'Palauta jonoon'}
                     </button>

@@ -10,6 +10,7 @@ import {
   adminSavePuzzle,
   adminSwapPuzzles,
 } from '../../api/client.js';
+import { AdminAlert } from './AdminPrimitives.js';
 import { AdminWordListPanel } from './AdminWordListPanel.js';
 import { PuzzleSlotControls } from './PuzzleSlotControls.js';
 import { SuggestionPanel } from './SuggestionPanel.js';
@@ -24,6 +25,7 @@ export function PuzzleEditor(): React.JSX.Element {
   const [nextSlot, setNextSlot] = useState<number | null>(null);
   const [totalPuzzles, setTotalPuzzles] = useState(0);
   const [activeSlots, setActiveSlots] = useState<number[]>([]);
+  const [todaySlot, setTodaySlot] = useState<number | null>(null);
   const [savedLetters, setSavedLetters] = useState('');
   const [savedCenter, setSavedCenter] = useState('');
   const [activeLetters, setActiveLetters] = useState('');
@@ -31,6 +33,7 @@ export function PuzzleEditor(): React.JSX.Element {
   const [variations, setVariations] = useState<VariationData[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [words, setWords] = useState<string[]>([]);
+  const [wordsLetters, setWordsLetters] = useState('');
   const [wordsLoading, setWordsLoading] = useState(false);
 
   const [jumpTarget, setJumpTarget] = useState('');
@@ -56,10 +59,12 @@ export function PuzzleEditor(): React.JSX.Element {
   const loadWordsFor = useCallback(
     async (letters: string | string[], center: string) => {
       if (!csrfToken || !letters || !center) return;
+      const lettersStr = Array.isArray(letters) ? letters.join(',') : letters;
       setWordsLoading(true);
       try {
         const res = await adminPreview(csrfToken, { letters, center });
         setWords(res.words);
+        setWordsLetters(lettersStr);
         setPreview({
           words: res.words,
           max_score: res.max_score,
@@ -67,6 +72,7 @@ export function PuzzleEditor(): React.JSX.Element {
         });
       } catch {
         setWords([]);
+        setWordsLetters('');
       } finally {
         setWordsLoading(false);
       }
@@ -111,18 +117,21 @@ export function PuzzleEditor(): React.JSX.Element {
     try {
       const res = await adminGetSlots(csrfToken);
       const slots = res.active_slots ?? res.slots.map((s) => s.slot);
+      const resolvedToday = res.today_slot ?? null;
       setActiveSlots(slots);
       setTotalPuzzles(res.total_puzzles);
-      return slots;
+      setTodaySlot(resolvedToday);
+      return { slots, todaySlot: resolvedToday };
     } catch {
-      return [];
+      return { slots: [] as number[], todaySlot: null as number | null };
     }
   }, [csrfToken]);
 
   useEffect(() => {
-    void refreshSlotsList().then((slots) => {
-      if (slots && slots.length > 0 && currentSlot === null) {
-        void loadPuzzle({ slot: slots[0] });
+    void refreshSlotsList().then((result) => {
+      if (result && result.slots.length > 0 && currentSlot === null) {
+        const initialSlot = result.todaySlot ?? result.slots[0]!;
+        void loadPuzzle({ slot: initialSlot });
       }
     });
   }, [refreshSlotsList, loadPuzzle, currentSlot]);
@@ -230,13 +239,14 @@ export function PuzzleEditor(): React.JSX.Element {
       await adminDeletePuzzle(csrfToken, target);
       setStatusMessage(`Slotti ${target} poistettu.`);
       setStatusType('success');
-      const slots = await refreshSlotsList();
-      if (slots && slots.length > 0) {
-        await loadPuzzle({ slot: slots[0] });
+      const result = await refreshSlotsList();
+      if (result && result.slots.length > 0) {
+        await loadPuzzle({ slot: result.slots[0] });
       } else {
         setCurrentSlot(null);
         setCurrentDisplayNumber(null);
         setWords([]);
+        setWordsLetters('');
         setVariations([]);
       }
     } catch (err: unknown) {
@@ -280,6 +290,7 @@ export function PuzzleEditor(): React.JSX.Element {
         hint_data: res.hint_data,
       });
       setWords(res.words);
+      setWordsLetters(newLetters);
     } catch (err: unknown) {
       setStatusMessage(err instanceof Error ? err.message : 'Esikatselu epäonnistui');
       setStatusType('error');
@@ -288,33 +299,63 @@ export function PuzzleEditor(): React.JSX.Element {
     }
   };
 
-  const handleSaveForm = async (overrideForce = false) => {
-    if (!csrfToken || !newLetters || !newCenter) return;
+  const savePuzzlePayload = async (
+    payload: { slot?: number; letters: string; center: string; force?: boolean },
+    successMessage: (res: { slot: number; display_number: number }) => string,
+  ): Promise<void> => {
+    if (!csrfToken) return;
     setSaving(true);
     setStatusMessage(null);
     try {
-      const payload: { slot?: number; letters: string; center: string; force?: boolean } = {
-        letters: newLetters,
-        center: newCenter,
-        force: overrideForce || forceRequired,
+      const res = (await adminSavePuzzle(csrfToken, payload)) as {
+        slot: number;
+        display_number: number;
       };
-      if (typeof newSlot === 'number' && newSlot >= 0) {
-        payload.slot = newSlot;
-      }
-      const res = (await adminSavePuzzle(csrfToken, payload)) as { slot: number };
-      setStatusMessage('Peli tallennettu onnistuneesti!');
+      setStatusMessage(successMessage(res));
       setStatusType('success');
       setForceRequired(false);
       await refreshSlotsList();
       await loadPuzzle({ slot: res.slot });
     } catch (err: unknown) {
       const reqForce = (err as { requires_force?: boolean }).requires_force;
-      if (reqForce) setForceRequired(true);
+      if (reqForce) {
+        setForceRequired(true);
+        if (payload.slot === undefined) {
+          setNewLetters(payload.letters);
+          setNewCenter(payload.center);
+          setNewSlot('');
+        }
+      }
       setStatusMessage(err instanceof Error ? err.message : 'Tallennus epäonnistui');
       setStatusType('error');
+      throw err;
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSaveForm = async (overrideForce = false) => {
+    if (!newLetters || !newCenter) return;
+    const payload: { slot?: number; letters: string; center: string; force?: boolean } = {
+      letters: newLetters,
+      center: newCenter,
+      force: overrideForce || forceRequired,
+    };
+    if (typeof newSlot === 'number' && newSlot >= 0) {
+      payload.slot = newSlot;
+    }
+    await savePuzzlePayload(payload, () => 'Peli tallennettu onnistuneesti!').catch(
+      () => undefined,
+    );
+  };
+
+  const handleAddSuggestion = async (letters: string, center: string): Promise<void> => {
+    await savePuzzlePayload({ letters, center }, (res) => {
+      setNewLetters('');
+      setNewCenter('');
+      setNewSlot('');
+      return `Ehdotettu peli lisätty kiertoon (peli #${res.display_number}, slotti ${res.slot})!`;
+    });
   };
 
   const handleBlockWord = async (word: string) => {
@@ -336,36 +377,9 @@ export function PuzzleEditor(): React.JSX.Element {
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
       {statusMessage && (
-        <div
-          role="alert"
-          className="p-3 rounded-lg text-xs font-semibold flex items-center justify-between border"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderColor: 'var(--color-border)',
-            color:
-              statusType === 'error'
-                ? 'var(--color-error)'
-                : statusType === 'warning'
-                  ? 'var(--color-accent)'
-                  : 'var(--color-accent)',
-          }}
-        >
-          <span>{statusMessage}</span>
-        </div>
-      )}
-
-      {preview && (
-        <div
-          className="p-3 rounded-xl border flex flex-wrap gap-4 text-xs font-semibold"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          <span>Sanoja: {preview.hint_data.word_count}</span>
-          <span>Maksimipisteet: {preview.max_score}</span>
-          <span>Pangrammeja: {preview.hint_data.pangram_count}</span>
-        </div>
+        <AdminAlert variant={statusType ?? 'success'} role="alert">
+          {statusMessage}
+        </AdminAlert>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -373,8 +387,13 @@ export function PuzzleEditor(): React.JSX.Element {
           <PuzzleSlotControls
             currentSlot={currentSlot}
             currentDisplayNumber={currentDisplayNumber}
+            canGoFirst={activeSlots.length > 0 && currentSlot !== activeSlots[0]}
             canGoPrev={prevSlot !== null}
+            canGoToday={todaySlot !== null && currentSlot !== todaySlot}
             canGoNext={nextSlot !== null}
+            canGoLast={
+              activeSlots.length > 0 && currentSlot !== activeSlots[activeSlots.length - 1]
+            }
             totalPuzzles={totalPuzzles}
             variations={variations}
             activeCenter={activeCenter}
@@ -390,8 +409,19 @@ export function PuzzleEditor(): React.JSX.Element {
             forceRequired={forceRequired}
             onJumpTargetChange={setJumpTarget}
             onSwapTargetChange={setSwapTarget}
+            onFirst={() => {
+              if (activeSlots.length > 0) void loadPuzzle({ slot: activeSlots[0] });
+            }}
             onPrev={handlePrev}
+            onToday={() => {
+              if (todaySlot !== null) void loadPuzzle({ slot: todaySlot });
+            }}
             onNext={handleNext}
+            onLast={() => {
+              if (activeSlots.length > 0) {
+                void loadPuzzle({ slot: activeSlots[activeSlots.length - 1] });
+              }
+            }}
             onJump={handleJump}
             onSwap={handleSwap}
             onCenterSelect={handleCenterSelect}
@@ -415,7 +445,8 @@ export function PuzzleEditor(): React.JSX.Element {
 
           <SuggestionPanel
             csrfToken={csrfToken}
-            onSelectSuggestion={(sLetters, sCenter) => {
+            onAddSuggestion={handleAddSuggestion}
+            onPreviewSuggestion={(sLetters, sCenter) => {
               setNewLetters(sLetters);
               setNewCenter(sCenter);
               setNewSlot('');
@@ -429,7 +460,8 @@ export function PuzzleEditor(): React.JSX.Element {
         <div className="lg:col-span-5 flex flex-col">
           <AdminWordListPanel
             words={words}
-            letters={activeLetters || newLetters}
+            letters={wordsLetters || activeLetters || newLetters}
+            maxScore={preview?.max_score}
             loading={wordsLoading}
             onBlock={handleBlockWord}
           />

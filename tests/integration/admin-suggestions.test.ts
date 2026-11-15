@@ -144,7 +144,7 @@ describe('Admin Suggestions & Combinations (Kysely + Hono integration)', () => {
   });
 
   describe('GET /api/admin/suggestion', () => {
-    it('returns a no-spoiler suggestion skipping already used puzzles', async () => {
+    it('returns a suggestion with pangrams (no full word list) skipping already used puzzles', async () => {
       setSuggestionQualityForTesting({
         'aekmnos:a': 'good',
         'eilmors:e': 'ok',
@@ -165,32 +165,14 @@ describe('Admin Suggestions & Combinations (Kysely + Hono integration)', () => {
         quality_label: string;
         score: number;
         words?: unknown;
-        pangrams?: unknown;
+        pangrams?: string[];
       };
 
       // Used letters 'aeiklns' should NOT be suggested
       expect(suggestion.letters_key).not.toBe('aeiklns');
-      expect(suggestion.words).toBeUndefined(); // Never expose solution words
-      expect(suggestion.pangrams).toBeUndefined(); // Pangrams hidden by default
-      expect(suggestion.quality_label).toBeTruthy();
-    });
-
-    it('returns pangrams when include_pangrams=true is requested', async () => {
-      setSuggestionQualityForTesting({
-        'aekmnos:a': 'good',
-        'eilmors:e': 'ok',
-      });
-
-      const res = await harness.app.request('/api/admin/suggestion?include_pangrams=true', {
-        headers: adminHeaders(),
-      });
-      expect(res.status).toBe(200);
-
-      const suggestion = (await res.json()) as {
-        letters: string[];
-        pangrams?: string[];
-      };
+      expect(suggestion.words).toBeUndefined(); // Never expose full solution word list
       expect(Array.isArray(suggestion.pangrams)).toBe(true);
+      expect(suggestion.quality_label).toBeTruthy();
     });
 
     it('reads variations stored with Sanakenno 1.0 pangram_count key and skips declined suggestions', async () => {

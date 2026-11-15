@@ -84,11 +84,14 @@ export async function adminGetSlots(csrfToken: string) {
     headers: csrfHeaders(csrfToken),
     credentials: 'same-origin',
   });
-  if (!res.ok) return { slots: [], active_slots: [] as number[], total_puzzles: 0 };
+  if (!res.ok) {
+    return { slots: [], active_slots: [] as number[], total_puzzles: 0, today_slot: null };
+  }
   return (await res.json()) as {
     slots: Array<{ slot: number; display_number: number }>;
     active_slots?: number[];
     total_puzzles: number;
+    today_slot?: number | null;
   };
 }
 
@@ -229,14 +232,12 @@ export async function adminGetSuggestion(
     declined?: string[];
     min_words?: number;
     max_words?: number;
-    include_pangrams?: boolean;
   } = {},
 ) {
   const sp = new URLSearchParams();
   if (params.declined?.length) sp.set('declined', params.declined.join(','));
   if (params.min_words) sp.set('min_words', String(params.min_words));
   if (params.max_words) sp.set('max_words', String(params.max_words));
-  if (params.include_pangrams) sp.set('include_pangrams', 'true');
   const qs = sp.toString();
   const url = `/api/admin/suggestion${qs ? `?${qs}` : ''}`;
   const res = await fetch(url, {

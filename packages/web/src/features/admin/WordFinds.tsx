@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AdminWordFindsResponse } from '@sanakenno/shared';
 import { adminBlockWord, adminGetWordFinds } from '../../api/client.js';
+import {
+  ADMIN_CARD_CLASS,
+  ADMIN_CARD_STYLE,
+  ADMIN_TABLE_HEAD_ROW_CLASS,
+  ADMIN_TABLE_HEAD_ROW_STYLE,
+  ADMIN_TABLE_ROW_CLASS,
+  ADMIN_TABLE_WRAPPER_CLASS,
+  AdminAlert,
+  LetterTile,
+  SegmentedControl,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 
 interface WordFindsProps {
   csrfToken: string | null;
@@ -11,6 +24,7 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
   const [data, setData] = useState<AdminWordFindsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'found' | 'hardest'>('hardest');
   const [blockingWord, setBlockingWord] = useState<string | null>(null);
 
@@ -38,11 +52,13 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
     if (!csrfToken) return;
     if (!window.confirm(`Haluatko varmasti estää sanan "${word}" tulevista peleistä?`)) return;
     setBlockingWord(word);
+    setStatusMessage(null);
+    setError(null);
     try {
       await adminBlockWord(csrfToken, word);
-      alert(`Sana "${word}" estetty onnistuneesti.`);
+      setStatusMessage(`Sana "${word}" estetty onnistuneesti.`);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
+      setError(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
     } finally {
       setBlockingWord(null);
     }
@@ -64,11 +80,11 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
   }, [data, sortMode]);
 
   return (
-    <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
+    <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="font-bold text-base">Pelin löydetyt sanat</h3>
-          <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+          <h3 className="font-bold text-base tracking-tight">Pelin löydetyt sanat</h3>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
             Tarkastele ratkaistuja sanoja ja tunnista liian vaikeat tai virheelliset sanat
           </p>
         </div>
@@ -78,66 +94,43 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
             type="button"
             disabled={displayNumber <= 1 || loading}
             onClick={() => setDisplayNumber((d) => Math.max(1, d - 1))}
-            className="px-2.5 py-1.5 rounded border text-xs cursor-pointer disabled:opacity-40"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
+            className={adminButtonClass('sm')}
+            style={adminButtonStyle('secondary', 'secondary')}
           >
             ← Edellinen peli
           </button>
-          <span className="font-bold text-xs px-2">Peli #{displayNumber}</span>
+          <span className="font-bold text-xs px-2 tabular-nums">Peli #{displayNumber}</span>
           <button
             type="button"
             disabled={loading}
             onClick={() => setDisplayNumber((d) => d + 1)}
-            className="px-2.5 py-1.5 rounded border text-xs cursor-pointer disabled:opacity-40"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
+            className={adminButtonClass('sm')}
+            style={adminButtonStyle('secondary', 'secondary')}
           >
             Seuraava peli →
           </button>
         </div>
       </div>
 
-      {error && (
-        <div
-          className="p-3 rounded-lg text-xs font-medium"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-error)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {statusMessage && <AdminAlert variant="success">{statusMessage}</AdminAlert>}
+      {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
       {data && (
         <div className="space-y-4">
           <div
-            className="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-            }}
+            className={`${ADMIN_CARD_CLASS} flex flex-wrap items-center justify-between gap-4`}
+            style={ADMIN_CARD_STYLE}
           >
-            <div className="flex items-center gap-4 text-xs">
-              <div>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Kirjaimet: </span>
-                <span className="font-mono font-bold tracking-widest uppercase">
-                  {data.letters}
-                </span>
-              </div>
-              <div>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Keskus: </span>
-                <span className="font-bold uppercase" style={{ color: 'var(--color-accent)' }}>
-                  {data.center}
-                </span>
+            <div className="flex flex-wrap items-center gap-4 text-xs tabular-nums">
+              <div className="flex items-center gap-1">
+                {Array.from(data.letters).map((ch) => (
+                  <LetterTile
+                    key={ch}
+                    letter={ch}
+                    size="sm"
+                    isCenter={ch.toLowerCase() === data.center.toLowerCase()}
+                  />
+                ))}
               </div>
               <div>
                 <span style={{ color: 'var(--color-text-secondary)' }}>Löydetty: </span>
@@ -151,51 +144,21 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
               </div>
             </div>
 
-            <div
-              className="flex rounded border overflow-hidden"
-              style={{ borderColor: 'var(--color-border)' }}
-            >
-              <button
-                type="button"
-                onClick={() => setSortMode('hardest')}
-                className="px-2.5 py-1 text-xs font-medium cursor-pointer"
-                style={{
-                  backgroundColor:
-                    sortMode === 'hardest' ? 'var(--color-accent)' : 'var(--color-bg-primary)',
-                  color:
-                    sortMode === 'hardest'
-                      ? 'var(--color-bg-primary)'
-                      : 'var(--color-text-primary)',
-                }}
-              >
-                Vaikeimmat ensin
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortMode('found')}
-                className="px-2.5 py-1 text-xs font-medium cursor-pointer"
-                style={{
-                  backgroundColor:
-                    sortMode === 'found' ? 'var(--color-accent)' : 'var(--color-bg-primary)',
-                  color:
-                    sortMode === 'found' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                }}
-              >
-                Löydetyt ensin
-              </button>
-            </div>
+            <SegmentedControl
+              ariaLabel="Sanojen järjestys"
+              value={sortMode}
+              onChange={setSortMode}
+              options={[
+                { value: 'hardest', label: 'Vaikeimmat ensin' },
+                { value: 'found', label: 'Löydetyt ensin' },
+              ]}
+            />
           </div>
 
-          <div
-            className="rounded-xl border overflow-x-auto"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-            }}
-          >
-            <table className="w-full text-left text-xs border-collapse">
+          <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+            <table className="w-full text-left text-xs border-collapse tabular-nums">
               <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
                   <th className="p-3">Sana</th>
                   <th className="p-3">Pituus</th>
                   <th className="p-3 text-right">Löytökertoja</th>
@@ -206,15 +169,15 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
                 {sortedWords.map((item) => (
                   <tr
                     key={item.word}
-                    className="border-b transition-colors hover:bg-black/5"
+                    className={ADMIN_TABLE_ROW_CLASS}
                     style={{ borderColor: 'var(--color-border)' }}
                   >
-                    <td className="p-3 font-mono font-bold">{item.word}</td>
-                    <td className="p-3 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+                    <td className="p-3 font-semibold">{item.word}</td>
+                    <td className="p-3" style={{ color: 'var(--color-text-secondary)' }}>
                       {item.word.length} kirjainta
                     </td>
                     <td
-                      className="p-3 text-right font-mono font-bold"
+                      className="p-3 text-right font-bold"
                       style={{
                         color:
                           item.find_count === 0
@@ -229,12 +192,8 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
                         type="button"
                         onClick={() => handleBlock(item.word)}
                         disabled={blockingWord === item.word}
-                        className="px-2.5 py-1 rounded text-xs font-medium cursor-pointer border"
-                        style={{
-                          backgroundColor: 'var(--color-bg-primary)',
-                          color: 'var(--color-error)',
-                          borderColor: 'var(--color-border)',
-                        }}
+                        className={adminButtonClass('sm')}
+                        style={adminButtonStyle('danger')}
                       >
                         Estä sana
                       </button>

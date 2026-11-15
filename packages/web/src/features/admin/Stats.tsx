@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AdminAchievementsResponse } from '@sanakenno/shared';
 import { adminGetAchievements } from '../../api/client.js';
+import {
+  ADMIN_CARD_CLASS,
+  ADMIN_CARD_STYLE,
+  ADMIN_TABLE_HEAD_ROW_CLASS,
+  ADMIN_TABLE_HEAD_ROW_STYLE,
+  ADMIN_TABLE_ROW_CLASS,
+  ADMIN_TABLE_WRAPPER_CLASS,
+  AdminAlert,
+  AdminPageHeader,
+  SegmentedControl,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 
 interface StatsProps {
   csrfToken: string | null;
@@ -35,129 +48,75 @@ export function Stats({ csrfToken }: StatsProps): React.JSX.Element {
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold">Saavutustilastot</h2>
-          <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            Pelaajien saavuttamat tasot ajanjaksolla ({grandTotal} tapahtumaa)
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            className="flex rounded border overflow-hidden"
-            style={{ borderColor: 'var(--color-border)' }}
-          >
+      <AdminPageHeader
+        title="Saavutustilastot"
+        subtitle={`Pelaajien saavuttamat tasot ajanjaksolla (${grandTotal} tapahtumaa)`}
+        actions={
+          <>
+            <SegmentedControl
+              ariaLabel="Näyttötila"
+              value={mode}
+              onChange={setMode}
+              options={[
+                { value: 'users', label: 'Pelaajat' },
+                { value: 'all', label: 'Kaikki tapahtumat' },
+              ]}
+            />
+            <SegmentedControl
+              ariaLabel="Aikaväli"
+              value={days}
+              onChange={setDays}
+              options={[
+                { value: 7, label: '7 pv' },
+                { value: 30, label: '30 pv' },
+                { value: 90, label: '90 pv' },
+              ]}
+            />
             <button
               type="button"
-              onClick={() => setMode('users')}
-              className="px-2.5 py-1 text-xs font-medium cursor-pointer"
-              style={{
-                backgroundColor:
-                  mode === 'users' ? 'var(--color-accent)' : 'var(--color-bg-primary)',
-                color: mode === 'users' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-              }}
+              onClick={loadStats}
+              disabled={loading}
+              className={adminButtonClass('md')}
+              style={adminButtonStyle('secondary', 'secondary')}
             >
-              Pelaajat
+              {loading ? 'Päivitetään...' : 'Päivitä'}
             </button>
-            <button
-              type="button"
-              onClick={() => setMode('all')}
-              className="px-2.5 py-1 text-xs font-medium cursor-pointer"
-              style={{
-                backgroundColor: mode === 'all' ? 'var(--color-accent)' : 'var(--color-bg-primary)',
-                color: mode === 'all' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-              }}
-            >
-              Kaikki tapahtumat
-            </button>
-          </div>
+          </>
+        }
+      />
 
-          <div
-            className="flex rounded border overflow-hidden"
-            style={{ borderColor: 'var(--color-border)' }}
-          >
-            {[7, 30, 90].map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDays(d)}
-                className="px-2 py-1 text-xs font-medium cursor-pointer"
-                style={{
-                  backgroundColor: days === d ? 'var(--color-accent)' : 'var(--color-bg-primary)',
-                  color: days === d ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                }}
-              >
-                {d} pv
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={loadStats}
-            disabled={loading}
-            className="px-3 py-1 rounded text-xs border cursor-pointer"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            {loading ? 'Päivitetään...' : 'Päivitä'}
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div
-          className="p-3 rounded-lg text-xs font-medium"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-error)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
       {data && (
         <div className="space-y-4">
           <div
-            className="p-4 rounded-xl border grid grid-cols-2 sm:grid-cols-4 gap-3 text-center"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-            }}
+            className={`${ADMIN_CARD_CLASS} grid grid-cols-2 sm:grid-cols-4 gap-3 text-center`}
+            style={ADMIN_CARD_STYLE}
           >
             {Object.entries(data.totals).map(([rank, count]) => (
               <div
                 key={rank}
-                className="p-2 rounded border"
-                style={{ borderColor: 'var(--color-border)' }}
+                className="p-2.5 rounded-xl border"
+                style={{
+                  backgroundColor: 'var(--color-bg-primary)',
+                  borderColor: 'var(--color-border)',
+                }}
               >
                 <div
-                  className="text-[11px] truncate"
+                  className="text-[11px] font-medium truncate"
                   style={{ color: 'var(--color-text-secondary)' }}
                 >
                   {rank}
                 </div>
-                <div className="text-base font-bold">{count}</div>
+                <div className="text-base font-bold tabular-nums mt-0.5">{count}</div>
               </div>
             ))}
           </div>
 
-          <div
-            className="rounded-xl border overflow-x-auto"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-            }}
-          >
-            <table className="w-full text-left text-xs border-collapse">
+          <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+            <table className="w-full text-left text-xs border-collapse tabular-nums">
               <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
                   <th className="p-3">Päivämäärä</th>
                   <th className="p-3 text-right">Yhteensä</th>
                   {Object.keys(data.totals).map((rank) => (
@@ -171,20 +130,20 @@ export function Stats({ csrfToken }: StatsProps): React.JSX.Element {
                 {data.daily.map((day) => (
                   <tr
                     key={day.date}
-                    className="border-b transition-colors hover:bg-black/5"
+                    className={ADMIN_TABLE_ROW_CLASS}
                     style={{ borderColor: 'var(--color-border)' }}
                   >
-                    <td className="p-3 font-mono font-medium">{day.date}</td>
+                    <td className="p-3 font-medium whitespace-nowrap">{day.date}</td>
                     <td className="p-3 text-right font-bold">{day.total}</td>
                     {Object.keys(data.totals).map((rank) => (
                       <td
                         key={rank}
-                        className="p-3 text-right font-mono"
+                        className="p-3 text-right"
                         style={{
                           color:
                             (day.counts[rank] ?? 0) > 0
                               ? 'var(--color-text-primary)'
-                              : 'var(--color-text-secondary)',
+                              : 'var(--color-text-tertiary)',
                         }}
                       >
                         {day.counts[rank] ?? 0}

@@ -1,10 +1,30 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VariationData } from '@sanakenno/shared';
 import { AdminWordListPanel } from '../../packages/web/src/features/admin/AdminWordListPanel.js';
+import { PuzzleEditor } from '../../packages/web/src/features/admin/PuzzleEditor.js';
 import { PuzzleSlotControls } from '../../packages/web/src/features/admin/PuzzleSlotControls.js';
+import { useAdminStore } from '../../packages/web/src/features/admin/useAdminStore.js';
 import { VariationsGrid } from '../../packages/web/src/features/admin/VariationsGrid.js';
 import { WordList } from '../../packages/web/src/features/admin/WordList.js';
+
+const mockAdminGetSlots = vi.fn();
+const mockAdminGetPuzzleVariations = vi.fn();
+const mockAdminPreview = vi.fn();
+const mockAdminSavePuzzle = vi.fn();
+const mockAdminGetSuggestion = vi.fn();
+
+vi.mock('../../packages/web/src/api/client.js', () => ({
+  adminGetSlots: (...args: unknown[]) => mockAdminGetSlots(...args),
+  adminGetPuzzleVariations: (...args: unknown[]) => mockAdminGetPuzzleVariations(...args),
+  adminPreview: (...args: unknown[]) => mockAdminPreview(...args),
+  adminSavePuzzle: (...args: unknown[]) => mockAdminSavePuzzle(...args),
+  adminGetSuggestion: (...args: unknown[]) => mockAdminGetSuggestion(...args),
+  adminRejectSuggestion: vi.fn(),
+  adminDeletePuzzle: vi.fn(),
+  adminSwapPuzzles: vi.fn(),
+  adminBlockWord: vi.fn(),
+}));
 
 describe('Admin Puzzle Editor UI Components', () => {
   const sampleVariations: VariationData[] = [
@@ -58,8 +78,11 @@ describe('Admin Puzzle Editor UI Components', () => {
   });
 
   it('renders PuzzleSlotControls with navigation, jump, swap, and variations', () => {
+    const onFirst = vi.fn();
     const onPrev = vi.fn();
+    const onToday = vi.fn();
     const onNext = vi.fn();
+    const onLast = vi.fn();
     const onJump = vi.fn((e) => e.preventDefault());
     const onSwap = vi.fn();
     const onCenterSelect = vi.fn();
@@ -75,8 +98,11 @@ describe('Admin Puzzle Editor UI Components', () => {
       <PuzzleSlotControls
         currentSlot={0}
         currentDisplayNumber={1}
+        canGoFirst={false}
         canGoPrev={false}
+        canGoToday={true}
         canGoNext={true}
+        canGoLast={true}
         totalPuzzles={307}
         variations={sampleVariations}
         activeCenter="a"
@@ -92,8 +118,11 @@ describe('Admin Puzzle Editor UI Components', () => {
         forceRequired={false}
         onJumpTargetChange={vi.fn()}
         onSwapTargetChange={vi.fn()}
+        onFirst={onFirst}
         onPrev={onPrev}
+        onToday={onToday}
         onNext={onNext}
+        onLast={onLast}
         onJump={onJump}
         onSwap={onSwap}
         onCenterSelect={onCenterSelect}
@@ -114,9 +143,17 @@ describe('Admin Puzzle Editor UI Components', () => {
     expect(screen.getByText('Slotti 0')).toBeInTheDocument();
     expect(screen.getByText('Muutoksia')).toBeInTheDocument();
 
+    expect(screen.getByRole('button', { name: 'Ensimmäinen peli' })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tämän päivän peli' }));
+    expect(onToday).toHaveBeenCalled();
+
     const nextBtn = screen.getByRole('button', { name: 'Seuraava peli' });
     fireEvent.click(nextBtn);
     expect(onNext).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Viimeinen peli' }));
+    expect(onLast).toHaveBeenCalled();
 
     const saveChangesBtn = screen.getByRole('button', { name: 'Tallenna muutokset' });
     fireEvent.click(saveChangesBtn);
@@ -125,5 +162,141 @@ describe('Admin Puzzle Editor UI Components', () => {
     const undoBtn = screen.getByTitle('Kumoa muutokset');
     fireEvent.click(undoBtn);
     expect(onRestore).toHaveBeenCalled();
+  });
+
+  describe('PuzzleEditor integration', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      useAdminStore.setState({
+        isAuthenticated: true,
+        username: 'admin',
+        csrfToken: 'test-csrf',
+        isLoading: false,
+        error: null,
+      });
+    });
+
+    it('defaults to today_slot on mount, keeps pangram count accurate on suggestion preview, and saves suggestion on "Lisää peli"', async () => {
+      mockAdminGetSlots.mockResolvedValue({
+        slots: [
+          { slot: 0, display_number: 1 },
+          { slot: 5, display_number: 2 },
+          { slot: 9, display_number: 3 },
+        ],
+        active_slots: [0, 5, 9],
+        total_puzzles: 3,
+        today_slot: 5,
+      });
+
+      mockAdminGetPuzzleVariations.mockImplementation(
+        async (_token: string, params: { slot?: number }) => {
+          if (params.slot === 5) {
+            return {
+              slot: 5,
+              display_number: 2,
+              total_puzzles: 3,
+              prev_slot: 0,
+              next_slot: 9,
+              letters: ['a', 'e', 'i', 'k', 'l', 'n', 's'],
+              center: 'a',
+              variations: sampleVariations,
+              is_active: true,
+            };
+          }
+          return {
+            slot: params.slot ?? 10,
+            display_number: 4,
+            total_puzzles: 4,
+            prev_slot: 9,
+            next_slot: null,
+            letters: ['a', 'e', 'k', 'm', 'n', 'o', 's'],
+            center: 'a',
+            variations: sampleVariations,
+            is_active: true,
+          };
+        },
+      );
+
+      mockAdminPreview.mockImplementation(
+        async (_token: string, payload: { letters: string | string[] }) => {
+          const lettersStr = Array.isArray(payload.letters)
+            ? payload.letters.join(',')
+            : payload.letters;
+          if (lettersStr.includes('m')) {
+            return {
+              words: ['kaamo', 'kaamoksen'],
+              max_score: 20,
+              word_count: 2,
+              pangram_count: 1,
+              hint_data: { word_count: 2, pangram_count: 1 },
+              variations: [],
+            };
+          }
+          return {
+            words: ['kala', 'kansallinen'],
+            max_score: 20,
+            word_count: 2,
+            pangram_count: 1,
+            hint_data: { word_count: 2, pangram_count: 1 },
+            variations: [],
+          };
+        },
+      );
+
+      mockAdminGetSuggestion.mockResolvedValueOnce({
+        letters: ['a', 'e', 'k', 'm', 'n', 'o', 's'],
+        letters_key: 'aekmnos',
+        center: 'a',
+        word_count: 30,
+        pangram_count: 1,
+        max_score: 110,
+        quality_grade: 'good',
+        quality_label: 'Hyvä pangrammilaatu',
+        score: 900,
+        overlaps: {
+          previous: { slot: 9, shared_letters: 2, shared_short_words: 0 },
+          next: { slot: 0, shared_letters: 1, shared_short_words: 0 },
+        },
+        variations: [],
+        reasons: ['sanamäärä tuo vaihtelua'],
+        pangrams: ['kaamoksen'],
+      });
+
+      mockAdminSavePuzzle.mockResolvedValueOnce({
+        status: 'saved',
+        slot: 10,
+        display_number: 4,
+        total_puzzles: 4,
+      });
+
+      render(<PuzzleEditor />);
+
+      await waitFor(() => {
+        expect(mockAdminGetPuzzleVariations).toHaveBeenCalledWith('test-csrf', { slot: 5 });
+        expect(screen.getByText('Peli 2 / 3')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ehdota peliä' }));
+      await waitFor(() => {
+        expect(screen.getByText('kaamoksen')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Esikatsele ehdotus' }));
+      await waitFor(() => {
+        expect(screen.getByText('kaamo')).toBeInTheDocument();
+        expect(screen.getByText('2 sanaa, 1 pangrammia')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lisää peli' }));
+      await waitFor(() => {
+        expect(mockAdminSavePuzzle).toHaveBeenCalledWith('test-csrf', {
+          letters: 'a,e,k,m,n,o,s',
+          center: 'a',
+        });
+        expect(
+          screen.getByText('Ehdotettu peli lisätty kiertoon (peli #4, slotti 10)!'),
+        ).toBeInTheDocument();
+      });
+    });
   });
 });

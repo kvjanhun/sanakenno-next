@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AdminCombinationItem } from '@sanakenno/shared';
 import { adminGetCombinations } from '../../api/client.js';
+import {
+  ADMIN_CARD_CLASS,
+  ADMIN_CARD_STYLE,
+  ADMIN_INPUT_CLASS,
+  ADMIN_INPUT_STYLE,
+  ADMIN_TABLE_HEAD_ROW_CLASS,
+  ADMIN_TABLE_HEAD_ROW_STYLE,
+  ADMIN_TABLE_ROW_CLASS,
+  ADMIN_TABLE_WRAPPER_CLASS,
+  AdminAlert,
+  AdminPageHeader,
+  LetterTile,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 
 interface CombinationsBrowserProps {
   csrfToken: string | null;
@@ -59,40 +74,28 @@ export function CombinationsBrowser({
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold">7-kirjaimen yhdistelmät</h2>
-          <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            Etsi ja selaa esilaskettuja pangrammiyhdistelmiä ({total} kpl)
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => loadCombinations(page)}
-          disabled={loading}
-          className="px-3 py-1.5 rounded text-xs border cursor-pointer"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          {loading ? 'Päivitetään...' : 'Päivitä'}
-        </button>
-      </div>
+      <AdminPageHeader
+        title="7-kirjaimen yhdistelmät"
+        subtitle={`Etsi ja selaa esilaskettuja pangrammiyhdistelmiä (${total} kpl)`}
+        actions={
+          <button
+            type="button"
+            onClick={() => loadCombinations(page)}
+            disabled={loading}
+            className={adminButtonClass('md')}
+            style={adminButtonStyle('secondary', 'secondary')}
+          >
+            {loading ? 'Päivitetään...' : 'Päivitä'}
+          </button>
+        }
+      />
 
-      <div
-        className="p-4 rounded-xl border space-y-3"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
+      <div className={`${ADMIN_CARD_CLASS} space-y-3`} style={ADMIN_CARD_STYLE}>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div>
             <label
               htmlFor="filter-requires"
-              className="block text-xs font-semibold uppercase mb-1"
+              className="block text-[11px] font-semibold uppercase tracking-wide mb-1"
               style={{ color: 'var(--color-text-secondary)' }}
             >
               Sisältää kirjaimet
@@ -103,19 +106,15 @@ export function CombinationsBrowser({
               placeholder="esim. s,k"
               value={requires}
               onChange={(e) => setRequires(e.target.value)}
-              className="w-full px-3 py-1.5 rounded border text-sm"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
+              className={`w-full ${ADMIN_INPUT_CLASS}`}
+              style={ADMIN_INPUT_STYLE}
             />
           </div>
 
           <div>
             <label
               htmlFor="filter-excludes"
-              className="block text-xs font-semibold uppercase mb-1"
+              className="block text-[11px] font-semibold uppercase tracking-wide mb-1"
               style={{ color: 'var(--color-text-secondary)' }}
             >
               Ei sisällä
@@ -126,19 +125,15 @@ export function CombinationsBrowser({
               placeholder="esim. z,w"
               value={excludes}
               onChange={(e) => setExcludes(e.target.value)}
-              className="w-full px-3 py-1.5 rounded border text-sm"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
+              className={`w-full ${ADMIN_INPUT_CLASS}`}
+              style={ADMIN_INPUT_STYLE}
             />
           </div>
 
           <div>
             <label
               htmlFor="filter-in-rotation"
-              className="block text-xs font-semibold uppercase mb-1"
+              className="block text-[11px] font-semibold uppercase tracking-wide mb-1"
               style={{ color: 'var(--color-text-secondary)' }}
             >
               Kierrossa
@@ -147,12 +142,8 @@ export function CombinationsBrowser({
               id="filter-in-rotation"
               value={inRotation}
               onChange={(e) => setInRotation(e.target.value)}
-              className="w-full px-3 py-1.5 rounded border text-sm cursor-pointer"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
+              className={`w-full cursor-pointer ${ADMIN_INPUT_CLASS}`}
+              style={ADMIN_INPUT_STYLE}
             >
               <option value="">Kaikki</option>
               <option value="1">Kyllä</option>
@@ -163,22 +154,18 @@ export function CombinationsBrowser({
           <div>
             <label
               htmlFor="filter-sort"
-              className="block text-xs font-semibold uppercase mb-1"
+              className="block text-[11px] font-semibold uppercase tracking-wide mb-1"
               style={{ color: 'var(--color-text-secondary)' }}
             >
               Järjestys
             </label>
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               <select
                 id="filter-sort"
                 value={sort}
                 onChange={(e) => setSort(e.target.value)}
-                className="w-full px-2 py-1.5 rounded border text-xs cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--color-bg-primary)',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                }}
+                className={`w-full text-xs cursor-pointer ${ADMIN_INPUT_CLASS}`}
+                style={ADMIN_INPUT_STYLE}
               >
                 <option value="max_word_count">Sanoja (Max)</option>
                 <option value="min_word_count">Sanoja (Min)</option>
@@ -189,12 +176,9 @@ export function CombinationsBrowser({
               <button
                 type="button"
                 onClick={() => setOrder(order === 'asc' ? 'desc' : 'asc')}
-                className="px-2 py-1.5 rounded border text-xs font-bold cursor-pointer"
-                style={{
-                  backgroundColor: 'var(--color-bg-primary)',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                }}
+                aria-label={order === 'asc' ? 'Nouseva järjestys' : 'Laskeva järjestys'}
+                className={adminButtonClass('md')}
+                style={adminButtonStyle('secondary', 'primary')}
               >
                 {order === 'asc' ? '↑' : '↓'}
               </button>
@@ -203,29 +187,12 @@ export function CombinationsBrowser({
         </div>
       </div>
 
-      {error && (
-        <div
-          className="p-3 rounded-lg text-xs font-medium"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-error)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
-      <div
-        className="rounded-xl border overflow-x-auto"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
-        <table className="w-full text-left text-xs border-collapse">
+      <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+        <table className="w-full text-left text-xs border-collapse tabular-nums">
           <thead>
-            <tr className="border-b" style={{ borderColor: 'var(--color-border)' }}>
+            <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
               <th className="p-3">Kirjaimet</th>
               <th className="p-3">Pangrammit</th>
               <th className="p-3">Sanoja (Min - Max)</th>
@@ -249,27 +216,34 @@ export function CombinationsBrowser({
               combinations.map((c) => (
                 <tr
                   key={c.letters}
-                  className="border-b transition-colors hover:bg-black/5"
+                  className={ADMIN_TABLE_ROW_CLASS}
                   style={{ borderColor: 'var(--color-border)' }}
                 >
-                  <td className="p-3 font-mono font-bold tracking-widest uppercase">{c.letters}</td>
-                  <td className="p-3">{c.total_pangrams}</td>
-                  <td className="p-3 font-mono">
+                  <td className="p-3">
+                    <div className="flex items-center gap-1">
+                      {Array.from(c.letters).map((ch) => (
+                        <LetterTile key={ch} letter={ch} size="sm" />
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-3 font-medium">{c.total_pangrams}</td>
+                  <td className="p-3">
                     {c.min_word_count} - {c.max_word_count}
                   </td>
-                  <td className="p-3 font-mono">
+                  <td className="p-3">
                     {c.min_max_score} - {c.max_max_score}
                   </td>
                   <td className="p-3">
                     <span
-                      className="px-2 py-0.5 rounded text-[10px] font-bold"
+                      className="px-2 py-0.5 rounded-full text-[11px] font-semibold border"
                       style={{
                         backgroundColor: c.in_rotation
                           ? 'var(--color-accent)'
                           : 'var(--color-bg-primary)',
                         color: c.in_rotation
-                          ? 'var(--color-bg-primary)'
+                          ? 'var(--color-on-accent)'
                           : 'var(--color-text-secondary)',
+                        borderColor: c.in_rotation ? 'var(--color-accent)' : 'var(--color-border)',
                       }}
                     >
                       {c.in_rotation ? 'Kyllä' : 'Ei'}
@@ -280,11 +254,8 @@ export function CombinationsBrowser({
                       <button
                         type="button"
                         onClick={() => onSelectLetters(Array.from(c.letters).join(','))}
-                        className="px-2.5 py-1 rounded text-[11px] font-semibold cursor-pointer"
-                        style={{
-                          backgroundColor: 'var(--color-accent)',
-                          color: 'var(--color-bg-primary)',
-                        }}
+                        className={adminButtonClass('sm')}
+                        style={adminButtonStyle('primary')}
                       >
                         Valitse
                       </button>
@@ -298,8 +269,8 @@ export function CombinationsBrowser({
       </div>
 
       {pages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        <div className="flex items-center justify-between pt-1">
+          <div className="text-xs tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
             Sivu {page} / {pages} (Yhteensä {total} kpl)
           </div>
           <div className="flex gap-2">
@@ -307,12 +278,8 @@ export function CombinationsBrowser({
               type="button"
               disabled={page <= 1 || loading}
               onClick={() => loadCombinations(page - 1)}
-              className="px-3 py-1.5 rounded border text-xs cursor-pointer disabled:opacity-40"
-              style={{
-                backgroundColor: 'var(--color-bg-secondary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
+              className={adminButtonClass('md')}
+              style={adminButtonStyle('secondary', 'secondary')}
             >
               Edellinen
             </button>
@@ -320,12 +287,8 @@ export function CombinationsBrowser({
               type="button"
               disabled={page >= pages || loading}
               onClick={() => loadCombinations(page + 1)}
-              className="px-3 py-1.5 rounded border text-xs cursor-pointer disabled:opacity-40"
-              style={{
-                backgroundColor: 'var(--color-bg-secondary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
+              className={adminButtonClass('md')}
+              style={adminButtonStyle('secondary', 'secondary')}
             >
               Seuraava
             </button>

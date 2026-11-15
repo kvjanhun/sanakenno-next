@@ -244,11 +244,15 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
     .get('/puzzle/slots', async (c) => {
       const slots = await getActiveSlots(db);
       const total = await totalPuzzles(db);
+      const todaySlot = await getPuzzleSlotForDate(db);
       const mapped = slots.map((slot, index) => ({
         slot,
         display_number: index + 1,
       }));
-      return c.json({ slots: mapped, active_slots: slots, total_puzzles: total }, 200);
+      return c.json(
+        { slots: mapped, active_slots: slots, total_puzzles: total, today_slot: todaySlot },
+        200,
+      );
     })
     .get('/puzzle/variations', async (c) => {
       const slotStr = c.req.query('slot');

@@ -1,13 +1,24 @@
 import type { FormEvent } from 'react';
 import type { VariationData } from '@sanakenno/shared';
+import {
+  ADMIN_CARD_CLASS,
+  ADMIN_CARD_STYLE,
+  ADMIN_INPUT_CLASS,
+  ADMIN_INPUT_STYLE,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 import { ManualPuzzleForm } from './ManualPuzzleForm.js';
 import { VariationsGrid } from './VariationsGrid.js';
 
 interface PuzzleSlotControlsProps {
   currentSlot: number | null;
   currentDisplayNumber: number | null;
+  canGoFirst?: boolean;
   canGoPrev: boolean;
+  canGoToday?: boolean;
   canGoNext: boolean;
+  canGoLast?: boolean;
   totalPuzzles: number;
   variations: VariationData[];
   activeCenter: string;
@@ -23,8 +34,11 @@ interface PuzzleSlotControlsProps {
   forceRequired: boolean;
   onJumpTargetChange: (val: string) => void;
   onSwapTargetChange: (val: string) => void;
+  onFirst?: () => void;
   onPrev: () => void;
+  onToday?: () => void;
   onNext: () => void;
+  onLast?: () => void;
   onJump: (e: FormEvent) => void;
   onSwap: () => void;
   onCenterSelect: (center: string) => void;
@@ -40,11 +54,17 @@ interface PuzzleSlotControlsProps {
   onCreateForm: (force?: boolean) => void;
 }
 
+const navButtonClass =
+  'px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer border-none transition-colors disabled:opacity-35 disabled:cursor-not-allowed';
+
 export function PuzzleSlotControls({
   currentSlot,
   currentDisplayNumber,
+  canGoFirst = false,
   canGoPrev,
+  canGoToday = false,
   canGoNext,
+  canGoLast = false,
   totalPuzzles,
   variations,
   activeCenter,
@@ -60,8 +80,11 @@ export function PuzzleSlotControls({
   forceRequired,
   onJumpTargetChange,
   onSwapTargetChange,
+  onFirst,
   onPrev,
+  onToday,
   onNext,
+  onLast,
   onJump,
   onSwap,
   onCenterSelect,
@@ -77,24 +100,28 @@ export function PuzzleSlotControls({
   onCreateForm,
 }: PuzzleSlotControlsProps): React.JSX.Element {
   return (
-    <div
-      className="p-5 rounded-2xl border space-y-5"
-      style={{
-        backgroundColor: 'var(--color-bg-secondary)',
-        borderColor: 'var(--color-border)',
-      }}
-    >
+    <div className={`${ADMIN_CARD_CLASS} space-y-5`} style={ADMIN_CARD_STYLE}>
       <div
         className="flex flex-wrap items-center justify-between gap-3 border-b pb-4"
         style={{ borderColor: 'var(--color-border)' }}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-400 font-bold text-sm">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm tabular-nums border"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--color-accent) 14%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--color-accent) 30%, transparent)',
+              color: 'var(--color-accent)',
+            }}
+          >
             {currentDisplayNumber ?? '#'}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold" style={{ color: 'var(--color-text-primary)' }}>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2
+                className="text-base font-bold tracking-tight"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
                 {currentDisplayNumber !== null
                   ? `Peli ${currentDisplayNumber} / ${totalPuzzles}`
                   : currentSlot !== null
@@ -103,10 +130,10 @@ export function PuzzleSlotControls({
               </h2>
               {isDirty && (
                 <span
-                  className="px-2 py-0.5 rounded text-xs font-semibold"
+                  className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
                   style={{
                     backgroundColor: 'var(--color-accent)',
-                    color: 'var(--color-bg-primary)',
+                    color: 'var(--color-on-accent)',
                   }}
                 >
                   Muutoksia
@@ -114,148 +141,167 @@ export function PuzzleSlotControls({
               )}
               {!isActive && currentSlot !== null && (
                 <span
-                  className="px-2 py-0.5 rounded text-xs font-semibold"
-                  style={{
-                    backgroundColor: 'var(--color-error)',
-                    color: 'var(--color-bg-primary)',
-                  }}
+                  className="px-2 py-0.5 rounded-full text-[11px] font-semibold border"
+                  style={adminButtonStyle('danger')}
                 >
                   Poistettu kierrosta
                 </span>
               )}
             </div>
             {currentSlot !== null && (
-              <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              <span
+                className="text-xs tabular-nums"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
                 Slotti {currentSlot}
               </span>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onToggleCreateMode}
+          className={adminButtonClass('md')}
+          style={adminButtonStyle('secondary', 'primary')}
+        >
+          + Uusi peli
+        </button>
+      </div>
+
+      <div
+        className="flex flex-wrap items-center gap-1 p-1 rounded-xl border w-fit max-w-full"
+        style={{
+          backgroundColor: 'var(--color-bg-primary)',
+          borderColor: 'var(--color-border)',
+        }}
+      >
+        {onFirst && (
           <button
             type="button"
-            onClick={onPrev}
-            disabled={!canGoPrev || loading}
-            aria-label="Edellinen peli"
-            className="px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer disabled:opacity-40"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
+            onClick={onFirst}
+            disabled={!canGoFirst || loading}
+            aria-label="Ensimmäinen peli"
+            title="Ensimmäinen peli"
+            className={navButtonClass}
+            style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
           >
-            ← Edellinen
+            |← Ensimmäinen
           </button>
+        )}
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={!canGoPrev || loading}
+          aria-label="Edellinen peli"
+          className={navButtonClass}
+          style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
+        >
+          ← Edellinen
+        </button>
+        {onToday && (
           <button
             type="button"
-            onClick={onNext}
-            disabled={!canGoNext || loading}
-            aria-label="Seuraava peli"
-            className="px-3 py-1.5 rounded-lg border text-xs font-medium cursor-pointer disabled:opacity-40"
+            onClick={onToday}
+            disabled={!canGoToday || loading}
+            aria-label="Tämän päivän peli"
+            title="Tämän päivän peli"
+            className={`${navButtonClass} font-semibold`}
             style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
+              backgroundColor: 'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+              color: 'var(--color-accent)',
             }}
           >
-            Seuraava →
+            Tänään
           </button>
+        )}
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={!canGoNext || loading}
+          aria-label="Seuraava peli"
+          className={navButtonClass}
+          style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
+        >
+          Seuraava →
+        </button>
+        {onLast && (
           <button
             type="button"
-            onClick={onToggleCreateMode}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ml-1"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              color: 'var(--color-text-primary)',
-              borderColor: 'var(--color-border)',
-            }}
+            onClick={onLast}
+            disabled={!canGoLast || loading}
+            aria-label="Viimeinen peli"
+            title="Viimeinen peli"
+            className={navButtonClass}
+            style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
           >
-            + Uusi peli
+            Viimeinen →|
           </button>
-        </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-        <form onSubmit={onJump} className="flex items-center gap-1.5">
-          <label htmlFor="jump-input" style={{ color: 'var(--color-text-secondary)' }}>
-            Siirry:
-          </label>
-          <input
-            id="jump-input"
-            aria-label="Siirry pelinumeroon"
-            type="number"
-            min={1}
-            max={totalPuzzles || 9999}
-            placeholder="#"
-            value={jumpTarget}
-            onChange={(e) => onJumpTargetChange(e.target.value)}
-            className="w-16 px-2 py-1 rounded border text-center font-mono"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          />
-          <button
-            type="submit"
-            className="px-2.5 py-1 rounded border font-medium cursor-pointer"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            Siirry
-          </button>
-        </form>
+        <div className="flex flex-wrap items-center gap-3">
+          <form onSubmit={onJump} className="flex items-center gap-1.5">
+            <label htmlFor="jump-input" style={{ color: 'var(--color-text-secondary)' }}>
+              Siirry:
+            </label>
+            <input
+              id="jump-input"
+              aria-label="Siirry pelinumeroon"
+              type="number"
+              min={1}
+              max={totalPuzzles || 9999}
+              placeholder="#"
+              value={jumpTarget}
+              onChange={(e) => onJumpTargetChange(e.target.value)}
+              className={`w-16 text-center tabular-nums py-1 ${ADMIN_INPUT_CLASS}`}
+              style={ADMIN_INPUT_STYLE}
+            />
+            <button
+              type="submit"
+              className={adminButtonClass('sm')}
+              style={adminButtonStyle('secondary', 'primary')}
+            >
+              Siirry
+            </button>
+          </form>
 
-        <div className="flex items-center gap-1.5">
-          <label htmlFor="swap-input" style={{ color: 'var(--color-text-secondary)' }}>
-            Vaihda pelin #:
-          </label>
-          <input
-            id="swap-input"
-            type="number"
-            min={1}
-            max={totalPuzzles || 9999}
-            placeholder="#"
-            value={swapTarget}
-            onChange={(e) => onSwapTargetChange(e.target.value)}
-            className="w-16 px-2 py-1 rounded border text-center font-mono"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          />
-          <button
-            type="button"
-            onClick={onSwap}
-            disabled={!swapTarget || loading}
-            className="px-2.5 py-1 rounded border font-medium cursor-pointer disabled:opacity-40"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            Vaihda
-          </button>
+          <div className="flex items-center gap-1.5">
+            <label htmlFor="swap-input" style={{ color: 'var(--color-text-secondary)' }}>
+              Vaihda pelin #:
+            </label>
+            <input
+              id="swap-input"
+              type="number"
+              min={1}
+              max={totalPuzzles || 9999}
+              placeholder="#"
+              value={swapTarget}
+              onChange={(e) => onSwapTargetChange(e.target.value)}
+              className={`w-16 text-center tabular-nums py-1 ${ADMIN_INPUT_CLASS}`}
+              style={ADMIN_INPUT_STYLE}
+            />
+            <button
+              type="button"
+              onClick={onSwap}
+              disabled={!swapTarget || loading}
+              className={adminButtonClass('sm')}
+              style={adminButtonStyle('secondary', 'primary')}
+            >
+              Vaihda
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isDirty && (
             <button
               type="button"
               onClick={onRestore}
               title="Kumoa muutokset"
-              className="px-3 py-1 rounded border text-xs font-medium cursor-pointer"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
+              className={adminButtonClass('sm')}
+              style={adminButtonStyle('secondary', 'primary')}
             >
               Kumoa muutokset
             </button>
@@ -265,11 +311,8 @@ export function PuzzleSlotControls({
             type="button"
             onClick={onSave}
             disabled={!isDirty || saving}
-            className="px-3 py-1 rounded text-xs font-semibold cursor-pointer disabled:opacity-40"
-            style={{
-              backgroundColor: 'var(--color-accent)',
-              color: 'var(--color-bg-primary)',
-            }}
+            className={adminButtonClass('sm')}
+            style={adminButtonStyle('primary')}
           >
             Tallenna muutokset
           </button>
@@ -280,11 +323,8 @@ export function PuzzleSlotControls({
                 type="button"
                 onClick={onDelete}
                 disabled={saving}
-                className="px-3 py-1 rounded text-xs font-medium cursor-pointer disabled:opacity-40"
-                style={{
-                  backgroundColor: 'var(--color-error)',
-                  color: 'var(--color-bg-primary)',
-                }}
+                className={adminButtonClass('sm')}
+                style={adminButtonStyle('danger')}
               >
                 Poista kierrosta
               </button>
@@ -293,11 +333,8 @@ export function PuzzleSlotControls({
                 type="button"
                 onClick={onReactivate}
                 disabled={saving}
-                className="px-3 py-1 rounded text-xs font-semibold cursor-pointer disabled:opacity-40"
-                style={{
-                  backgroundColor: 'var(--color-accent)',
-                  color: 'var(--color-bg-primary)',
-                }}
+                className={adminButtonClass('sm')}
+                style={adminButtonStyle('primary')}
               >
                 Palauta kiertoon
               </button>
@@ -307,10 +344,10 @@ export function PuzzleSlotControls({
 
       <div className="space-y-2">
         <span
-          className="text-xs font-semibold uppercase tracking-wider"
+          className="block text-[11px] font-semibold uppercase tracking-wider"
           style={{ color: 'var(--color-text-secondary)' }}
         >
-          Keskuskirjaimen variaatiot (klikkaa vaihtaaksesi):
+          Keskuskirjaimen variaatiot (klikkaa vaihtaaksesi)
         </span>
         <VariationsGrid
           variations={variations}
@@ -319,7 +356,7 @@ export function PuzzleSlotControls({
         />
       </div>
 
-      <div className="pt-2">
+      <div className="pt-1">
         <ManualPuzzleForm
           newLetters={newLetters}
           newCenter={newCenter}

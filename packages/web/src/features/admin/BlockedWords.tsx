@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { adminBlockWord, adminGetBlocked, adminUnblockWord } from '../../api/client.js';
+import {
+  ADMIN_CARD_CLASS,
+  ADMIN_CARD_STYLE,
+  ADMIN_INPUT_CLASS,
+  ADMIN_INPUT_STYLE,
+  AdminAlert,
+  AdminPageHeader,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
 import { useAdminStore } from './useAdminStore.js';
 
 export function BlockedWords(): React.JSX.Element {
@@ -57,82 +67,53 @@ export function BlockedWords(): React.JSX.Element {
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold">Estetyt sanat</h2>
-        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-          Yhteensä: {blocked.length} sanaa
-        </span>
-      </div>
+      <AdminPageHeader title="Estetyt sanat" subtitle={`Yhteensä: ${blocked.length} sanaa`} />
 
-      {error && (
-        <div
-          className="p-3 rounded-lg text-xs font-medium"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            color: 'var(--color-error)',
-            borderColor: 'var(--color-border)',
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
       <form
         onSubmit={handleBlock}
-        className="p-4 rounded-xl border flex gap-3 items-center"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
+        className={`${ADMIN_CARD_CLASS} flex gap-3 items-center`}
+        style={ADMIN_CARD_STYLE}
       >
         <input
           type="text"
           placeholder="Estä uusi sana..."
           value={newWord}
           onChange={(e) => setNewWord(e.target.value)}
-          className="flex-1 px-3 py-1.5 rounded border text-sm"
-          style={{
-            backgroundColor: 'var(--color-bg-primary)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
+          className={`flex-1 ${ADMIN_INPUT_CLASS}`}
+          style={ADMIN_INPUT_STYLE}
         />
         <button
           type="submit"
           disabled={loading || !newWord.trim()}
-          className="px-4 py-1.5 rounded text-xs font-semibold cursor-pointer disabled:opacity-50"
-          style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-bg-primary)' }}
+          className={adminButtonClass('md')}
+          style={adminButtonStyle('primary')}
         >
           Estä sana
         </button>
       </form>
 
-      <div
-        className="p-4 rounded-xl border space-y-2"
-        style={{
-          backgroundColor: 'var(--color-bg-secondary)',
-          borderColor: 'var(--color-border)',
-        }}
-      >
+      <div className={ADMIN_CARD_CLASS} style={ADMIN_CARD_STYLE}>
         {blocked.length === 0 ? (
           <p className="text-xs italic" style={{ color: 'var(--color-text-secondary)' }}>
             Ei vielä estettyjä sanoja.
           </p>
         ) : (
-          <div className="divide-y" style={{ borderColor: 'var(--color-border)' }}>
+          <div>
             {blocked.map((item) => (
-              <div key={item.id} className="py-2 flex justify-between items-center">
-                <span className="font-mono text-sm">{item.word}</span>
+              <div
+                key={item.id}
+                className="py-2.5 flex justify-between items-center border-b last:border-b-0"
+                style={{ borderColor: 'var(--color-border)' }}
+              >
+                <span className="text-sm font-medium">{item.word}</span>
                 <button
                   type="button"
                   onClick={() => handleUnblock(item.id)}
                   disabled={loading}
-                  className="px-2.5 py-1 rounded text-xs font-medium cursor-pointer border"
-                  style={{
-                    backgroundColor: 'var(--color-bg-primary)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-error)',
-                  }}
+                  className={adminButtonClass('sm')}
+                  style={adminButtonStyle('danger')}
                 >
                   Poista esto
                 </button>

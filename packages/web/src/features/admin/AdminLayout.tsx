@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { ThemeToggle } from '../theme/ThemeToggle.js';
+import { usePaletteStore } from '../theme/usePaletteStore.js';
+import { adminButtonClass, adminButtonStyle } from './AdminPrimitives.js';
 import { BlockedWords } from './BlockedWords.js';
 import { CombinationsBrowser } from './CombinationsBrowser.js';
 import { LoginPage } from './LoginPage.js';
@@ -12,8 +15,19 @@ import { WordData } from './WordData.js';
 type Tab =
   'editor' | 'schedule' | 'blocked' | 'combinations' | 'rejected' | 'analytics' | 'worddata';
 
+const ADMIN_TABS: readonly { id: Tab; label: string }[] = [
+  { id: 'editor', label: 'Puzzlet' },
+  { id: 'schedule', label: 'Aikataulu' },
+  { id: 'blocked', label: 'Estetyt sanat' },
+  { id: 'combinations', label: 'Yhdistelmät' },
+  { id: 'rejected', label: 'Hylätyt' },
+  { id: 'analytics', label: 'Tilastot' },
+  { id: 'worddata', label: 'Sanadata' },
+];
+
 export function AdminLayout(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('editor');
+  usePaletteStore((s) => s.themeId);
   const isAuthenticated = useAdminStore((s) => s.isAuthenticated);
   const isLoading = useAdminStore((s) => s.isLoading);
   const username = useAdminStore((s) => s.username);
@@ -28,7 +42,7 @@ export function AdminLayout(): React.JSX.Element {
   if (isLoading) {
     return (
       <div
-        className="min-h-screen flex items-center justify-center p-4 text-sm font-medium"
+        className="min-h-screen flex items-center justify-center p-4 text-sm font-medium select-text"
         style={{ backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-text-secondary)' }}
       >
         Tarkistetaan istuntoa...
@@ -42,138 +56,100 @@ export function AdminLayout(): React.JSX.Element {
 
   return (
     <div
-      className="min-h-screen"
+      className="min-h-screen select-text"
       style={{ backgroundColor: 'var(--color-bg-primary)', color: 'var(--color-text-primary)' }}
     >
       <header
-        className="border-b"
+        className="sticky top-0 z-30 border-b"
         style={{
-          backgroundColor: 'var(--color-bg-secondary)',
+          backgroundColor: 'var(--color-bg-primary)',
           borderColor: 'var(--color-border)',
         }}
       >
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <span className="font-bold text-sm tracking-tight">Sanakenno Admin</span>
-            <nav className="flex gap-2 text-xs font-medium">
-              <button
-                type="button"
-                onClick={() => setTab('editor')}
-                className="px-3 py-1.5 rounded cursor-pointer transition-colors"
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="h-14 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span
+                className="text-lg font-semibold tracking-tight whitespace-nowrap"
+                style={{ fontFamily: 'var(--font-game)', color: 'var(--color-text-primary)' }}
+              >
+                Sanakenno
+                <span style={{ color: 'var(--color-accent)', fontWeight: 800 }}>.</span>
+                <span style={{ fontWeight: 300 }}>fi</span>
+              </span>
+              <span
+                className="px-2 py-0.5 rounded-full text-[11px] font-semibold"
                 style={{
-                  backgroundColor: tab === 'editor' ? 'var(--color-accent)' : 'transparent',
-                  color: tab === 'editor' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
+                  backgroundColor: 'color-mix(in srgb, var(--color-accent) 14%, transparent)',
+                  color: 'var(--color-accent)',
                 }}
               >
-                Puzzlet
-              </button>
+                Admin
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {username && (
+                <span
+                  className="hidden sm:inline text-xs font-medium mr-1"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  {username}
+                </span>
+              )}
+              <ThemeToggle />
+              <a
+                href="#/"
+                className={`${adminButtonClass('sm')} no-underline`}
+                style={adminButtonStyle('secondary', 'secondary')}
+              >
+                Peliin
+              </a>
               <button
                 type="button"
-                onClick={() => setTab('schedule')}
-                className="px-3 py-1.5 rounded cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: tab === 'schedule' ? 'var(--color-accent)' : 'transparent',
-                  color:
-                    tab === 'schedule' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                }}
+                onClick={() => void logout()}
+                className={adminButtonClass('sm')}
+                style={adminButtonStyle('danger')}
               >
-                Aikataulu
+                Kirjaudu ulos
               </button>
-              <button
-                type="button"
-                onClick={() => setTab('blocked')}
-                className="px-3 py-1.5 rounded cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: tab === 'blocked' ? 'var(--color-accent)' : 'transparent',
-                  color:
-                    tab === 'blocked' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                }}
-              >
-                Estetyt sanat
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('combinations')}
-                className="px-3 py-1.5 rounded cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: tab === 'combinations' ? 'var(--color-accent)' : 'transparent',
-                  color:
-                    tab === 'combinations'
-                      ? 'var(--color-bg-primary)'
-                      : 'var(--color-text-primary)',
-                }}
-              >
-                Yhdistelmät
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('rejected')}
-                className="px-3 py-1.5 rounded cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: tab === 'rejected' ? 'var(--color-accent)' : 'transparent',
-                  color:
-                    tab === 'rejected' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                }}
-              >
-                Hylätyt
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('analytics')}
-                className="px-3 py-1.5 rounded cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: tab === 'analytics' ? 'var(--color-accent)' : 'transparent',
-                  color:
-                    tab === 'analytics' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                }}
-              >
-                Tilastot
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('worddata')}
-                className="px-3 py-1.5 rounded cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: tab === 'worddata' ? 'var(--color-accent)' : 'transparent',
-                  color:
-                    tab === 'worddata' ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                }}
-              >
-                Sanadata
-              </button>
-            </nav>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
-            <span style={{ color: 'var(--color-text-secondary)' }}>{username}</span>
-            <a
-              href="#/"
-              className="px-2.5 py-1 rounded border cursor-pointer"
+          <nav aria-label="Ylläpidon osiot" className="pb-3">
+            <div
+              role="tablist"
+              className="flex items-center gap-1 overflow-x-auto scrollbar-none p-1 rounded-xl border"
               style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                borderColor: 'var(--color-border)',
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              Peliin
-            </a>
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className="px-2.5 py-1 rounded cursor-pointer font-medium"
-              style={{
-                backgroundColor: 'var(--color-bg-primary)',
-                color: 'var(--color-error)',
+                backgroundColor: 'var(--color-bg-secondary)',
                 borderColor: 'var(--color-border)',
               }}
             >
-              Kirjaudu ulos
-            </button>
-          </div>
+              {ADMIN_TABS.map((item) => {
+                const active = tab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(item.id)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer border-none transition-all"
+                    style={{
+                      backgroundColor: active ? 'var(--color-accent)' : 'transparent',
+                      color: active ? 'var(--color-on-accent)' : 'var(--color-text-secondary)',
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-4 sm:p-6">
+      <main className="max-w-5xl mx-auto p-4 sm:p-6">
         {tab === 'editor' && <PuzzleEditor />}
         {tab === 'schedule' && <Schedule />}
         {tab === 'blocked' && <BlockedWords />}

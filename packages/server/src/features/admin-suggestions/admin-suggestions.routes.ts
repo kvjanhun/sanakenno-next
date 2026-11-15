@@ -89,15 +89,11 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
 
       const minWords = q.min_words ? Number(q.min_words) : undefined;
       const maxWords = q.max_words ? Number(q.max_words) : undefined;
-      const includePangrams = ['1', 'true', 'yes'].includes(
-        (q.include_pangrams ?? '').toLowerCase(),
-      );
 
       const suggestion = await suggestPuzzle(db, {
         declined: allDeclined,
         minWords,
         maxWords,
-        includePangrams,
       });
 
       if (!suggestion) {

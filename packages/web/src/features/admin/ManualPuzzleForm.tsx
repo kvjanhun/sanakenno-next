@@ -1,3 +1,11 @@
+import {
+  ADMIN_INPUT_CLASS,
+  ADMIN_SUBCARD_CLASS,
+  ADMIN_SUBCARD_STYLE,
+  adminButtonClass,
+  adminButtonStyle,
+} from './AdminPrimitives.js';
+
 interface ManualPuzzleFormProps {
   newLetters: string;
   newCenter: string;
@@ -11,6 +19,12 @@ interface ManualPuzzleFormProps {
   onCreate: (force?: boolean) => void;
   onDelete?: () => void;
 }
+
+const fieldStyle = {
+  backgroundColor: 'var(--color-bg-secondary)',
+  borderColor: 'var(--color-border)',
+  color: 'var(--color-text-primary)',
+};
 
 export function ManualPuzzleForm({
   newLetters,
@@ -28,18 +42,15 @@ export function ManualPuzzleForm({
   const letterChars = Array.from(new Set(newLetters.toLowerCase().replace(/[^a-zåäö]/g, '')));
 
   return (
-    <div
-      className="p-4 rounded-xl border space-y-4"
-      style={{
-        backgroundColor: 'var(--color-bg-primary)',
-        borderColor: 'var(--color-border)',
-      }}
-    >
+    <div className={`${ADMIN_SUBCARD_CLASS} space-y-4`} style={ADMIN_SUBCARD_STYLE}>
       <div className="flex justify-between items-center">
         <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
           Luo tai muokkaa peliä käsin
         </h3>
-        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        <span
+          className="text-xs font-medium tabular-nums"
+          style={{ color: 'var(--color-text-secondary)' }}
+        >
           {letterChars.length}/7 kirjainta
         </span>
       </div>
@@ -48,7 +59,7 @@ export function ManualPuzzleForm({
         <div>
           <label
             htmlFor="puzzle-slot"
-            className="block text-xs font-semibold uppercase mb-1"
+            className="block text-[11px] font-semibold uppercase tracking-wide mb-1"
             style={{ color: 'var(--color-text-secondary)' }}
           >
             Slotti (Valinnainen)
@@ -59,19 +70,15 @@ export function ManualPuzzleForm({
             placeholder="Uusi slotti"
             value={newSlot}
             onChange={(e) => onSlotChange(e.target.value ? Number(e.target.value) : '')}
-            className="w-full px-3 py-1.5 rounded border text-sm"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
+            className={`w-full tabular-nums ${ADMIN_INPUT_CLASS}`}
+            style={fieldStyle}
           />
         </div>
 
         <div>
           <label
             htmlFor="puzzle-letters"
-            className="block text-xs font-semibold uppercase mb-1"
+            className="block text-[11px] font-semibold uppercase tracking-wide mb-1"
             style={{ color: 'var(--color-text-secondary)' }}
           >
             Kirjaimet (7 kpl)
@@ -82,19 +89,15 @@ export function ManualPuzzleForm({
             placeholder="esim. a,e,i,k,l,n,s"
             value={newLetters}
             onChange={(e) => onLettersChange(e.target.value)}
-            className="w-full px-3 py-1.5 rounded border text-sm font-mono"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
+            className={`w-full ${ADMIN_INPUT_CLASS}`}
+            style={fieldStyle}
           />
         </div>
 
         <div>
           <label
             htmlFor="puzzle-center"
-            className="block text-xs font-semibold uppercase mb-1"
+            className="block text-[11px] font-semibold uppercase tracking-wide mb-1"
             style={{ color: 'var(--color-text-secondary)' }}
           >
             Keskuskirjain
@@ -106,38 +109,40 @@ export function ManualPuzzleForm({
             placeholder="Keskus"
             value={newCenter}
             onChange={(e) => onCenterChange(e.target.value.toLowerCase())}
-            className="w-full px-3 py-1.5 rounded border text-sm font-mono text-center uppercase"
-            style={{
-              backgroundColor: 'var(--color-bg-secondary)',
-              borderColor: 'var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
+            className={`w-full text-center font-bold uppercase ${ADMIN_INPUT_CLASS}`}
+            style={{ ...fieldStyle, fontFamily: 'var(--font-game)' }}
           />
         </div>
       </div>
 
       {letterChars.length === 7 && (
-        <div className="space-y-1">
-          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+        <div className="space-y-1.5">
+          <span
+            className="block text-xs font-medium"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
             Valitse keskuskirjain:
           </span>
-          <div className="flex gap-1.5">
-            {letterChars.map((ch) => (
-              <button
-                key={ch}
-                type="button"
-                onClick={() => onCenterChange(ch)}
-                className="w-8 h-8 rounded text-xs font-bold uppercase cursor-pointer border transition-colors"
-                style={{
-                  backgroundColor:
-                    newCenter === ch ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
-                  color: newCenter === ch ? 'var(--color-bg-primary)' : 'var(--color-text-primary)',
-                  borderColor: 'var(--color-border)',
-                }}
-              >
-                {ch}
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-1.5">
+            {letterChars.map((ch) => {
+              const selected = newCenter === ch;
+              return (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => onCenterChange(ch)}
+                  className="w-8 h-8 rounded-lg text-xs font-bold uppercase cursor-pointer border transition-all"
+                  style={{
+                    fontFamily: 'var(--font-game)',
+                    backgroundColor: selected ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
+                    color: selected ? 'var(--color-on-accent)' : 'var(--color-text-primary)',
+                    borderColor: selected ? 'var(--color-accent)' : 'var(--color-border)',
+                  }}
+                >
+                  {ch}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -147,12 +152,8 @@ export function ManualPuzzleForm({
           type="button"
           onClick={onPreview}
           disabled={saving || letterChars.length !== 7 || !newCenter}
-          className="px-4 py-1.5 rounded text-xs font-medium cursor-pointer disabled:opacity-50 border"
-          style={{
-            backgroundColor: 'var(--color-bg-secondary)',
-            borderColor: 'var(--color-border)',
-            color: 'var(--color-text-primary)',
-          }}
+          className={adminButtonClass('md')}
+          style={adminButtonStyle('secondary', 'secondary')}
         >
           Esikatsele
         </button>
@@ -161,11 +162,8 @@ export function ManualPuzzleForm({
           type="button"
           onClick={() => onCreate(false)}
           disabled={saving || letterChars.length !== 7 || !newCenter}
-          className="px-4 py-1.5 rounded text-xs font-semibold cursor-pointer disabled:opacity-50"
-          style={{
-            backgroundColor: 'var(--color-accent)',
-            color: 'var(--color-bg-primary)',
-          }}
+          className={adminButtonClass('md')}
+          style={adminButtonStyle('primary')}
         >
           Tallenna peli
         </button>
@@ -175,11 +173,8 @@ export function ManualPuzzleForm({
             type="button"
             onClick={() => onCreate(true)}
             disabled={saving}
-            className="px-3 py-1.5 rounded text-xs font-semibold cursor-pointer"
-            style={{
-              backgroundColor: 'var(--color-accent)',
-              color: 'var(--color-bg-primary)',
-            }}
+            className={adminButtonClass('md')}
+            style={adminButtonStyle('primary')}
           >
             Luo silti (Ohita varoitus)
           </button>
@@ -190,11 +185,8 @@ export function ManualPuzzleForm({
             type="button"
             onClick={onDelete}
             disabled={saving}
-            className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer disabled:opacity-50 ml-auto"
-            style={{
-              backgroundColor: 'var(--color-error)',
-              color: 'var(--color-bg-primary)',
-            }}
+            className={`${adminButtonClass('md')} ml-auto`}
+            style={adminButtonStyle('danger')}
           >
             Poista peli
           </button>
