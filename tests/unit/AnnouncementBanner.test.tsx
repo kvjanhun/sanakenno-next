@@ -123,13 +123,18 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     act(() => {
       useUiStore.getState().enqueueAnnouncement({
         kind: 'gameplay',
-        category: 'pangram',
-        badgeText: '★',
-        title: 'Pangrammi! Kaikki 7 kirjainta käytetty',
-        metaPill: '+7 p.',
+        category: 'no_hint_milestone',
+        badgeText: '50 %',
+        title: 'Avuitta taitava',
+        subtitle: '50 % pisteistä ilman apuja!',
+        metaPill: '50 %',
       });
     });
     expect(screen.getByTestId('announcement-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('announcement-title')).toHaveTextContent('Avuitta taitava');
+    expect(screen.getByTestId('announcement-subtitle')).toHaveTextContent(
+      '50 % pisteistä ilman apuja!',
+    );
 
     act(() => {
       useUiStore.getState().setShowRanks(true);
@@ -174,27 +179,25 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     act(() => {
       window.sanakennoAnnounce?.('milestone', 50);
     });
-    expect(screen.getByTestId('announcement-title')).toHaveTextContent(
-      'Avuitta taitava — 50 % pisteistä ilman apuja!',
+    expect(screen.getByTestId('announcement-title')).toHaveTextContent('Avuitta taitava');
+    expect(screen.getByTestId('announcement-subtitle')).toHaveTextContent(
+      '50 % pisteistä ilman apuja!',
     );
-
-    fireEvent.click(screen.getByTestId('announcement-banner'));
-    act(() => {
-      window.sanakennoAnnounce?.('pangram');
-    });
-    expect(screen.getByTestId('announcement-title')).toHaveTextContent(
-      'Pangrammi! Kaikki 7 kirjainta käytetty',
-    );
+    expect(screen.getByTestId('announcement-meta-pill')).toHaveTextContent('50 %');
 
     unmount();
     expect(window.sanakennoAnnounce).toBeUndefined();
   });
 
-  it('keeps MessageBar strictly single-chip for points and word validation errors', () => {
-    const { rerender } = render(<MessageBar message="+6" type="ok" />);
-    expect(screen.getByTestId('message-bar')).toHaveTextContent('+6');
+  it('keeps MessageBar for points, Pangrammi! secondary chip, and word validation errors', () => {
+    const { rerender } = render(
+      <MessageBar message="+18" type="ok" secondaryMessage="Pangrammi!" secondaryType="special" />,
+    );
+    expect(screen.getByTestId('message-bar')).toHaveTextContent('+18');
+    expect(screen.getByTestId('message-bar')).toHaveTextContent('Pangrammi!');
 
     rerender(<MessageBar message="Kirjain 'A' puuttuu!" type="error" />);
     expect(screen.getByTestId('message-bar')).toHaveTextContent("Kirjain 'A' puuttuu!");
+    expect(screen.getByTestId('message-bar')).not.toHaveTextContent('Pangrammi!');
   });
 });

@@ -257,15 +257,11 @@ describe('useGameStore Achievements & Streak Integration', () => {
     }
     await useGameStore.getState().submitWord();
 
-    // 1st queued: Pangrammi!
-    expect(useUiStore.getState().activeAnnouncement?.category).toBe('pangram');
-    useUiStore.getState().dismissAnnouncement();
-
-    // 2nd queued: Unassisted 25% milestone (18 / 50 = 36%)
+    // 1st queued: Unassisted 25% milestone (18 / 50 = 36%)
     expect(useUiStore.getState().activeAnnouncement?.category).toBe('no_hint_milestone');
     useUiStore.getState().dismissAnnouncement();
 
-    // 3rd queued: Streak progress (2 / 7 päivää)
+    // 2nd queued: Streak progress (2 / 7 päivää)
     expect(useUiStore.getState().activeAnnouncement).toMatchObject({
       kind: 'achievement',
       category: 'achievement_progress',
@@ -278,7 +274,7 @@ describe('useGameStore Achievements & Streak Integration', () => {
     });
     useUiStore.getState().dismissAnnouncement();
 
-    // 4th queued: Pangram near-unlock progress (6 / 7 pangrammia)
+    // 3rd queued: Pangram near-unlock progress (6 / 7 pangrammia)
     expect(useUiStore.getState().activeAnnouncement).toMatchObject({
       kind: 'achievement',
       category: 'achievement_progress',

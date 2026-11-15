@@ -65,6 +65,8 @@ export function GameplayView(): React.JSX.Element {
 
   const message = useUiStore((s) => s.message);
   const messageType = useUiStore((s) => s.messageType);
+  const secondaryMessage = useUiStore((s) => s.secondaryMessage);
+  const secondaryType = useUiStore((s) => s.secondaryType);
   const showRanks = useUiStore((s) => s.showRanks);
   const showRules = useUiStore((s) => s.showRules);
   const showAllFoundWords = useUiStore((s) => s.showAllFoundWords);
@@ -417,7 +419,12 @@ export function GameplayView(): React.JSX.Element {
 
               {!allFound && (
                 <div className="mb-2">
-                  <MessageBar message={message} type={messageType} />
+                  <MessageBar
+                    message={message}
+                    type={messageType}
+                    secondaryMessage={secondaryMessage}
+                    secondaryType={secondaryType}
+                  />
                 </div>
               )}
 

@@ -11,16 +11,12 @@ import { getTierToken } from '../modals/achievementIcons.js';
 export type AnnouncementKind = 'gameplay' | 'achievement';
 
 export type AnnouncementCategory =
-  | 'letter_cleared'
-  | 'achievement_unlocked'
-  | 'achievement_progress'
-  | 'pangram'
-  | 'no_hint_milestone';
+  'letter_cleared' | 'achievement_unlocked' | 'achievement_progress' | 'no_hint_milestone';
 
 export interface GameplayAnnouncement {
   id: string;
   kind: 'gameplay';
-  category: 'letter_cleared' | 'pangram' | 'no_hint_milestone';
+  category: 'letter_cleared' | 'no_hint_milestone';
   title: string;
   subtitle?: string;
   badgeText?: string;
@@ -123,36 +119,16 @@ export function triggerConsoleAnnouncement(
       tierName: tier.name,
       isUnlock: false,
     };
-  } else if (kindKey === 'pangram') {
-    const clearedLetter =
-      typeof args[0] === 'string' && args[0].trim() ? args[0].trim().toUpperCase() : null;
-    item = clearedLetter
-      ? {
-          kind: 'gameplay',
-          category: 'pangram',
-          badgeText: '★',
-          title: `Pangrammi! · Kaikki ${clearedLetter}-alkuiset löydetty!`,
-          metaPill: '+7 p.',
-        }
-      : {
-          kind: 'gameplay',
-          category: 'pangram',
-          badgeText: '★',
-          title: 'Pangrammi! Kaikki 7 kirjainta käytetty',
-          metaPill: '+7 p.',
-        };
   } else if (kindKey === 'milestone') {
     const pct = Number(args[0]) === 25 ? 25 : 50;
-    const title =
-      pct === 25
-        ? 'Omin avuin — 25 % pisteistä ilman apuja!'
-        : 'Avuitta taitava — 50 % pisteistä ilman apuja!';
+    const title = pct === 25 ? 'Omin avuin' : 'Avuitta taitava';
     item = {
       kind: 'gameplay',
       category: 'no_hint_milestone',
       badgeText: `${pct} %`,
       title,
-      metaPill: 'Ilman apuja',
+      subtitle: `${pct} % pisteistä ilman apuja!`,
+      metaPill: `${pct} %`,
     };
   } else {
     const letter =

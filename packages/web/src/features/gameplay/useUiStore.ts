@@ -18,7 +18,7 @@ function writeHintsHidden(hidden: boolean): void {
 }
 
 /** Message severity used for immediate word-submission feedback. */
-export type MessageType = 'ok' | 'error';
+export type MessageType = 'ok' | 'error' | 'special';
 
 /** Celebration overlay type. */
 export type CelebrationType = 'allistyttava' | 'nohint-allistyttava' | 'taysikenno' | null;
@@ -26,6 +26,8 @@ export type CelebrationType = 'allistyttava' | 'nohint-allistyttava' | 'taysiken
 export interface UiState {
   message: string;
   messageType: MessageType;
+  secondaryMessage: string;
+  secondaryType: MessageType;
   activeAnnouncement: Announcement | null;
   announcementQueue: Announcement[];
   celebration: CelebrationType;
@@ -49,7 +51,14 @@ export interface UiState {
   hintsHidden: boolean;
 
   setHintsHidden: (hidden: boolean) => void;
-  showToast: (msg: string, type?: MessageType, duration?: number, onExpire?: () => void) => void;
+  showToast: (
+    msg: string,
+    type?: MessageType,
+    duration?: number,
+    secondaryMessage?: string,
+    secondaryType?: MessageType,
+    onExpire?: () => void,
+  ) => void;
   enqueueAnnouncement: (announcement: AnnouncementInput) => void;
   dismissAnnouncement: () => void;
   triggerWordShake: (resubmittedWord?: string | null) => void;
@@ -94,6 +103,8 @@ function getAnnouncementDuration(item: Announcement): number {
 export const useUiStore = create<UiState>()((set, get) => ({
   message: '',
   messageType: 'ok',
+  secondaryMessage: '',
+  secondaryType: 'ok',
   activeAnnouncement: null,
   announcementQueue: [],
   celebration: null,
@@ -120,16 +131,27 @@ export const useUiStore = create<UiState>()((set, get) => ({
     set({ hintsHidden });
   },
 
-  showToast: (msg, type = 'ok', duration = 2000, onExpire) => {
+  showToast: (
+    msg,
+    type = 'ok',
+    duration = 2000,
+    secondaryMessage = '',
+    secondaryType = 'ok',
+    onExpire,
+  ) => {
     if (messageTimer !== null) clearTimeout(messageTimer);
     set({
       message: msg,
       messageType: type,
+      secondaryMessage,
+      secondaryType,
     });
     messageTimer = setTimeout(() => {
       set({
         message: '',
         messageType: 'ok',
+        secondaryMessage: '',
+        secondaryType: 'ok',
       });
       messageTimer = null;
       onExpire?.();
@@ -251,6 +273,8 @@ export const useUiStore = create<UiState>()((set, get) => ({
     set({
       message: '',
       messageType: 'ok',
+      secondaryMessage: '',
+      secondaryType: 'ok',
       activeAnnouncement: null,
       announcementQueue: [],
       celebration: null,

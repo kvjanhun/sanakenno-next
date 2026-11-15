@@ -72,7 +72,7 @@ function fisherYatesShuffle<T>(arr: readonly T[]): T[] {
 function rejectWord(msg: string, resubmittedWord: string | null = null): void {
   const ui = useUiStore.getState();
   ui.triggerWordShake(resubmittedWord);
-  ui.showToast(msg, 'error', 2000, () => {
+  ui.showToast(msg, 'error', 2000, '', 'ok', () => {
     if (useUiStore.getState().wordRejected) {
       useUiStore.getState().clearWordRejection();
       useGameStore.setState({ currentWord: '' });

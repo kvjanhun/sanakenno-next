@@ -74,9 +74,11 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     }
   }
 
-  ui.showToast(`+${pts}`, 'ok', 2000);
   if (pangram) {
     ui.triggerPangramRipple();
+    ui.showToast(`+${pts}`, 'ok', 2500, 'Pangrammi!', 'special');
+  } else {
+    ui.showToast(`+${pts}`, 'ok', 2000);
   }
 
   const firstLetter = normalized[0];
@@ -92,24 +94,7 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     }
   }
 
-  if (pangram && letterCleared && firstLetter) {
-    const upper = firstLetter.toUpperCase();
-    ui.enqueueAnnouncement({
-      kind: 'gameplay',
-      category: 'pangram',
-      badgeText: '★',
-      title: `Pangrammi! · Kaikki ${upper}-alkuiset löydetty!`,
-      metaPill: `${totalForLetter}/${totalForLetter}`,
-    });
-  } else if (pangram) {
-    ui.enqueueAnnouncement({
-      kind: 'gameplay',
-      category: 'pangram',
-      badgeText: '★',
-      title: 'Pangrammi! Kaikki 7 kirjainta käytetty',
-      metaPill: '+7 p.',
-    });
-  } else if (letterCleared && firstLetter) {
+  if (letterCleared && firstLetter) {
     const upper = firstLetter.toUpperCase();
     ui.enqueueAnnouncement({
       kind: 'gameplay',
@@ -142,8 +127,9 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
         kind: 'gameplay',
         category: 'no_hint_milestone',
         badgeText: `${highestCrossed.pct} %`,
-        title: `${highestCrossed.name} — ${highestCrossed.pct} % pisteistä ilman apuja!`,
-        metaPill: 'Ilman apuja',
+        title: highestCrossed.name,
+        subtitle: `${highestCrossed.pct} % pisteistä ilman apuja!`,
+        metaPill: `${highestCrossed.pct} %`,
       });
     }
   }

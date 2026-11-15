@@ -93,7 +93,7 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useUiStore.getState().messageType).toBe('ok');
   });
 
-  it('awards pangram bonus (+7) and triggers Pangrammi! and letter-cleared announcements while MessageBar keeps +pts only', async () => {
+  it('awards pangram bonus (+7) in MessageBar secondary chip and triggers letter-cleared / two-row milestone announcements in AnnouncementBanner', async () => {
     const puzzle = await buildSamplePuzzle(8);
     await useGameStore.getState().loadPuzzle(puzzle);
 
@@ -107,12 +107,8 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useGameStore.getState().rank()).toBe('Ällistyttävä');
     expect(useUiStore.getState().message).toBe('+18');
     expect(useUiStore.getState().messageType).toBe('ok');
-    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
-      kind: 'gameplay',
-      category: 'pangram',
-      title: 'Pangrammi! Kaikki 7 kirjainta käytetty',
-      metaPill: '+7 p.',
-    });
+    expect(useUiStore.getState().secondaryMessage).toBe('Pangrammi!');
+    expect(useUiStore.getState().secondaryType).toBe('special');
     expect(useUiStore.getState().celebration).toBe('nohint-allistyttava');
     expect(useUiStore.getState().pangramRipple).toBe(true);
 
@@ -128,6 +124,7 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     await useGameStore.getState().submitWord();
     expect(useUiStore.getState().message).toBe('+6');
     expect(useUiStore.getState().messageType).toBe('ok');
+    expect(useUiStore.getState().secondaryMessage).toBe('');
     expect(useUiStore.getState().activeAnnouncement).toMatchObject({
       kind: 'gameplay',
       category: 'letter_cleared',
@@ -141,7 +138,7 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useUiStore.getState().shuffleSpin).toBe(true);
   });
 
-  it('coalesces pangram and letter-cleared into one announcement and announces unassisted 25%/50% milestones', async () => {
+  it('keeps Pangrammi! in MessageBar while queuing letter-cleared and two-row unassisted milestones in AnnouncementBanner', async () => {
     const words = ['kana', 'kala', 'kansallinen', 'omena'];
     const hashes = await Promise.all(words.map((w) => hashWord(w)));
     const puzzle: PuzzleResponse = {
@@ -168,10 +165,15 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     }
     await useGameStore.getState().submitWord();
 
+    expect(useUiStore.getState().message).toBe('+18');
+    expect(useUiStore.getState().secondaryMessage).toBe('Pangrammi!');
+    expect(useUiStore.getState().secondaryType).toBe('special');
+
     expect(useUiStore.getState().activeAnnouncement).toMatchObject({
       kind: 'gameplay',
-      category: 'pangram',
-      title: 'Pangrammi! · Kaikki K-alkuiset löydetty!',
+      category: 'letter_cleared',
+      badgeText: 'K',
+      title: 'Kaikki K-alkuiset sanat löydetty!',
       metaPill: '1/1',
     });
 
@@ -180,7 +182,9 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
       kind: 'gameplay',
       category: 'no_hint_milestone',
       badgeText: '25 %',
-      title: 'Omin avuin — 25 % pisteistä ilman apuja!',
+      title: 'Omin avuin',
+      subtitle: '25 % pisteistä ilman apuja!',
+      metaPill: '25 %',
     });
   });
 

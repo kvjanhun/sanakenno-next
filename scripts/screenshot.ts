@@ -285,12 +285,14 @@ async function captureWithCdp(
         });
         await new Promise((r) => setTimeout(r, 100));
       }
-      const cmd = target.action.includes('achievement')
-        ? `window.sanakennoAnnounce?.('achievement', 'total_words', 'gold')`
-        : target.action.includes('progress')
-          ? `window.sanakennoAnnounce?.('progress', 'streak', 6, 7, 'bronze')`
-          : `window.sanakennoAnnounce?.('letter', 'K', 7)`;
-      await send('Runtime.evaluate', { expression: cmd });
+      const cmds: Record<string, string> = {
+        achievement: `window.sanakennoAnnounce?.('achievement', 'total_words', 'gold')`,
+        progress: `window.sanakennoAnnounce?.('progress', 'streak', 6, 7, 'bronze')`,
+        milestone: `window.sanakennoAnnounce?.('milestone', 50)`,
+        letter: `window.sanakennoAnnounce?.('letter', 'K', 7)`,
+      };
+      const key = Object.keys(cmds).find((k) => target.action?.includes(k)) ?? 'letter';
+      await send('Runtime.evaluate', { expression: cmds[key] });
       await new Promise((r) => setTimeout(r, 350));
     }
 
@@ -326,131 +328,44 @@ async function main() {
   }
 
   try {
+    const desk = (name: string, action?: string) => ({
+      name,
+      width: 1280,
+      height: 800,
+      mobile: false,
+      action,
+    });
+    const mob = (name: string, action?: string) => ({
+      name,
+      width: 390,
+      height: 844,
+      mobile: true,
+      action,
+    });
     const targets = [
-      { name: 'desktop', width: 1280, height: 800, mobile: false, action: undefined },
-      { name: 'desktop-matrix', width: 1280, height: 800, mobile: false, action: 'unlock-matrix' },
-      {
-        name: 'desktop-clues-open',
-        width: 1280,
-        height: 800,
-        mobile: false,
-        action: 'view-clues-open',
-      },
-      {
-        name: 'desktop-archive',
-        width: 1280,
-        height: 800,
-        mobile: false,
-        action: 'view-archive',
-      },
-      {
-        name: 'desktop-stats-achievements',
-        width: 1280,
-        height: 800,
-        mobile: false,
-        action: 'view-stats-achievements',
-      },
-      {
-        name: 'desktop-stats-summary',
-        width: 1280,
-        height: 800,
-        mobile: false,
-        action: 'view-stats-summary',
-      },
-      { name: 'mobile', width: 390, height: 844, mobile: true, action: undefined },
-      { name: 'mobile-light', width: 390, height: 844, mobile: true, action: 'theme-light' },
-      { name: 'mobile-matrix', width: 390, height: 844, mobile: true, action: 'unlock-matrix' },
-      {
-        name: 'mobile-archive',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-archive',
-      },
-      {
-        name: 'mobile-archive-light',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-archive-light',
-      },
-      {
-        name: 'mobile-stats-achievements',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-stats-achievements',
-      },
-      {
-        name: 'mobile-stats-achievements-light',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-stats-achievements-light',
-      },
-      {
-        name: 'mobile-stats-achievements-bottom',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-stats-achievements-bottom',
-      },
-      {
-        name: 'mobile-stats-achievements-light-bottom',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-stats-achievements-light-bottom',
-      },
-      {
-        name: 'mobile-stats-summary',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-stats-summary',
-      },
-      {
-        name: 'mobile-clues-closed',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-clues-closed',
-      },
-      {
-        name: 'mobile-clues-open',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-clues-open',
-      },
-      {
-        name: 'mobile-clues-typed',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-clues-open-typed',
-      },
-      {
-        name: 'desktop-announcement-achievement',
-        width: 1280,
-        height: 800,
-        mobile: false,
-        action: 'view-announcement-achievement',
-      },
-      {
-        name: 'mobile-announcement-letter',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-announcement-letter',
-      },
-      {
-        name: 'mobile-announcement-progress-light',
-        width: 390,
-        height: 844,
-        mobile: true,
-        action: 'view-announcement-progress-light',
-      },
+      desk('desktop'),
+      desk('desktop-matrix', 'unlock-matrix'),
+      desk('desktop-clues-open', 'view-clues-open'),
+      desk('desktop-archive', 'view-archive'),
+      desk('desktop-stats-achievements', 'view-stats-achievements'),
+      desk('desktop-stats-summary', 'view-stats-summary'),
+      mob('mobile'),
+      mob('mobile-light', 'theme-light'),
+      mob('mobile-matrix', 'unlock-matrix'),
+      mob('mobile-archive', 'view-archive'),
+      mob('mobile-archive-light', 'view-archive-light'),
+      mob('mobile-stats-achievements', 'view-stats-achievements'),
+      mob('mobile-stats-achievements-light', 'view-stats-achievements-light'),
+      mob('mobile-stats-achievements-bottom', 'view-stats-achievements-bottom'),
+      mob('mobile-stats-achievements-light-bottom', 'view-stats-achievements-light-bottom'),
+      mob('mobile-stats-summary', 'view-stats-summary'),
+      mob('mobile-clues-closed', 'view-clues-closed'),
+      mob('mobile-clues-open', 'view-clues-open'),
+      mob('mobile-clues-typed', 'view-clues-open-typed'),
+      desk('desktop-announcement-achievement', 'view-announcement-achievement'),
+      mob('mobile-announcement-letter', 'view-announcement-letter'),
+      mob('mobile-announcement-milestone', 'view-announcement-milestone'),
+      mob('mobile-announcement-progress-light', 'view-announcement-progress-light'),
     ];
 
     for (const target of targets) {

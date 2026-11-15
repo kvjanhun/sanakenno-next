@@ -1,15 +1,12 @@
 import { useEffect } from 'react';
 import { getTierToken, HexagonMedallion } from '../modals/achievementIcons.js';
 import { triggerConsoleAnnouncement, type Announcement } from './announcements.js';
-import { CircleStarIcon, SparklesIcon } from './icons.js';
+import { CircleStarIcon } from './icons.js';
 import { useUiStore } from './useUiStore.js';
 
 function renderGameplayIcon(
   announcement: Extract<Announcement, { kind: 'gameplay' }>,
 ): React.JSX.Element {
-  if (announcement.category === 'pangram') {
-    return <SparklesIcon size={16} strokeWidth={2.3} />;
-  }
   if (announcement.category === 'no_hint_milestone') {
     return <CircleStarIcon size={17} strokeWidth={2.3} />;
   }
