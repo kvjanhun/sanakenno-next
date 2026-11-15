@@ -192,6 +192,68 @@ describe('Admin Suggestions & Combinations (Kysely + Hono integration)', () => {
       };
       expect(Array.isArray(suggestion.pangrams)).toBe(true);
     });
+
+    it('reads variations stored with Sanakenno 1.0 pangram_count key and skips declined suggestions', async () => {
+      setWordlist([...DEFAULT_SEED_WORDS, 'kaamoksen', 'reilomies']);
+      await harness.db.deleteFrom('combinations').execute();
+      await harness.db
+        .insertInto('combinations')
+        .values([
+          {
+            letters: 'aekmnos',
+            total_pangrams: 1,
+            min_word_count: 20,
+            max_word_count: 35,
+            min_max_score: 90,
+            max_max_score: 130,
+            variations: JSON.stringify([
+              { center: 'a', word_count: 30, max_score: 110, pangram_count: 1 },
+            ]),
+            in_rotation: 0,
+          },
+          {
+            letters: 'eilmors',
+            total_pangrams: 2,
+            min_word_count: 40,
+            max_word_count: 55,
+            min_max_score: 140,
+            max_max_score: 190,
+            variations: JSON.stringify([
+              { center: 'e', word_count: 45, max_score: 160, pangram_count: 2 },
+            ]),
+            in_rotation: 0,
+          },
+        ])
+        .execute();
+
+      setSuggestionQualityForTesting({
+        'aekmnos:a': 'good',
+        'eilmors:e': 'good',
+      });
+
+      const firstRes = await harness.app.request('/api/admin/suggestion', {
+        headers: adminHeaders(),
+      });
+      expect(firstRes.status).toBe(200);
+      const first = (await firstRes.json()) as {
+        letters_key: string;
+        center: string;
+        pangram_count: number;
+        variations: Array<{ center: string; pangrams: number }>;
+      };
+      expect(first.pangram_count).toBeGreaterThanOrEqual(1);
+      expect(first.variations[0]?.pangrams).toBeGreaterThanOrEqual(1);
+
+      const secondRes = await harness.app.request(
+        `/api/admin/suggestion?declined=${encodeURIComponent(`${first.letters_key}:${first.center}`)}`,
+        { headers: adminHeaders() },
+      );
+      expect(secondRes.status).toBe(200);
+      const second = (await secondRes.json()) as { letters_key: string; center: string };
+      expect(`${second.letters_key}:${second.center}`).not.toBe(
+        `${first.letters_key}:${first.center}`,
+      );
+    });
   });
 
   describe('POST & DELETE /api/admin/suggestion-rejections', () => {

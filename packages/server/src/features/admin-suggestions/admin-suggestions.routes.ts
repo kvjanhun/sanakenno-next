@@ -1,7 +1,4 @@
-import {
-  AdminSuggestionRejectionPayloadSchema,
-  type AdminCombinationVariation,
-} from '@sanakenno/shared';
+import { AdminSuggestionRejectionPayloadSchema } from '@sanakenno/shared';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
@@ -20,7 +17,7 @@ import {
   insertSuggestionRejection,
   persistedSuggestionRejectionKeys,
 } from './admin-suggestions.queries.js';
-import { suggestPuzzle } from './suggestion-engine.js';
+import { parseVariations, suggestPuzzle } from './suggestion-engine.js';
 import { normalizeLettersKey } from './suggestion-scorer.js';
 
 export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
@@ -59,24 +56,16 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
         per_page,
       });
 
-      const combinations = rows.map((r) => {
-        let variations: AdminCombinationVariation[] = [];
-        try {
-          variations = JSON.parse(r.variations) as AdminCombinationVariation[];
-        } catch {
-          variations = [];
-        }
-        return {
-          letters: r.letters,
-          total_pangrams: r.total_pangrams,
-          min_word_count: r.min_word_count,
-          max_word_count: r.max_word_count,
-          min_max_score: r.min_max_score,
-          max_max_score: r.max_max_score,
-          variations,
-          in_rotation: Boolean(r.in_rotation),
-        };
-      });
+      const combinations = rows.map((r) => ({
+        letters: r.letters,
+        total_pangrams: r.total_pangrams,
+        min_word_count: r.min_word_count,
+        max_word_count: r.max_word_count,
+        min_max_score: r.min_max_score,
+        max_max_score: r.max_max_score,
+        variations: parseVariations(r.variations),
+        in_rotation: Boolean(r.in_rotation),
+      }));
 
       const pages = Math.ceil(total / per_page);
 

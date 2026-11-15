@@ -43,19 +43,18 @@ const DEFAULT_MAX_WORDS = 80;
 const MAX_PANGRAMS = 5;
 const PRELIMINARY_LIMIT = 300;
 
-function parseVariations(raw: string): AdminCombinationVariation[] {
+export function parseVariations(raw: string): AdminCombinationVariation[] {
   try {
     const list = JSON.parse(raw) as unknown[];
     if (!Array.isArray(list)) return [];
-    return list.map((item) => {
-      const rec = item as Record<string, unknown>;
-      return {
+    return list
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+      .map((rec) => ({
         center: String(rec.center ?? ''),
         word_count: Number(rec.word_count ?? 0),
         max_score: Number(rec.max_score ?? 0),
-        pangrams: Number(rec.pangrams ?? 0),
-      };
-    });
+        pangrams: Number(rec.pangrams ?? rec.pangram_count ?? 0),
+      }));
   } catch {
     return [];
   }

@@ -5,6 +5,7 @@ import { LoginPage } from '../../packages/web/src/features/admin/LoginPage.js';
 import { ManualPuzzleForm } from '../../packages/web/src/features/admin/ManualPuzzleForm.js';
 import { Schedule } from '../../packages/web/src/features/admin/Schedule.js';
 import { Stats } from '../../packages/web/src/features/admin/Stats.js';
+import { SuggestionPanel } from '../../packages/web/src/features/admin/SuggestionPanel.js';
 import { SuggestionRejections } from '../../packages/web/src/features/admin/SuggestionRejections.js';
 import { useAdminStore } from '../../packages/web/src/features/admin/useAdminStore.js';
 
@@ -12,6 +13,8 @@ const mockAdminGetBlocked = vi.fn();
 const mockAdminBlockWord = vi.fn();
 const mockAdminUnblockWord = vi.fn();
 const mockAdminGetSchedule = vi.fn();
+const mockAdminGetSuggestion = vi.fn();
+const mockAdminRejectSuggestion = vi.fn();
 const mockAdminGetSuggestionRejections = vi.fn();
 const mockAdminDeleteSuggestionRejection = vi.fn();
 const mockAdminGetAchievements = vi.fn();
@@ -21,6 +24,8 @@ vi.mock('../../packages/web/src/api/client.js', () => ({
   adminBlockWord: (...args: unknown[]) => mockAdminBlockWord(...args),
   adminUnblockWord: (...args: unknown[]) => mockAdminUnblockWord(...args),
   adminGetSchedule: (...args: unknown[]) => mockAdminGetSchedule(...args),
+  adminGetSuggestion: (...args: unknown[]) => mockAdminGetSuggestion(...args),
+  adminRejectSuggestion: (...args: unknown[]) => mockAdminRejectSuggestion(...args),
   adminGetSuggestionRejections: (...args: unknown[]) => mockAdminGetSuggestionRejections(...args),
   adminDeleteSuggestionRejection: (...args: unknown[]) =>
     mockAdminDeleteSuggestionRejection(...args),
@@ -202,6 +207,107 @@ describe('Admin UI Components', () => {
       const createBtn = screen.getByRole('button', { name: /Tallenna peli/i });
       fireEvent.click(createBtn);
       expect(onCreate).toHaveBeenCalled();
+    });
+  });
+
+  describe('SuggestionPanel', () => {
+    const firstSuggestion = {
+      letters: ['a', 'e', 'k', 'm', 'n', 'o', 's'],
+      letters_key: 'aekmnos',
+      center: 'a',
+      word_count: 30,
+      pangram_count: 1,
+      max_score: 110,
+      quality_grade: 'good',
+      quality_label: 'Hyvä pangrammilaatu',
+      score: 900,
+      overlaps: {
+        previous: { slot: 1, shared_letters: 2, shared_short_words: 1 },
+        next: { slot: 2, shared_letters: 1, shared_short_words: 0 },
+      },
+      variations: [],
+      reasons: ['sanamäärä tuo vaihtelua (tavallinen)'],
+    };
+
+    const secondSuggestion = {
+      ...firstSuggestion,
+      letters: ['e', 'i', 'l', 'm', 'o', 'r', 's'],
+      letters_key: 'eilmors',
+      center: 'e',
+      word_count: 45,
+      pangram_count: 2,
+      max_score: 160,
+    };
+
+    it('fetches suggestion, advances declined list on "Ehdota toista", and reveals spoilers for current item', async () => {
+      mockAdminGetSuggestion
+        .mockResolvedValueOnce(firstSuggestion)
+        .mockResolvedValueOnce(secondSuggestion)
+        .mockResolvedValueOnce({ ...secondSuggestion, pangrams: ['mielisero'] });
+
+      const onSelectSuggestion = vi.fn();
+      render(
+        <SuggestionPanel csrfToken="test-csrf-token" onSelectSuggestion={onSelectSuggestion} />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ehdota peliä' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('30')).toBeInTheDocument();
+      });
+      expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(1, 'test-csrf-token', {
+        declined: [],
+        include_pangrams: false,
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ehdota toista' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('45')).toBeInTheDocument();
+      });
+      expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(2, 'test-csrf-token', {
+        declined: ['aekmnos:a'],
+        include_pangrams: false,
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Näytä pangrammit (Spoileri)' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('mielisero')).toBeInTheDocument();
+      });
+      expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(3, 'test-csrf-token', {
+        declined: ['aekmnos:a'],
+        include_pangrams: true,
+      });
+    });
+
+    it('rejects current suggestion permanently and loads the next suggestion', async () => {
+      mockAdminGetSuggestion
+        .mockResolvedValueOnce(firstSuggestion)
+        .mockResolvedValueOnce(secondSuggestion);
+      mockAdminRejectSuggestion.mockResolvedValueOnce({ id: 1 });
+
+      render(<SuggestionPanel csrfToken="test-csrf-token" onSelectSuggestion={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ehdota peliä' }));
+      await waitFor(() => {
+        expect(screen.getByText('30')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Hylkää pysyvästi' }));
+
+      await waitFor(() => {
+        expect(mockAdminRejectSuggestion).toHaveBeenCalledWith(
+          'test-csrf-token',
+          firstSuggestion.letters,
+          'a',
+        );
+        expect(screen.getByText('45')).toBeInTheDocument();
+      });
+      expect(mockAdminGetSuggestion).toHaveBeenNthCalledWith(2, 'test-csrf-token', {
+        declined: ['aekmnos:a'],
+        include_pangrams: false,
+      });
     });
   });
 

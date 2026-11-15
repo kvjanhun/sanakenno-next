@@ -17,13 +17,13 @@ export function SuggestionPanel({
   const [spoilers, setSpoilers] = useState(false);
   const [declined, setDeclined] = useState<string[]>([]);
 
-  const fetchSuggestion = async (includeSpoilers = spoilers) => {
+  const fetchSuggestion = async (includeSpoilers = spoilers, declinedList = declined) => {
     if (!csrfToken) return;
     setLoading(true);
     setError(null);
     try {
       const res = (await adminGetSuggestion(csrfToken, {
-        declined,
+        declined: declinedList,
         include_pangrams: includeSpoilers,
       })) as AdminSuggestionResponse;
       setSuggestion(res);
@@ -35,14 +35,27 @@ export function SuggestionPanel({
     }
   };
 
+  const appendDeclined = (item: AdminSuggestionResponse): string[] => {
+    const key = `${item.letters_key}:${item.center}`;
+    if (declined.includes(key)) return declined;
+    const next = [...declined, key];
+    setDeclined(next);
+    return next;
+  };
+
+  const handleSuggestClick = async () => {
+    const nextDeclined = suggestion ? appendDeclined(suggestion) : declined;
+    await fetchSuggestion(spoilers, nextDeclined);
+  };
+
   const handleReject = async () => {
     if (!csrfToken || !suggestion) return;
     setLoading(true);
     try {
       await adminRejectSuggestion(csrfToken, suggestion.letters, suggestion.center);
-      setDeclined((prev) => [...prev, `${suggestion.letters_key}:${suggestion.center}`]);
+      const nextDeclined = appendDeclined(suggestion);
       setSuggestion(null);
-      void fetchSuggestion();
+      await fetchSuggestion(spoilers, nextDeclined);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ehdotuksen hylkäys epäonnistui');
       setLoading(false);
@@ -53,7 +66,7 @@ export function SuggestionPanel({
     const next = !spoilers;
     setSpoilers(next);
     if (next && suggestion && !suggestion.pangrams) {
-      await fetchSuggestion(true);
+      await fetchSuggestion(true, declined);
     }
   };
 
@@ -74,7 +87,7 @@ export function SuggestionPanel({
         </div>
         <button
           type="button"
-          onClick={() => fetchSuggestion(spoilers)}
+          onClick={() => void handleSuggestClick()}
           disabled={loading}
           className="px-4 py-2 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-50 transition-opacity"
           style={{
