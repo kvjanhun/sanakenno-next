@@ -1,4 +1,10 @@
 import { create } from 'zustand';
+import {
+  DEFAULT_ACHIEVEMENT_ANNOUNCEMENT_MS,
+  DEFAULT_GAMEPLAY_ANNOUNCEMENT_MS,
+  type Announcement,
+  type AnnouncementInput,
+} from './announcements.js';
 
 /** localStorage key for the player's "hide hint deck" preference. Defaults to true (collapsed). */
 export const HINTS_HIDDEN_KEY = 'sanakenno_hints_hidden';
@@ -11,8 +17,8 @@ function writeHintsHidden(hidden: boolean): void {
   }
 }
 
-/** Message severity used for toast display. */
-export type MessageType = 'ok' | 'error' | 'special';
+/** Message severity used for immediate word-submission feedback. */
+export type MessageType = 'ok' | 'error';
 
 /** Celebration overlay type. */
 export type CelebrationType = 'allistyttava' | 'nohint-allistyttava' | 'taysikenno' | null;
@@ -20,8 +26,8 @@ export type CelebrationType = 'allistyttava' | 'nohint-allistyttava' | 'taysiken
 export interface UiState {
   message: string;
   messageType: MessageType;
-  secondaryMessage: string;
-  secondaryType: MessageType;
+  activeAnnouncement: Announcement | null;
+  announcementQueue: Announcement[];
   celebration: CelebrationType;
   wordShake: boolean;
   wordRejected: boolean;
@@ -43,14 +49,9 @@ export interface UiState {
   hintsHidden: boolean;
 
   setHintsHidden: (hidden: boolean) => void;
-  showToast: (
-    msg: string,
-    type?: MessageType,
-    duration?: number,
-    secondaryMessage?: string,
-    secondaryType?: MessageType,
-    onExpire?: () => void,
-  ) => void;
+  showToast: (msg: string, type?: MessageType, duration?: number, onExpire?: () => void) => void;
+  enqueueAnnouncement: (announcement: AnnouncementInput) => void;
+  dismissAnnouncement: () => void;
   triggerWordShake: (resubmittedWord?: string | null) => void;
   triggerPangramRipple: () => void;
   triggerShuffleSpin: () => void;
@@ -69,16 +70,32 @@ export interface UiState {
   resetUi: () => void;
 }
 
+let announcementCounter = 0;
+let announcementTimer: ReturnType<typeof setTimeout> | null = null;
 let messageTimer: ReturnType<typeof setTimeout> | null = null;
 let shakeTimer: ReturnType<typeof setTimeout> | null = null;
 let rippleTimer: ReturnType<typeof setTimeout> | null = null;
 let shuffleTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const useUiStore = create<UiState>()((set) => ({
+function clearAnnouncementTimer(): void {
+  if (announcementTimer !== null) {
+    clearTimeout(announcementTimer);
+    announcementTimer = null;
+  }
+}
+
+function getAnnouncementDuration(item: Announcement): number {
+  if (item.durationMs && item.durationMs > 0) return item.durationMs;
+  return item.kind === 'achievement'
+    ? DEFAULT_ACHIEVEMENT_ANNOUNCEMENT_MS
+    : DEFAULT_GAMEPLAY_ANNOUNCEMENT_MS;
+}
+
+export const useUiStore = create<UiState>()((set, get) => ({
   message: '',
   messageType: 'ok',
-  secondaryMessage: '',
-  secondaryType: 'ok',
+  activeAnnouncement: null,
+  announcementQueue: [],
   celebration: null,
   wordShake: false,
   wordRejected: false,
@@ -103,31 +120,57 @@ export const useUiStore = create<UiState>()((set) => ({
     set({ hintsHidden });
   },
 
-  showToast: (
-    msg,
-    type = 'ok',
-    duration = 2000,
-    secondaryMessage = '',
-    secondaryType = 'ok',
-    onExpire,
-  ) => {
+  showToast: (msg, type = 'ok', duration = 2000, onExpire) => {
     if (messageTimer !== null) clearTimeout(messageTimer);
     set({
       message: msg,
       messageType: type,
-      secondaryMessage,
-      secondaryType,
     });
     messageTimer = setTimeout(() => {
       set({
         message: '',
         messageType: 'ok',
-        secondaryMessage: '',
-        secondaryType: 'ok',
       });
       messageTimer = null;
       onExpire?.();
     }, duration);
+  },
+
+  enqueueAnnouncement: (input) => {
+    const item: Announcement = {
+      ...input,
+      id: `ann-${++announcementCounter}`,
+    };
+    if (get().activeAnnouncement === null) {
+      clearAnnouncementTimer();
+      set({ activeAnnouncement: item });
+      announcementTimer = setTimeout(() => {
+        get().dismissAnnouncement();
+      }, getAnnouncementDuration(item));
+    } else {
+      set((state) => ({
+        announcementQueue: [...state.announcementQueue, item],
+      }));
+    }
+  },
+
+  dismissAnnouncement: () => {
+    clearAnnouncementTimer();
+    const queue = get().announcementQueue;
+    if (queue.length === 0) {
+      set({ activeAnnouncement: null });
+      return;
+    }
+    const [next, ...rest] = queue;
+    set({
+      activeAnnouncement: next ?? null,
+      announcementQueue: rest,
+    });
+    if (next) {
+      announcementTimer = setTimeout(() => {
+        get().dismissAnnouncement();
+      }, getAnnouncementDuration(next));
+    }
   },
 
   triggerWordShake: (resubmittedWord = null) => {
@@ -188,6 +231,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setViewingPuzzleDate: (viewingPuzzleDate) => set({ viewingPuzzleDate }),
 
   resetUi: () => {
+    clearAnnouncementTimer();
     if (messageTimer !== null) {
       clearTimeout(messageTimer);
       messageTimer = null;
@@ -207,8 +251,8 @@ export const useUiStore = create<UiState>()((set) => ({
     set({
       message: '',
       messageType: 'ok',
-      secondaryMessage: '',
-      secondaryType: 'ok',
+      activeAnnouncement: null,
+      announcementQueue: [],
       celebration: null,
       wordShake: false,
       wordRejected: false,

@@ -90,13 +90,14 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useGameStore.getState().foundWords.has('kana')).toBe(true);
     expect(useGameStore.getState().currentWord).toBe('');
     expect(useUiStore.getState().message).toBe('+1');
+    expect(useUiStore.getState().messageType).toBe('ok');
   });
 
-  it('awards pangram bonus (+7) and triggers special Pangrammi! toast and celebration', async () => {
+  it('awards pangram bonus (+7) and triggers Pangrammi! and letter-cleared announcements while MessageBar keeps +pts only', async () => {
     const puzzle = await buildSamplePuzzle(8);
     await useGameStore.getState().loadPuzzle(puzzle);
 
-    // 'kansallinen' = 11 letters + 7 pangram bonus = 18 points (18 / 26 >= 70% -> Ällistyttävä)
+    // 'kansallinen' = 11 letters + 7 pangram bonus = 18 points (18 / 25 >= 70% -> Ällistyttävä)
     for (const ch of 'kansallinen') {
       useGameStore.getState().addLetter(ch);
     }
@@ -105,21 +106,82 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useGameStore.getState().score).toBe(18);
     expect(useGameStore.getState().rank()).toBe('Ällistyttävä');
     expect(useUiStore.getState().message).toBe('+18');
-    expect(useUiStore.getState().secondaryMessage).toBe('Pangrammi!');
-    expect(useUiStore.getState().secondaryType).toBe('special');
+    expect(useUiStore.getState().messageType).toBe('ok');
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'gameplay',
+      category: 'pangram',
+      title: 'Pangrammi! Kaikki 7 kirjainta käytetty',
+      metaPill: '+7 p.',
+    });
     expect(useUiStore.getState().celebration).toBe('nohint-allistyttava');
     expect(useUiStore.getState().pangramRipple).toBe(true);
+
+    // Drain any queued announcements (e.g. daily streak progress) before next word check
+    while (useUiStore.getState().activeAnnouncement !== null) {
+      useUiStore.getState().dismissAnnouncement();
+    }
 
     // Submitting 'lakana' (the only 'l' word) clears letter L
     for (const ch of 'lakana') {
       useGameStore.getState().addLetter(ch);
     }
     await useGameStore.getState().submitWord();
-    expect(useUiStore.getState().secondaryMessage).toBe('Kaikki L-alkuiset löydetty!');
+    expect(useUiStore.getState().message).toBe('+6');
+    expect(useUiStore.getState().messageType).toBe('ok');
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'gameplay',
+      category: 'letter_cleared',
+      badgeText: 'L',
+      title: 'Kaikki L-alkuiset sanat löydetty!',
+      metaPill: '1/1',
+    });
 
     // Shuffling triggers shuffleSpin
     useGameStore.getState().shuffleLetters();
     expect(useUiStore.getState().shuffleSpin).toBe(true);
+  });
+
+  it('coalesces pangram and letter-cleared into one announcement and announces unassisted 25%/50% milestones', async () => {
+    const words = ['kana', 'kala', 'kansallinen', 'omena'];
+    const hashes = await Promise.all(words.map((w) => hashWord(w)));
+    const puzzle: PuzzleResponse = {
+      center: 'a',
+      letters: ['a', 'e', 'i', 'k', 'l', 'n', 's'],
+      word_hashes: hashes,
+      hint_data: {
+        word_count: words.length,
+        pangram_count: 1,
+        by_letter: { k: 1, l: 1, o: 1 },
+        by_length: { '4': 2, '5': 1, '11': 1 },
+        by_pair: { ka: 1 },
+      },
+      max_score: 40, // 25% = 10, 50% = 20, 70% = 28
+      puzzle_number: 61,
+      display_number: 61,
+      total_puzzles: 10,
+    };
+    await useGameStore.getState().loadPuzzle(puzzle);
+
+    // 'kansallinen' is the only 'k' word AND a pangram AND scores 18 pts (45% -> crosses 25% milestone)
+    for (const ch of 'kansallinen') {
+      useGameStore.getState().addLetter(ch);
+    }
+    await useGameStore.getState().submitWord();
+
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'gameplay',
+      category: 'pangram',
+      title: 'Pangrammi! · Kaikki K-alkuiset löydetty!',
+      metaPill: '1/1',
+    });
+
+    useUiStore.getState().dismissAnnouncement();
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'gameplay',
+      category: 'no_hint_milestone',
+      badgeText: '25 %',
+      title: 'Omin avuin — 25 % pisteistä ilman apuja!',
+    });
   });
 
   it('captures scoreBeforeHints on first hint unlock and preserves it across subsequent words and hints', async () => {

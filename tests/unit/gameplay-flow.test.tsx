@@ -70,8 +70,8 @@ describe('Integrated Gameplay Flow (in-process)', () => {
       viewingPuzzleDate: null,
       message: '',
       messageType: 'ok',
-      secondaryMessage: '',
-      secondaryType: 'ok',
+      activeAnnouncement: null,
+      announcementQueue: [],
       showRanks: false,
       showRules: false,
       showAllFoundWords: false,
@@ -175,6 +175,9 @@ describe('Integrated Gameplay Flow (in-process)', () => {
       expect(screen.getByTestId('score-display')).toHaveTextContent('1 piste');
     });
     expect(screen.getByTestId('found-words-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('announcement-banner')).toHaveTextContent('Päivittäinen tapa');
+    fireEvent.click(screen.getByTestId('announcement-banner'));
+    expect(screen.queryByTestId('announcement-banner')).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Avaa sanan "kana" määritelmä Kotuksessa' }),
     ).toHaveAttribute('href', 'https://www.kielitoimistonsanakirja.fi/#/kana');
@@ -188,10 +191,18 @@ describe('Integrated Gameplay Flow (in-process)', () => {
     expect(screen.getByTestId('word-input')).toHaveTextContent('KANSALLINEN');
     fireEvent.keyDown(window, { key: 'Enter' });
 
-    // Score increments from 1 to 19 (1 + 18)
+    // Score increments from 1 to 19 (1 + 18); MessageBar keeps "+18" while AnnouncementBanner shows Pangrammi!
     await waitFor(() => {
       expect(screen.getByTestId('score-display')).toHaveTextContent('19 pistettä');
     });
+    expect(screen.getByTestId('message-bar')).toHaveTextContent('+18');
+    expect(screen.getByTestId('message-bar')).not.toHaveTextContent('Pangrammi!');
+    const banner = screen.getByTestId('announcement-banner');
+    expect(banner).toHaveTextContent('Pangrammi!');
+    const stickyWrapper = screen.getByTestId('score-display').closest('.sticky');
+    expect(stickyWrapper).toContainElement(banner);
+    expect(banner.parentElement).toHaveStyle({ position: 'absolute', top: '100%' });
+    expect(screen.getByTestId('hint-deck')).toHaveStyle({ height: '172px' });
     expect(screen.getByTestId('found-words-count')).toHaveTextContent('2');
     expect(screen.getByTestId('rank-button')).not.toHaveTextContent('Etsi sanoja!');
     expect(

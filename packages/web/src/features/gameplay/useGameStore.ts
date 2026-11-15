@@ -37,13 +37,6 @@ export interface GameState {
   scoreBeforeHints: number | null;
   startedAt: number;
   totalPausedMs: number;
-  newAchievement: {
-    id: string;
-    title: string;
-    tierName: string;
-    target: number;
-    unit?: string;
-  } | null;
 
   center: () => string;
   allLetters: () => Set<string>;
@@ -57,7 +50,6 @@ export interface GameState {
   deleteLetter: () => void;
   shuffleLetters: () => void;
   submitWord: () => Promise<void>;
-  clearNewAchievement: () => void;
   unlockHint: (id: string) => void;
   tickTimer: (startedAt: number, totalPausedMs: number) => void;
   saveState: () => void;
@@ -80,7 +72,7 @@ function fisherYatesShuffle<T>(arr: readonly T[]): T[] {
 function rejectWord(msg: string, resubmittedWord: string | null = null): void {
   const ui = useUiStore.getState();
   ui.triggerWordShake(resubmittedWord);
-  ui.showToast(msg, 'error', 2000, '', 'ok', () => {
+  ui.showToast(msg, 'error', 2000, () => {
     if (useUiStore.getState().wordRejected) {
       useUiStore.getState().clearWordRejection();
       useGameStore.setState({ currentWord: '' });
@@ -98,8 +90,6 @@ export const useGameStore = create<GameState>()((set, get) => ({
   scoreBeforeHints: null,
   startedAt: 0,
   totalPausedMs: 0,
-  newAchievement: null,
-  clearNewAchievement: () => set({ newAchievement: null }),
 
   center: () => get().puzzle?.center ?? '',
   allLetters: () => {
@@ -202,6 +192,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
       pts,
       pangram,
       newFoundWords,
+      previousScore: state.score,
       newScore,
       previousRank,
       newRank,
@@ -213,7 +204,6 @@ export const useGameStore = create<GameState>()((set, get) => ({
       totalPausedMs: state.totalPausedMs,
       scoreBeforeHints: state.scoreBeforeHints,
       foundWords,
-      onNewAchievement: (newAchievement) => set({ newAchievement }),
     });
   },
 

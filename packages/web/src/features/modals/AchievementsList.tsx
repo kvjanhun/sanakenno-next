@@ -1,30 +1,14 @@
 import {
   evaluateAchievements,
-  type AchievementTierKey,
   type PlayerAchievementProgress,
   type PlayerStats,
 } from '@sanakenno/shared';
 import { CheckIcon } from '../gameplay/icons.js';
-import { AchievementIcon, TrophyIcon } from './achievementIcons.js';
+import { getTierToken, HexagonMedallion, TrophyIcon } from './achievementIcons.js';
 
 export interface AchievementsListProps {
   stats: PlayerStats;
   streak: { current: number; best: number };
-}
-
-function getTierToken(key: AchievementTierKey): string {
-  switch (key) {
-    case 'bronze':
-      return 'var(--color-tier-bronze)';
-    case 'silver':
-      return 'var(--color-tier-silver)';
-    case 'gold':
-      return 'var(--color-tier-gold)';
-    case 'diamond':
-      return 'var(--color-tier-diamond)';
-    case 'master':
-      return 'var(--color-tier-master)';
-  }
 }
 
 function computeTimelineProgress(item: PlayerAchievementProgress): number {
@@ -46,46 +30,6 @@ function computeTimelineProgress(item: PlayerAchievementProgress): number {
 
   const basePct = 10 + (currentLevel - 1) * 20;
   return basePct + progressInRange * 20;
-}
-
-function HexagonMedallion({
-  id,
-  tierToken,
-  isActivated,
-}: {
-  id: string;
-  tierToken?: string;
-  isActivated: boolean;
-}): React.JSX.Element {
-  return (
-    <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
-      <svg
-        viewBox="0 0 40 40"
-        className="absolute inset-0 w-full h-full transition-all duration-300"
-        fill="none"
-      >
-        <polygon
-          points="20,2 36,11 36,29 20,38 4,29 4,11"
-          stroke={isActivated && tierToken ? tierToken : 'var(--color-border)'}
-          strokeWidth={isActivated ? '2.5' : '1.5'}
-          strokeLinejoin="round"
-          fill={
-            isActivated && tierToken
-              ? `color-mix(in srgb, ${tierToken} 18%, var(--color-bg-primary))`
-              : 'var(--color-bg-primary)'
-          }
-        />
-      </svg>
-      <div
-        className="relative z-10 transition-colors duration-300"
-        style={{
-          color: isActivated && tierToken ? tierToken : 'var(--color-text-tertiary)',
-        }}
-      >
-        <AchievementIcon id={id} size={20} strokeWidth={isActivated ? 2.4 : 2} />
-      </div>
-    </div>
-  );
 }
 
 export function AchievementsList({ stats, streak }: AchievementsListProps): React.JSX.Element {

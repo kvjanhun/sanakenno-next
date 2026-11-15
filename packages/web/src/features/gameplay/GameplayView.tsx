@@ -3,7 +3,7 @@ import { ConnectBanner } from '../player-sync/ConnectBanner.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { usePaletteStore } from '../theme/usePaletteStore.js';
 import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
-import { AchievementNotification } from './AchievementNotification.js';
+import { AnnouncementBanner } from './AnnouncementBanner.js';
 import { Celebration } from './Celebration.js';
 import { FoundWords } from './FoundWords.js';
 import { GameControls } from './GameControls.js';
@@ -65,8 +65,6 @@ export function GameplayView(): React.JSX.Element {
 
   const message = useUiStore((s) => s.message);
   const messageType = useUiStore((s) => s.messageType);
-  const secondaryMessage = useUiStore((s) => s.secondaryMessage);
-  const secondaryType = useUiStore((s) => s.secondaryType);
   const showRanks = useUiStore((s) => s.showRanks);
   const showRules = useUiStore((s) => s.showRules);
   const showAllFoundWords = useUiStore((s) => s.showAllFoundWords);
@@ -398,6 +396,7 @@ export function GameplayView(): React.JSX.Element {
                   scoreBeforeHints={displayScoreBeforeHints}
                   hasUnlockedHints={hintsUnlocked.size > 0}
                 />
+                <AnnouncementBanner />
               </div>
 
               <HintPanels
@@ -418,12 +417,7 @@ export function GameplayView(): React.JSX.Element {
 
               {!allFound && (
                 <div className="mb-2">
-                  <MessageBar
-                    message={message}
-                    type={messageType}
-                    secondaryMessage={secondaryMessage}
-                    secondaryType={secondaryType}
-                  />
+                  <MessageBar message={message} type={messageType} />
                 </div>
               )}
 
@@ -482,8 +476,6 @@ export function GameplayView(): React.JSX.Element {
           onShare={handleShare}
         />
       )}
-
-      <AchievementNotification />
     </div>
   );
 }

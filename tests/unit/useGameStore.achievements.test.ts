@@ -43,7 +43,6 @@ describe('useGameStore Achievements & Streak Integration', () => {
   beforeEach(() => {
     window.localStorage.clear();
     useGameStore.getState().reset();
-    useGameStore.setState({ newAchievement: null });
     useUiStore.setState({ viewingPuzzleDate: null });
   });
 
@@ -169,7 +168,7 @@ describe('useGameStore Achievements & Streak Integration', () => {
     expect(rec?.long_words_count).toBe(1);
   });
 
-  it('submitting a word that crosses an achievement tier boundary triggers newAchievement notification', async () => {
+  it('submitting a word that crosses an achievement tier boundary triggers an achievement_unlocked announcement', async () => {
     const today = getHelsinkiDateString();
     // Pre-seed 99 words across previous records (1 word away from Sanasampo Pronssi = 100 words)
     const seededStats: PlayerStats = {
@@ -199,22 +198,96 @@ describe('useGameStore Achievements & Streak Integration', () => {
     }
     await useGameStore.getState().submitWord();
 
-    const newAch = useGameStore.getState().newAchievement;
-    expect(newAch).not.toBeNull();
-    expect(newAch?.id).toBe('total_words');
-    expect(newAch?.title).toBe('Sanasampo');
-    expect(newAch?.tierName).toBe('Pronssi');
-    expect(newAch?.target).toBe(100);
+    const ann = useUiStore.getState().activeAnnouncement;
+    expect(ann).not.toBeNull();
+    expect(ann).toMatchObject({
+      kind: 'achievement',
+      category: 'achievement_unlocked',
+      achievementId: 'total_words',
+      title: 'Sanasampo',
+      subtitle: 'Uusi saavutus · 100 sanaa',
+      tierKey: 'bronze',
+      tierName: 'Pronssi',
+      isUnlock: true,
+    });
 
-    // Clear notification
-    useGameStore.getState().clearNewAchievement();
-    expect(useGameStore.getState().newAchievement).toBeNull();
+    // Dismiss notification
+    useUiStore.getState().dismissAnnouncement();
+    expect(useUiStore.getState().activeAnnouncement).toBeNull();
 
-    // Subsequent word submission that does NOT cross a tier boundary does not trigger notification
+    // Subsequent word submission that does NOT cross a tier boundary does not trigger achievement notification
     for (const char of 'kala') {
       useGameStore.getState().addLetter(char);
     }
     await useGameStore.getState().submitWord();
-    expect(useGameStore.getState().newAchievement).toBeNull();
+    expect(useUiStore.getState().activeAnnouncement).toBeNull();
+  });
+
+  it('queues an achievement_progress announcement when daily streak increments or a pangram reaches 1 away from a tier', async () => {
+    const today = getHelsinkiDateString();
+    const yesterday = new Date(`${today}T12:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    // Pre-seed yesterday's daily play (streak = 1) and 5 pangrams (so next pangram -> 6/7 = 1 away from Pronssi)
+    saveToStorage(STATS_STORAGE_KEY, {
+      version: 1,
+      records: [
+        {
+          puzzle_number: 1,
+          date: yesterdayStr,
+          best_rank: 'Onnistuja',
+          best_score: 50,
+          max_score: 100,
+          words_found: 10,
+          pangrams_found: 5,
+          hints_used: 1,
+          elapsed_ms: 5000,
+          is_daily: true,
+          played_at_date: yesterdayStr,
+        },
+      ],
+    });
+
+    const puzzle = await buildTestPuzzle(10, today);
+    await useGameStore.getState().loadPuzzle(puzzle);
+
+    for (const char of 'kansallinen') {
+      useGameStore.getState().addLetter(char);
+    }
+    await useGameStore.getState().submitWord();
+
+    // 1st queued: Pangrammi!
+    expect(useUiStore.getState().activeAnnouncement?.category).toBe('pangram');
+    useUiStore.getState().dismissAnnouncement();
+
+    // 2nd queued: Unassisted 25% milestone (18 / 50 = 36%)
+    expect(useUiStore.getState().activeAnnouncement?.category).toBe('no_hint_milestone');
+    useUiStore.getState().dismissAnnouncement();
+
+    // 3rd queued: Streak progress (2 / 7 päivää)
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'achievement',
+      category: 'achievement_progress',
+      achievementId: 'streak',
+      title: 'Päivittäinen tapa',
+      subtitle: 'Edistyminen · 2 / 7 päivää',
+      tierKey: 'bronze',
+      tierName: 'Pronssi',
+      isUnlock: false,
+    });
+    useUiStore.getState().dismissAnnouncement();
+
+    // 4th queued: Pangram near-unlock progress (6 / 7 pangrammia)
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'achievement',
+      category: 'achievement_progress',
+      achievementId: 'pangrams',
+      title: 'Taitava #7',
+      subtitle: 'Edistyminen · 6 / 7 pangrammia',
+      tierKey: 'bronze',
+      tierName: 'Pronssi',
+      isUnlock: false,
+    });
   });
 });

@@ -2,11 +2,13 @@ import {
   computeStreak,
   evaluateAchievements,
   getHelsinkiDateString,
+  noHintMilestoneStates,
   type PuzzleResponse,
   type RankName,
 } from '@sanakenno/shared';
 import { postAchievement, postWordFind } from '../../api/client.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
+import { formatAnnouncementCount } from './announcements.js';
 import { recordLocalStatsUpdate } from './storage.js';
 import { useUiStore } from './useUiStore.js';
 
@@ -15,6 +17,7 @@ export interface AcceptedWordContext {
   pts: number;
   pangram: boolean;
   newFoundWords: Set<string>;
+  previousScore?: number;
   newScore: number;
   previousRank: string;
   newRank: string;
@@ -26,14 +29,9 @@ export interface AcceptedWordContext {
   totalPausedMs: number;
   scoreBeforeHints: number | null;
   foundWords: Set<string>;
-  onNewAchievement: (ach: {
-    id: string;
-    title: string;
-    tierName: string;
-    target: number;
-    unit?: string;
-  }) => void;
 }
+
+const NEAR_UNLOCK_PROGRESS_IDS = new Set(['pangrams', 'full_board', 'unassisted_master']);
 
 export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
   const {
@@ -41,6 +39,7 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     pts,
     pangram,
     newFoundWords,
+    previousScore,
     newScore,
     previousRank,
     newRank,
@@ -52,8 +51,9 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     totalPausedMs,
     scoreBeforeHints,
     foundWords,
-    onNewAchievement,
   } = ctx;
+
+  const ui = useUiStore.getState();
 
   postWordFind({ word: normalized, puzzle_number: puzzle.puzzle_number });
 
@@ -68,15 +68,87 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     });
 
     if (newRank === 'Täysi kenno') {
-      useUiStore.getState().setCelebration('taysikenno');
+      ui.setCelebration('taysikenno');
     } else if (newRank === 'Ällistyttävä') {
-      useUiStore
-        .getState()
-        .setCelebration(visibleHintsUnlocked.length === 0 ? 'nohint-allistyttava' : 'allistyttava');
+      ui.setCelebration(visibleHintsUnlocked.length === 0 ? 'nohint-allistyttava' : 'allistyttava');
     }
   }
 
-  const viewingDate = useUiStore.getState().viewingPuzzleDate;
+  ui.showToast(`+${pts}`, 'ok', 2000);
+  if (pangram) {
+    ui.triggerPangramRipple();
+  }
+
+  const firstLetter = normalized[0];
+  let letterCleared = false;
+  const totalForLetter = firstLetter ? (puzzle.hint_data.by_letter[firstLetter] ?? 0) : 0;
+  if (firstLetter && totalForLetter > 0) {
+    let foundWithLetter = 0;
+    for (const w of foundWords) {
+      if (w[0] === firstLetter) foundWithLetter += 1;
+    }
+    if (foundWithLetter + 1 === totalForLetter) {
+      letterCleared = true;
+    }
+  }
+
+  if (pangram && letterCleared && firstLetter) {
+    const upper = firstLetter.toUpperCase();
+    ui.enqueueAnnouncement({
+      kind: 'gameplay',
+      category: 'pangram',
+      badgeText: '★',
+      title: `Pangrammi! · Kaikki ${upper}-alkuiset löydetty!`,
+      metaPill: `${totalForLetter}/${totalForLetter}`,
+    });
+  } else if (pangram) {
+    ui.enqueueAnnouncement({
+      kind: 'gameplay',
+      category: 'pangram',
+      badgeText: '★',
+      title: 'Pangrammi! Kaikki 7 kirjainta käytetty',
+      metaPill: '+7 p.',
+    });
+  } else if (letterCleared && firstLetter) {
+    const upper = firstLetter.toUpperCase();
+    ui.enqueueAnnouncement({
+      kind: 'gameplay',
+      category: 'letter_cleared',
+      badgeText: upper,
+      title: `Kaikki ${upper}-alkuiset sanat löydetty!`,
+      metaPill: `${totalForLetter}/${totalForLetter}`,
+    });
+  }
+
+  if (
+    visibleHintsUnlocked.length === 0 &&
+    puzzle.max_score > 0 &&
+    newRank !== 'Ällistyttävä' &&
+    newRank !== 'Täysi kenno'
+  ) {
+    const prevScore = previousScore ?? Math.max(0, newScore - pts);
+    const prevMilestones = noHintMilestoneStates(prevScore, puzzle.max_score);
+    const nextMilestones = noHintMilestoneStates(newScore, puzzle.max_score);
+    const highestCrossed = nextMilestones
+      .filter((m) => {
+        if (m.pct === 70) return false;
+        const wasUnlocked = prevMilestones.find((p) => p.pct === m.pct)?.unlocked ?? false;
+        return m.unlocked && !wasUnlocked;
+      })
+      .at(-1);
+
+    if (highestCrossed) {
+      ui.enqueueAnnouncement({
+        kind: 'gameplay',
+        category: 'no_hint_milestone',
+        badgeText: `${highestCrossed.pct} %`,
+        title: `${highestCrossed.name} — ${highestCrossed.pct} % pisteistä ilman apuja!`,
+        metaPill: 'Ilman apuja',
+      });
+    }
+  }
+
+  const viewingDate = ui.viewingPuzzleDate;
   const isDaily =
     viewingDate === null && (puzzle.date ? puzzle.date === getHelsinkiDateString() : true);
 
@@ -99,20 +171,51 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     const newStreak = computeStreak(statsResult.updated.records);
     const prevEvals = evaluateAchievements(statsResult.previous, prevStreak);
     const newEvals = evaluateAchievements(statsResult.updated, newStreak);
+    const unlockedIds = new Set<string>();
 
     for (const newProg of newEvals) {
       const oldProg = prevEvals.find((p) => p.id === newProg.id);
       const oldTier = oldProg?.unlockedTier ?? 0;
       if (newProg.unlockedTier > oldTier && newProg.currentTier) {
-        const tier = newProg.currentTier;
-        onNewAchievement({
-          id: newProg.id,
+        unlockedIds.add(newProg.id);
+        const unitSuffix = newProg.unit ? ` ${newProg.unit}` : '';
+        ui.enqueueAnnouncement({
+          kind: 'achievement',
+          category: 'achievement_unlocked',
+          achievementId: newProg.id,
           title: newProg.title,
-          tierName: tier.name,
-          target: tier.target,
-          unit: newProg.unit,
+          subtitle: `Uusi saavutus · ${formatAnnouncementCount(newProg.currentTier.target)}${unitSuffix}`,
+          tierKey: newProg.currentTier.key,
+          tierName: newProg.currentTier.name,
+          isUnlock: true,
         });
-        break;
+      }
+    }
+
+    for (const newProg of newEvals) {
+      if (unlockedIds.has(newProg.id) || !newProg.nextTier) continue;
+      const oldProg = prevEvals.find((p) => p.id === newProg.id);
+      const oldVal = oldProg?.currentValue ?? 0;
+      const didAdvance = newProg.currentValue > oldVal;
+      if (!didAdvance) continue;
+
+      const isStreakAdvance = newProg.id === 'streak' && newStreak.current > prevStreak.current;
+      const isNearUnlock =
+        NEAR_UNLOCK_PROGRESS_IDS.has(newProg.id) &&
+        newProg.nextTier.target - newProg.currentValue === 1;
+
+      if (isStreakAdvance || isNearUnlock) {
+        const unitSuffix = newProg.unit ? ` ${newProg.unit}` : '';
+        ui.enqueueAnnouncement({
+          kind: 'achievement',
+          category: 'achievement_progress',
+          achievementId: newProg.id,
+          title: newProg.title,
+          subtitle: `Edistyminen · ${formatAnnouncementCount(newProg.currentValue)} / ${formatAnnouncementCount(newProg.nextTier.target)}${unitSuffix}`,
+          tierKey: newProg.nextTier.key,
+          tierName: newProg.nextTier.name,
+          isUnlock: false,
+        });
       }
     }
   }
@@ -120,7 +223,7 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
   // Debounced cloud sync
   const syncPayload = {
     puzzle_number: puzzle.puzzle_number,
-    date: useUiStore.getState().viewingPuzzleDate ?? getHelsinkiDateString(),
+    date: ui.viewingPuzzleDate ?? getHelsinkiDateString(),
     found_words: [...newFoundWords],
     score: newScore,
     hints_unlocked: visibleHintsUnlocked,
@@ -136,38 +239,5 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
   // Immediate flush on major milestones
   if (newRank === 'Ällistyttävä' || newRank === 'Täysi kenno') {
     void useAuthStore.getState().flushPendingSync();
-  }
-
-  const firstLetter = normalized[0];
-  let letterCleared = false;
-  if (firstLetter && puzzle.hint_data.by_letter[firstLetter]) {
-    const totalForLetter = puzzle.hint_data.by_letter[firstLetter];
-    let foundWithLetter = 0;
-    for (const w of foundWords) {
-      if (w[0] === firstLetter) foundWithLetter += 1;
-    }
-    if (foundWithLetter + 1 === totalForLetter) {
-      letterCleared = true;
-    }
-  }
-
-  if (pangram) {
-    useUiStore.getState().triggerPangramRipple();
-    const secondary = letterCleared
-      ? `Pangrammi! · Kaikki ${firstLetter?.toUpperCase()}-sanat!`
-      : 'Pangrammi!';
-    useUiStore.getState().showToast(`+${pts}`, 'ok', 2500, secondary, 'special');
-  } else if (letterCleared) {
-    useUiStore
-      .getState()
-      .showToast(
-        `+${pts}`,
-        'ok',
-        2500,
-        `Kaikki ${firstLetter?.toUpperCase()}-alkuiset löydetty!`,
-        'special',
-      );
-  } else {
-    useUiStore.getState().showToast(`+${pts}`, 'ok', 2000);
   }
 }

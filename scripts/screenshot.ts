@@ -278,6 +278,22 @@ async function captureWithCdp(
       await new Promise((r) => setTimeout(r, 400));
     }
 
+    if (target.action?.startsWith('view-announcement')) {
+      if (target.action.includes('light')) {
+        await send('Runtime.evaluate', {
+          expression: `document.documentElement.setAttribute('data-theme', 'light')`,
+        });
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const cmd = target.action.includes('achievement')
+        ? `window.sanakennoAnnounce?.('achievement', 'total_words', 'gold')`
+        : target.action.includes('progress')
+          ? `window.sanakennoAnnounce?.('progress', 'streak', 6, 7, 'bronze')`
+          : `window.sanakennoAnnounce?.('letter', 'K', 7)`;
+      await send('Runtime.evaluate', { expression: cmd });
+      await new Promise((r) => setTimeout(r, 350));
+    }
+
     const result = (await send('Page.captureScreenshot', {
       format: 'png',
       clip: { x: 0, y: 0, width: target.width, height: target.height, scale: 1 },
@@ -413,6 +429,27 @@ async function main() {
         height: 844,
         mobile: true,
         action: 'view-clues-open-typed',
+      },
+      {
+        name: 'desktop-announcement-achievement',
+        width: 1280,
+        height: 800,
+        mobile: false,
+        action: 'view-announcement-achievement',
+      },
+      {
+        name: 'mobile-announcement-letter',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-announcement-letter',
+      },
+      {
+        name: 'mobile-announcement-progress-light',
+        width: 390,
+        height: 844,
+        mobile: true,
+        action: 'view-announcement-progress-light',
       },
     ];
 

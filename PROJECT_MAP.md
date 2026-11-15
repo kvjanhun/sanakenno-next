@@ -42,7 +42,7 @@ sanakenno-next/
         api/                 # Typed Hono RPC client (hc<AppType>), split into client.ts and admin-client.ts
         pwa.config.ts        # PWA manifest, service worker registration & Workbox runtime caching
         features/
-          gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AchievementNotification), gameplay-effects.ts, useMidnightRollover, and hybrid state
+          gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AnnouncementBanner), announcements, gameplay-effects.ts, useMidnightRollover, and hybrid state
           modals/            # Code-split modals via React.lazy() (ModalShell, ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal) and PrivacySection (GDPR Art. 13 & localStorage disclosure)
           player-sync/       # Player auth store with debounced sync queue and keepalive, monotonic sync reconciliation, 6-digit PIN SyncModal, ConnectBanner
           theme/             # 6-palette CSS custom property theme system (usePaletteStore, useThemePreferenceStore, ThemeSelector, ThemeToggle)
