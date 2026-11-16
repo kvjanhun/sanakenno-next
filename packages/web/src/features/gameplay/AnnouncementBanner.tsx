@@ -45,13 +45,13 @@ export function AnnouncementBanner(): React.JSX.Element | null {
         background: `linear-gradient(90deg, color-mix(in srgb, ${tone} 14%, var(--color-bg-primary)) 0%, var(--color-bg-primary) 72%)`,
         border: `1.5px solid color-mix(in srgb, ${tone} 68%, var(--color-border))`,
         borderLeft: `4px solid ${tone}`,
-        boxShadow: `0 4px 16px var(--color-button-shadow), 0 0 12px color-mix(in srgb, ${tone} 15%, transparent)`,
+        boxShadow: `0 4px 12px var(--color-button-shadow), 0 0 10px color-mix(in srgb, ${tone} 15%, transparent)`,
       }
     : {
         background: `color-mix(in srgb, ${tone} 6%, var(--color-bg-primary))`,
         border: `1px solid color-mix(in srgb, ${tone} 42%, var(--color-border))`,
         borderLeft: `4px solid ${tone}`,
-        boxShadow: '0 4px 14px var(--color-button-shadow)',
+        boxShadow: '0 4px 12px var(--color-button-shadow)',
       };
 
   return (
@@ -62,10 +62,12 @@ export function AnnouncementBanner(): React.JSX.Element | null {
       style={{
         position: 'absolute',
         top: '100%',
-        left: 0,
-        right: 0,
+        left: '-12px',
+        right: '-12px',
+        padding: '0 12px 20px 12px',
         zIndex: 30,
         marginTop: '0.35rem',
+        transform: 'translate3d(0, 0, 0)',
       }}
     >
       <button
