@@ -33,6 +33,7 @@ function ControlButton({
   accentGloss,
   Icon,
   className = '',
+  disabled = false,
 }: {
   label: string;
   variant: ControlVariant;
@@ -40,11 +41,13 @@ function ControlButton({
   accentGloss: string;
   Icon: ComponentType<IconProps>;
   className?: string;
+  disabled?: boolean;
 }): React.JSX.Element {
   const isAccent = variant === 'accent';
   const handledByPointerRef = useRef(false);
 
   const handlePointerDown = (e: PointerEvent<HTMLButtonElement>): void => {
+    if (disabled) return;
     e.preventDefault();
     e.currentTarget.releasePointerCapture?.(e.pointerId);
     handledByPointerRef.current = true;
@@ -52,6 +55,7 @@ function ControlButton({
   };
 
   const handleClick = (): void => {
+    if (disabled) return;
     if (handledByPointerRef.current) {
       handledByPointerRef.current = false;
       return;
@@ -62,10 +66,15 @@ function ControlButton({
   return (
     <button
       type="button"
+      disabled={disabled}
       onPointerDown={handlePointerDown}
       onClick={handleClick}
       aria-label={label}
-      className={`relative min-w-0 overflow-hidden rounded-xl text-sm font-medium cursor-pointer transition-transform duration-100 active:translate-y-px active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-offset-2 flex items-center justify-center ${className}`}
+      className={`relative min-w-0 overflow-hidden rounded-xl text-sm font-medium transition-transform duration-100 focus-visible:outline-2 focus-visible:outline-offset-2 flex items-center justify-center ${
+        disabled
+          ? 'cursor-default opacity-45'
+          : 'cursor-pointer active:translate-y-px active:scale-[0.985]'
+      } ${className}`}
       style={{
         backgroundColor: 'transparent',
         color: isAccent ? 'var(--color-on-accent)' : 'var(--color-text-primary)',
@@ -107,6 +116,7 @@ export interface GameControlsProps {
   onShare: () => void;
   shareCopied: boolean;
   onSubmit: () => void;
+  disabled?: boolean;
   themeId?: ThemeId;
   scheme?: 'light' | 'dark';
 }
@@ -117,6 +127,7 @@ export function GameControls({
   onShare,
   shareCopied,
   onSubmit,
+  disabled = false,
   themeId = DEFAULT_THEME_ID,
   scheme = 'light',
 }: GameControlsProps): React.JSX.Element {
@@ -143,6 +154,7 @@ export function GameControls({
         className="w-20 h-11"
         accentGloss={accentGloss}
         onAction={onDelete}
+        disabled={disabled}
       />
       <ControlButton
         label="Sekoita"
@@ -151,6 +163,7 @@ export function GameControls({
         className="w-12 h-11"
         accentGloss={accentGloss}
         onAction={onShuffle}
+        disabled={disabled}
       />
       <div style={{ position: 'relative' }}>
         <ControlButton
@@ -191,6 +204,7 @@ export function GameControls({
         className="w-20 h-11"
         accentGloss={accentGloss}
         onAction={onSubmit}
+        disabled={disabled}
       />
     </div>
   );

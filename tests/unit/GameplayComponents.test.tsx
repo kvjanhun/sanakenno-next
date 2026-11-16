@@ -430,4 +430,46 @@ describe('Gameplay UI Components', () => {
     const controlsRow = gcContainer.firstElementChild;
     expect(controlsRow?.className).toContain('gap-2.5 sm:gap-3');
   });
+
+  it('GameControls deactivates Poista, Sekoita, and OK when disabled while keeping Jaa active', () => {
+    const onDelete = vi.fn();
+    const onShuffle = vi.fn();
+    const onShare = vi.fn();
+    const onSubmit = vi.fn();
+
+    render(
+      <GameControls
+        onDelete={onDelete}
+        onShuffle={onShuffle}
+        onShare={onShare}
+        shareCopied={false}
+        onSubmit={onSubmit}
+        disabled={true}
+      />,
+    );
+
+    const deleteBtn = screen.getByRole('button', { name: 'Poista' });
+    const shuffleBtn = screen.getByRole('button', { name: 'Sekoita' });
+    const shareBtn = screen.getByRole('button', { name: 'Jaa' });
+    const submitBtn = screen.getByRole('button', { name: 'OK' });
+
+    expect(deleteBtn).toBeDisabled();
+    expect(shuffleBtn).toBeDisabled();
+    expect(submitBtn).toBeDisabled();
+    expect(shareBtn).not.toBeDisabled();
+
+    fireEvent.pointerDown(deleteBtn);
+    fireEvent.click(deleteBtn);
+    fireEvent.pointerDown(shuffleBtn);
+    fireEvent.click(shuffleBtn);
+    fireEvent.pointerDown(submitBtn);
+    fireEvent.click(submitBtn);
+
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(onShuffle).not.toHaveBeenCalled();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    fireEvent.click(shareBtn);
+    expect(onShare).toHaveBeenCalledTimes(1);
+  });
 });

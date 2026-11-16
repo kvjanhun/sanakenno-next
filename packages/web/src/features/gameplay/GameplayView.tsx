@@ -442,19 +442,18 @@ export function GameplayView(): React.JSX.Element {
                 />
               </div>
 
-              {!allFound && (
-                <div className="mb-3">
-                  <GameControls
-                    onDelete={() => useGameStore.getState().deleteLetter()}
-                    onShuffle={() => useGameStore.getState().shuffleLetters()}
-                    onShare={handleShare}
-                    shareCopied={shareCopied}
-                    onSubmit={() => {
-                      void useGameStore.getState().submitWord();
-                    }}
-                  />
-                </div>
-              )}
+              <div className="mb-3">
+                <GameControls
+                  onDelete={() => useGameStore.getState().deleteLetter()}
+                  onShuffle={() => useGameStore.getState().shuffleLetters()}
+                  onShare={handleShare}
+                  shareCopied={shareCopied}
+                  onSubmit={() => {
+                    void useGameStore.getState().submitWord();
+                  }}
+                  disabled={allFound}
+                />
+              </div>
 
               <div className="w-full min-h-[56px]">
                 <FoundWords

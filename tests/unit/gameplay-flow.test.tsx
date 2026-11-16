@@ -318,4 +318,51 @@ describe('Integrated Gameplay Flow (in-process)', () => {
     const mainInner = mainEl.firstElementChild;
     expect(mainInner?.className).toContain('w-full max-w-[440px] mx-auto px-3.5 sm:px-4');
   });
+
+  it('keeps GameControls visible with Poista/Sekoita/OK disabled and Jaa active when all words are found', async () => {
+    window.localStorage.setItem(
+      puzzleStateKey(2),
+      JSON.stringify({
+        foundWords: ['kana', 'kala'],
+        score: 8,
+        hintsUnlocked: [],
+        scoreBeforeHints: 8,
+      }),
+    );
+
+    mockPuzzleData = {
+      puzzle_number: 2,
+      display_number: 2,
+      total_puzzles: 10,
+      center: 'a',
+      letters: ['a', 'k', 'l', 'n', 'e', 'i', 's'],
+      word_hashes: [await hashWord('kana'), await hashWord('kala')],
+      max_score: 8,
+      hint_data: {
+        word_count: 2,
+        pangram_count: 0,
+        by_letter: { k: 2 },
+        by_length: { '4': 2 },
+        by_pair: {},
+        matrix: { k: { '4': 2 } },
+      },
+    };
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <GameplayView />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('word-input')).toHaveTextContent('Kaikki 2 sanaa löydetty!');
+    });
+
+    expect(screen.getByRole('button', { name: 'Poista' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Sekoita' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'OK' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Jaa' })).not.toBeDisabled();
+  });
 });
