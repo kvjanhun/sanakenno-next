@@ -5,6 +5,7 @@ import {
   ADMIN_CARD_STYLE,
   ADMIN_INPUT_CLASS,
   ADMIN_INPUT_STYLE,
+  ADMIN_NO_SPINNER_CLASS,
   adminButtonClass,
   adminButtonStyle,
 } from './AdminPrimitives.js';
@@ -55,7 +56,7 @@ interface PuzzleSlotControlsProps {
 }
 
 const navButtonClass =
-  'px-2.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer border-none transition-colors disabled:opacity-35 disabled:cursor-not-allowed';
+  'px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-medium text-center whitespace-nowrap cursor-pointer border-none transition-colors disabled:opacity-35 disabled:cursor-not-allowed';
 
 export function PuzzleSlotControls({
   currentSlot,
@@ -170,7 +171,7 @@ export function PuzzleSlotControls({
       </div>
 
       <div
-        className="flex flex-wrap items-center gap-1 p-1 rounded-xl border w-fit max-w-full"
+        className="grid grid-cols-5 sm:inline-flex items-center gap-1 p-1 rounded-xl border w-full sm:w-auto"
         style={{
           backgroundColor: 'var(--color-bg-primary)',
           borderColor: 'var(--color-border)',
@@ -186,7 +187,7 @@ export function PuzzleSlotControls({
             className={navButtonClass}
             style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
           >
-            |← Ensimmäinen
+            |←<span className="hidden sm:inline"> Ensimmäinen</span>
           </button>
         )}
         <button
@@ -197,7 +198,7 @@ export function PuzzleSlotControls({
           className={navButtonClass}
           style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
         >
-          ← Edellinen
+          ←<span className="hidden sm:inline"> Edellinen</span>
         </button>
         {onToday && (
           <button
@@ -223,7 +224,7 @@ export function PuzzleSlotControls({
           className={navButtonClass}
           style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
         >
-          Seuraava →
+          <span className="hidden sm:inline">Seuraava </span>→
         </button>
         {onLast && (
           <button
@@ -235,7 +236,7 @@ export function PuzzleSlotControls({
             className={navButtonClass}
             style={{ backgroundColor: 'transparent', color: 'var(--color-text-primary)' }}
           >
-            Viimeinen →|
+            <span className="hidden sm:inline">Viimeinen </span>→|
           </button>
         )}
       </div>
@@ -255,7 +256,7 @@ export function PuzzleSlotControls({
               placeholder="#"
               value={jumpTarget}
               onChange={(e) => onJumpTargetChange(e.target.value)}
-              className={`w-16 text-center tabular-nums py-1 ${ADMIN_INPUT_CLASS}`}
+              className={`w-20 px-2 text-center tabular-nums py-1 ${ADMIN_INPUT_CLASS} ${ADMIN_NO_SPINNER_CLASS}`}
               style={ADMIN_INPUT_STYLE}
             />
             <button
@@ -279,7 +280,7 @@ export function PuzzleSlotControls({
               placeholder="#"
               value={swapTarget}
               onChange={(e) => onSwapTargetChange(e.target.value)}
-              className={`w-16 text-center tabular-nums py-1 ${ADMIN_INPUT_CLASS}`}
+              className={`w-20 px-2 text-center tabular-nums py-1 ${ADMIN_INPUT_CLASS} ${ADMIN_NO_SPINNER_CLASS}`}
               style={ADMIN_INPUT_STYLE}
             />
             <button

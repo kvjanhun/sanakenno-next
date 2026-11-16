@@ -13,6 +13,7 @@ import {
   SegmentedControl,
   adminButtonClass,
   adminButtonStyle,
+  useIsDesktop,
 } from './AdminPrimitives.js';
 
 interface StatsProps {
@@ -20,6 +21,7 @@ interface StatsProps {
 }
 
 export function Stats({ csrfToken }: StatsProps): React.JSX.Element {
+  const isDesktop = useIsDesktop();
   const [days, setDays] = useState(7);
   const [mode, setMode] = useState<'users' | 'all'>('users');
   const [data, setData] = useState<AdminAchievementsResponse | null>(null);
@@ -90,7 +92,7 @@ export function Stats({ csrfToken }: StatsProps): React.JSX.Element {
       {data && (
         <div className="space-y-4">
           <div
-            className={`${ADMIN_CARD_CLASS} grid grid-cols-2 sm:grid-cols-4 gap-3 text-center`}
+            className={`${ADMIN_CARD_CLASS} grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-center`}
             style={ADMIN_CARD_STYLE}
           >
             {Object.entries(data.totals).map(([rank, count]) => (
@@ -113,47 +115,83 @@ export function Stats({ csrfToken }: StatsProps): React.JSX.Element {
             ))}
           </div>
 
-          <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
-            <table className="w-full text-left text-xs border-collapse tabular-nums">
-              <thead>
-                <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
-                  <th className="p-3">Päivämäärä</th>
-                  <th className="p-3 text-right">Yhteensä</th>
-                  {Object.keys(data.totals).map((rank) => (
-                    <th key={rank} className="p-3 text-right">
-                      {rank}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.daily.map((day) => (
-                  <tr
-                    key={day.date}
-                    className={ADMIN_TABLE_ROW_CLASS}
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <td className="p-3 font-medium whitespace-nowrap">{day.date}</td>
-                    <td className="p-3 text-right font-bold">{day.total}</td>
+          {!isDesktop ? (
+            <div className="space-y-2.5 tabular-nums">
+              {data.daily.map((day) => (
+                <div
+                  key={day.date}
+                  className="p-3.5 rounded-xl border space-y-2"
+                  style={ADMIN_CARD_STYLE}
+                >
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span>{day.date}</span>
+                    <span>Yhteensä: {day.total}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
                     {Object.keys(data.totals).map((rank) => (
-                      <td
+                      <div
                         key={rank}
-                        className="p-3 text-right"
+                        className="flex items-center justify-between px-2 py-1 rounded-lg border"
                         style={{
+                          backgroundColor: 'var(--color-bg-primary)',
+                          borderColor: 'var(--color-border)',
                           color:
                             (day.counts[rank] ?? 0) > 0
                               ? 'var(--color-text-primary)'
                               : 'var(--color-text-tertiary)',
                         }}
                       >
-                        {day.counts[rank] ?? 0}
-                      </td>
+                        <span className="truncate mr-1">{rank}</span>
+                        <span className="font-semibold">{day.counts[rank] ?? 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+              <table className="w-full text-left text-xs border-collapse tabular-nums">
+                <thead>
+                  <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
+                    <th className="p-3">Päivämäärä</th>
+                    <th className="p-3 text-right">Yhteensä</th>
+                    {Object.keys(data.totals).map((rank) => (
+                      <th key={rank} className="p-3 text-right">
+                        {rank}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {data.daily.map((day) => (
+                    <tr
+                      key={day.date}
+                      className={ADMIN_TABLE_ROW_CLASS}
+                      style={{ borderColor: 'var(--color-border)' }}
+                    >
+                      <td className="p-3 font-medium whitespace-nowrap">{day.date}</td>
+                      <td className="p-3 text-right font-bold">{day.total}</td>
+                      {Object.keys(data.totals).map((rank) => (
+                        <td
+                          key={rank}
+                          className="p-3 text-right"
+                          style={{
+                            color:
+                              (day.counts[rank] ?? 0) > 0
+                                ? 'var(--color-text-primary)'
+                                : 'var(--color-text-tertiary)',
+                          }}
+                        >
+                          {day.counts[rank] ?? 0}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

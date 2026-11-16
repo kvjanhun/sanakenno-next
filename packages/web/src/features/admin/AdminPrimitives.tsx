@@ -1,4 +1,23 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+
+export function useIsDesktop(): boolean {
+  const getMatches = () => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
+    return window.matchMedia('(min-width: 768px)').matches;
+  };
+  const [isDesktop, setIsDesktop] = useState(getMatches);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(min-width: 768px)');
+    setIsDesktop(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  return isDesktop;
+}
 
 export type AdminButtonVariant = 'primary' | 'secondary' | 'danger';
 export type AdminAlertVariant = 'error' | 'success' | 'warning';
@@ -17,6 +36,8 @@ export const ADMIN_SUBCARD_STYLE: CSSProperties = {
 
 export const ADMIN_INPUT_CLASS =
   'px-3 py-1.5 rounded-lg border text-sm outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--color-accent)]';
+export const ADMIN_NO_SPINNER_CLASS =
+  '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 export const ADMIN_INPUT_STYLE: CSSProperties = {
   backgroundColor: 'var(--color-bg-primary)',
   borderColor: 'var(--color-border)',

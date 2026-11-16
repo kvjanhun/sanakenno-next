@@ -18,6 +18,7 @@ export function BlockedWords(): React.JSX.Element {
     [],
   );
   const [newWord, setNewWord] = useState('');
+  const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,32 +95,62 @@ export function BlockedWords(): React.JSX.Element {
         </button>
       </form>
 
-      <div className={ADMIN_CARD_CLASS} style={ADMIN_CARD_STYLE}>
+      <div className={`${ADMIN_CARD_CLASS} space-y-4`} style={ADMIN_CARD_STYLE}>
         {blocked.length === 0 ? (
           <p className="text-xs italic" style={{ color: 'var(--color-text-secondary)' }}>
             Ei vielä estettyjä sanoja.
           </p>
         ) : (
-          <div>
-            {blocked.map((item) => (
-              <div
-                key={item.id}
-                className="py-2.5 flex justify-between items-center border-b last:border-b-0"
-                style={{ borderColor: 'var(--color-border)' }}
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <input
+                type="search"
+                placeholder="Suodata estettyjä sanoja..."
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className={`w-full sm:w-64 ${ADMIN_INPUT_CLASS}`}
+                style={ADMIN_INPUT_STYLE}
+              />
+              <span
+                className="text-xs tabular-nums"
+                style={{ color: 'var(--color-text-secondary)' }}
               >
-                <span className="text-sm font-medium">{item.word}</span>
-                <button
-                  type="button"
-                  onClick={() => handleUnblock(item.id)}
-                  disabled={loading}
-                  className={adminButtonClass('sm')}
-                  style={adminButtonStyle('danger')}
-                >
-                  Poista esto
-                </button>
-              </div>
-            ))}
-          </div>
+                Näytetään{' '}
+                {
+                  blocked.filter((item) =>
+                    item.word.toLowerCase().includes(filter.trim().toLowerCase()),
+                  ).length
+                }{' '}
+                / {blocked.length}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {blocked
+                .filter((item) => item.word.toLowerCase().includes(filter.trim().toLowerCase()))
+                .map((item) => (
+                  <div
+                    key={item.id}
+                    className="px-3 py-2 rounded-xl border flex justify-between items-center gap-2"
+                    style={{
+                      backgroundColor: 'var(--color-bg-primary)',
+                      borderColor: 'var(--color-border)',
+                    }}
+                  >
+                    <span className="text-sm font-medium truncate">{item.word}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleUnblock(item.id)}
+                      disabled={loading}
+                      className={`${adminButtonClass('sm')} shrink-0`}
+                      style={adminButtonStyle('danger')}
+                    >
+                      Poista esto
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </>
         )}
       </div>
     </div>

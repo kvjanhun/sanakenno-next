@@ -15,6 +15,7 @@ import {
   LetterTile,
   adminButtonClass,
   adminButtonStyle,
+  useIsDesktop,
 } from './AdminPrimitives.js';
 
 interface CombinationsBrowserProps {
@@ -26,6 +27,7 @@ export function CombinationsBrowser({
   csrfToken,
   onSelectLetters,
 }: CombinationsBrowserProps): React.JSX.Element {
+  const isDesktop = useIsDesktop();
   const [combinations, setCombinations] = useState<AdminCombinationItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -189,84 +191,153 @@ export function CombinationsBrowser({
 
       {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
-      <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
-        <table className="w-full text-left text-xs border-collapse tabular-nums">
-          <thead>
-            <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
-              <th className="p-3">Kirjaimet</th>
-              <th className="p-3">Pangrammit</th>
-              <th className="p-3">Sanoja (Min - Max)</th>
-              <th className="p-3">Pisteet (Min - Max)</th>
-              <th className="p-3">Kierrossa</th>
-              {onSelectLetters && <th className="p-3 text-right">Toiminto</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {combinations.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={onSelectLetters ? 6 : 5}
-                  className="p-4 text-center"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  {loading ? 'Ladataan yhdistelmiä...' : 'Ei hakuehtoja vastaavia yhdistelmiä.'}
-                </td>
-              </tr>
-            ) : (
-              combinations.map((c) => (
-                <tr
-                  key={c.letters}
-                  className={ADMIN_TABLE_ROW_CLASS}
-                  style={{ borderColor: 'var(--color-border)' }}
-                >
-                  <td className="p-3">
-                    <div className="flex items-center gap-1">
-                      {Array.from(c.letters).map((ch) => (
-                        <LetterTile key={ch} letter={ch} size="sm" />
-                      ))}
-                    </div>
-                  </td>
-                  <td className="p-3 font-medium">{c.total_pangrams}</td>
-                  <td className="p-3">
-                    {c.min_word_count} - {c.max_word_count}
-                  </td>
-                  <td className="p-3">
-                    {c.min_max_score} - {c.max_max_score}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className="px-2 py-0.5 rounded-full text-[11px] font-semibold border"
-                      style={{
-                        backgroundColor: c.in_rotation
-                          ? 'var(--color-accent)'
-                          : 'var(--color-bg-primary)',
-                        color: c.in_rotation
-                          ? 'var(--color-on-accent)'
-                          : 'var(--color-text-secondary)',
-                        borderColor: c.in_rotation ? 'var(--color-accent)' : 'var(--color-border)',
-                      }}
-                    >
-                      {c.in_rotation ? 'Kyllä' : 'Ei'}
+      {!isDesktop ? (
+        <div className="space-y-2.5 tabular-nums">
+          {combinations.length === 0 ? (
+            <div
+              className="p-4 rounded-xl border text-center text-xs"
+              style={{ ...ADMIN_CARD_STYLE, color: 'var(--color-text-secondary)' }}
+            >
+              {loading ? 'Ladataan yhdistelmiä...' : 'Ei hakuehtoja vastaavia yhdistelmiä.'}
+            </div>
+          ) : (
+            combinations.map((c) => (
+              <div
+                key={c.letters}
+                className="p-3.5 rounded-xl border space-y-2.5"
+                style={ADMIN_CARD_STYLE}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {Array.from(c.letters).map((ch) => (
+                      <LetterTile key={ch} letter={ch} size="sm" />
+                    ))}
+                  </div>
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[11px] font-semibold border shrink-0"
+                    style={{
+                      backgroundColor: c.in_rotation
+                        ? 'var(--color-accent)'
+                        : 'var(--color-bg-primary)',
+                      color: c.in_rotation
+                        ? 'var(--color-on-accent)'
+                        : 'var(--color-text-secondary)',
+                      borderColor: c.in_rotation ? 'var(--color-accent)' : 'var(--color-border)',
+                    }}
+                  >
+                    {c.in_rotation ? 'Kierrossa' : 'Ei kierrossa'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <div style={{ color: 'var(--color-text-secondary)' }}>
+                    <span>{c.total_pangrams} pg</span>
+                    <span> · </span>
+                    <span>
+                      {c.min_word_count}–{c.max_word_count} sanaa
                     </span>
-                  </td>
+                    <span> · </span>
+                    <span>
+                      {c.min_max_score}–{c.max_max_score} p
+                    </span>
+                  </div>
                   {onSelectLetters && (
-                    <td className="p-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onSelectLetters(Array.from(c.letters).join(','))}
-                        className={adminButtonClass('sm')}
-                        style={adminButtonStyle('primary')}
-                      >
-                        Valitse
-                      </button>
-                    </td>
+                    <button
+                      type="button"
+                      onClick={() => onSelectLetters(Array.from(c.letters).join(','))}
+                      className={adminButtonClass('sm')}
+                      style={adminButtonStyle('primary')}
+                    >
+                      Valitse
+                    </button>
                   )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+          <table className="w-full text-left text-xs border-collapse tabular-nums">
+            <thead>
+              <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
+                <th className="p-3">Kirjaimet</th>
+                <th className="p-3">Pangrammit</th>
+                <th className="p-3">Sanoja (Min - Max)</th>
+                <th className="p-3">Pisteet (Min - Max)</th>
+                <th className="p-3">Kierrossa</th>
+                {onSelectLetters && <th className="p-3 text-right">Toiminto</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {combinations.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={onSelectLetters ? 6 : 5}
+                    className="p-4 text-center"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                  >
+                    {loading ? 'Ladataan yhdistelmiä...' : 'Ei hakuehtoja vastaavia yhdistelmiä.'}
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                combinations.map((c) => (
+                  <tr
+                    key={c.letters}
+                    className={ADMIN_TABLE_ROW_CLASS}
+                    style={{ borderColor: 'var(--color-border)' }}
+                  >
+                    <td className="p-3">
+                      <div className="flex items-center gap-1">
+                        {Array.from(c.letters).map((ch) => (
+                          <LetterTile key={ch} letter={ch} size="sm" />
+                        ))}
+                      </div>
+                    </td>
+                    <td className="p-3 font-medium">{c.total_pangrams}</td>
+                    <td className="p-3">
+                      {c.min_word_count} - {c.max_word_count}
+                    </td>
+                    <td className="p-3">
+                      {c.min_max_score} - {c.max_max_score}
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[11px] font-semibold border"
+                        style={{
+                          backgroundColor: c.in_rotation
+                            ? 'var(--color-accent)'
+                            : 'var(--color-bg-primary)',
+                          color: c.in_rotation
+                            ? 'var(--color-on-accent)'
+                            : 'var(--color-text-secondary)',
+                          borderColor: c.in_rotation
+                            ? 'var(--color-accent)'
+                            : 'var(--color-border)',
+                        }}
+                      >
+                        {c.in_rotation ? 'Kyllä' : 'Ei'}
+                      </span>
+                    </td>
+                    {onSelectLetters && (
+                      <td className="p-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => onSelectLetters(Array.from(c.letters).join(','))}
+                          className={adminButtonClass('sm')}
+                          style={adminButtonStyle('primary')}
+                        >
+                          Valitse
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {pages > 1 && (
         <div className="flex items-center justify-between pt-1">

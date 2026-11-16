@@ -27,6 +27,7 @@ const ADMIN_TABS: readonly { id: Tab; label: string }[] = [
 
 export function AdminLayout(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('editor');
+  const [prefillLetters, setPrefillLetters] = useState<string | null>(null);
   usePaletteStore((s) => s.themeId);
   const isAuthenticated = useAdminStore((s) => s.isAuthenticated);
   const isLoading = useAdminStore((s) => s.isLoading);
@@ -119,7 +120,7 @@ export function AdminLayout(): React.JSX.Element {
           <nav aria-label="Ylläpidon osiot" className="pb-3">
             <div
               role="tablist"
-              className="flex items-center gap-1 overflow-x-auto scrollbar-none p-1 rounded-xl border"
+              className="flex flex-wrap sm:flex-nowrap items-center gap-1 p-1 rounded-xl border"
               style={{
                 backgroundColor: 'var(--color-bg-secondary)',
                 borderColor: 'var(--color-border)',
@@ -134,7 +135,7 @@ export function AdminLayout(): React.JSX.Element {
                     role="tab"
                     aria-selected={active}
                     onClick={() => setTab(item.id)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 cursor-pointer border-none transition-all"
+                    className="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer border-none transition-all"
                     style={{
                       backgroundColor: active ? 'var(--color-accent)' : 'transparent',
                       color: active ? 'var(--color-on-accent)' : 'var(--color-text-secondary)',
@@ -150,10 +151,23 @@ export function AdminLayout(): React.JSX.Element {
       </header>
 
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
-        {tab === 'editor' && <PuzzleEditor />}
+        {tab === 'editor' && (
+          <PuzzleEditor
+            prefillLetters={prefillLetters}
+            onPrefillConsumed={() => setPrefillLetters(null)}
+          />
+        )}
         {tab === 'schedule' && <Schedule />}
         {tab === 'blocked' && <BlockedWords />}
-        {tab === 'combinations' && <CombinationsBrowser csrfToken={csrfToken} />}
+        {tab === 'combinations' && (
+          <CombinationsBrowser
+            csrfToken={csrfToken}
+            onSelectLetters={(letters) => {
+              setPrefillLetters(letters);
+              setTab('editor');
+            }}
+          />
+        )}
         {tab === 'rejected' && <SuggestionRejections csrfToken={csrfToken} />}
         {tab === 'analytics' && <Stats csrfToken={csrfToken} />}
         {tab === 'worddata' && <WordData csrfToken={csrfToken} />}

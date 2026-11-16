@@ -13,6 +13,7 @@ import {
   SegmentedControl,
   adminButtonClass,
   adminButtonStyle,
+  useIsDesktop,
 } from './AdminPrimitives.js';
 
 interface WordFindsProps {
@@ -20,6 +21,7 @@ interface WordFindsProps {
 }
 
 export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
+  const isDesktop = useIsDesktop();
   const [displayNumber, setDisplayNumber] = useState(1);
   const [data, setData] = useState<AdminWordFindsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -155,54 +157,96 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
             />
           </div>
 
-          <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
-            <table className="w-full text-left text-xs border-collapse tabular-nums">
-              <thead>
-                <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
-                  <th className="p-3">Sana</th>
-                  <th className="p-3">Pituus</th>
-                  <th className="p-3 text-right">Löytökertoja</th>
-                  <th className="p-3 text-right">Toiminto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedWords.map((item) => (
-                  <tr
-                    key={item.word}
-                    className={ADMIN_TABLE_ROW_CLASS}
-                    style={{ borderColor: 'var(--color-border)' }}
-                  >
-                    <td className="p-3 font-semibold">{item.word}</td>
-                    <td className="p-3" style={{ color: 'var(--color-text-secondary)' }}>
-                      {item.word.length} kirjainta
-                    </td>
-                    <td
-                      className="p-3 text-right font-bold"
-                      style={{
-                        color:
-                          item.find_count === 0
-                            ? 'var(--color-error)'
-                            : 'var(--color-text-primary)',
-                      }}
-                    >
-                      {item.find_count === 0 ? '0 (Ei löydetty)' : item.find_count}
-                    </td>
-                    <td className="p-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleBlock(item.word)}
-                        disabled={blockingWord === item.word}
-                        className={adminButtonClass('sm')}
-                        style={adminButtonStyle('danger')}
+          {!isDesktop ? (
+            <div className="space-y-2 tabular-nums">
+              {sortedWords.map((item) => (
+                <div
+                  key={item.word}
+                  className="p-3 rounded-xl border flex items-center justify-between gap-3"
+                  style={ADMIN_CARD_STYLE}
+                >
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm truncate">{item.word}</div>
+                    <div className="text-xs mt-0.5 flex items-center gap-2">
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        {item.word.length} kirjainta
+                      </span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>·</span>
+                      <span
+                        className="font-bold"
+                        style={{
+                          color:
+                            item.find_count === 0
+                              ? 'var(--color-error)'
+                              : 'var(--color-text-primary)',
+                        }}
                       >
-                        Estä sana
-                      </button>
-                    </td>
+                        {item.find_count === 0 ? '0 (Ei löydetty)' : `${item.find_count} löytöä`}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleBlock(item.word)}
+                    disabled={blockingWord === item.word}
+                    className={`${adminButtonClass('sm')} shrink-0`}
+                    style={adminButtonStyle('danger')}
+                  >
+                    Estä sana
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={ADMIN_TABLE_WRAPPER_CLASS} style={ADMIN_CARD_STYLE}>
+              <table className="w-full text-left text-xs border-collapse tabular-nums">
+                <thead>
+                  <tr className={ADMIN_TABLE_HEAD_ROW_CLASS} style={ADMIN_TABLE_HEAD_ROW_STYLE}>
+                    <th className="p-3">Sana</th>
+                    <th className="p-3">Pituus</th>
+                    <th className="p-3 text-right">Löytökertoja</th>
+                    <th className="p-3 text-right">Toiminto</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {sortedWords.map((item) => (
+                    <tr
+                      key={item.word}
+                      className={ADMIN_TABLE_ROW_CLASS}
+                      style={{ borderColor: 'var(--color-border)' }}
+                    >
+                      <td className="p-3 font-semibold">{item.word}</td>
+                      <td className="p-3" style={{ color: 'var(--color-text-secondary)' }}>
+                        {item.word.length} kirjainta
+                      </td>
+                      <td
+                        className="p-3 text-right font-bold"
+                        style={{
+                          color:
+                            item.find_count === 0
+                              ? 'var(--color-error)'
+                              : 'var(--color-text-primary)',
+                        }}
+                      >
+                        {item.find_count === 0 ? '0 (Ei löydetty)' : item.find_count}
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleBlock(item.word)}
+                          disabled={blockingWord === item.word}
+                          className={adminButtonClass('sm')}
+                          style={adminButtonStyle('danger')}
+                        >
+                          Estä sana
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -16,7 +16,15 @@ import { PuzzleSlotControls } from './PuzzleSlotControls.js';
 import { SuggestionPanel } from './SuggestionPanel.js';
 import { useAdminStore } from './useAdminStore.js';
 
-export function PuzzleEditor(): React.JSX.Element {
+interface PuzzleEditorProps {
+  prefillLetters?: string | null;
+  onPrefillConsumed?: () => void;
+}
+
+export function PuzzleEditor({
+  prefillLetters,
+  onPrefillConsumed,
+}: PuzzleEditorProps = {}): React.JSX.Element {
   const csrfToken = useAdminStore((s) => s.csrfToken);
 
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
@@ -126,6 +134,15 @@ export function PuzzleEditor(): React.JSX.Element {
       return { slots: [] as number[], todaySlot: null as number | null };
     }
   }, [csrfToken]);
+
+  useEffect(() => {
+    if (!prefillLetters) return;
+    setNewLetters(prefillLetters);
+    setNewCenter('');
+    setNewSlot('');
+    setForceRequired(false);
+    onPrefillConsumed?.();
+  }, [prefillLetters, onPrefillConsumed]);
 
   useEffect(() => {
     void refreshSlotsList().then((result) => {
