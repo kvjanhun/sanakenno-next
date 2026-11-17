@@ -5,6 +5,7 @@ import {
   DEFAULT_SEED_WORDS,
   getWordlist,
   invalidatePuzzleCache,
+  loadWordlist,
   setWordlist,
 } from '../features/puzzle/wordlist.js';
 import { createDb } from './connection.js';
@@ -16,7 +17,10 @@ import type { Database } from './schema.js';
  */
 export async function seedDatabase(db: Kysely<Database>): Promise<void> {
   if (getWordlist().size === 0) {
-    setWordlist(DEFAULT_SEED_WORDS);
+    loadWordlist();
+    if (getWordlist().size === 0) {
+      setWordlist(DEFAULT_SEED_WORDS);
+    }
   }
   invalidatePuzzleCache();
 

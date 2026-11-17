@@ -185,6 +185,20 @@ describe('Architectural Fitness Guardrails', () => {
       const content = fs.readFileSync(path.join(ROOT, docName), 'utf8');
       expect(content).not.toMatch(/\b(used to|no longer|previously|was moved|was renamed)\b/i);
     }
+
+    for (const file of [
+      'OPEN_SOURCE_LICENSES.md',
+      'packages/web/src/features/modals/licenses.ts',
+    ]) {
+      const content = fs.readFileSync(path.join(ROOT, file), 'utf8');
+      expect(content).not.toMatch(/\bLucide\b/i);
+    }
+
+    const webPkg = JSON.parse(
+      fs.readFileSync(path.join(ROOT, 'packages/web/package.json'), 'utf8'),
+    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    expect(webPkg.dependencies?.['@sanakenno/server']).toBeUndefined();
+    expect(webPkg.devDependencies?.['@sanakenno/server']).toBe('workspace:*');
   });
 
   it('keeps specs/NN-*.md files structurally valid and synchronized with specs/00-backlog.md', () => {

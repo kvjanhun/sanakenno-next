@@ -3,6 +3,7 @@ import SQLite from 'better-sqlite3';
 import {
   CompiledQuery,
   Kysely,
+  sql,
   SqliteDialect,
   SqliteDriver,
   type DatabaseConnection,
@@ -62,6 +63,21 @@ export function createDb(
       database: sqlite,
     }),
   });
+}
+
+/** Return true if at least one puzzle row exists in SQLite. */
+export async function hasAnyPuzzles(db: Kysely<Database>): Promise<boolean> {
+  const row = await db
+    .selectFrom('puzzles')
+    .select((eb) => eb.fn.countAll<number>().as('count'))
+    .executeTakeFirst();
+  return Number(row?.count ?? 0) > 0;
+}
+
+/** Flush SQLite WAL frames to the main database file and destroy the connection pool. */
+export async function checkpointAndDestroyDb(db: Kysely<Database>): Promise<void> {
+  await sql`PRAGMA wal_checkpoint(TRUNCATE)`.execute(db).catch(() => undefined);
+  await db.destroy();
 }
 
 function isSqliteBusyError(error: unknown): boolean {

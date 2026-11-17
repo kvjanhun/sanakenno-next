@@ -96,13 +96,6 @@ export const OPEN_LICENSES: readonly OpenLicenseEntry[] = [
     type: 'library',
   },
   {
-    name: 'Lucide Icons',
-    license: 'ISC',
-    copyright: 'Lucide Contributors',
-    url: 'https://lucide.dev',
-    type: 'library',
-  },
-  {
     name: 'Litestream',
     license: 'Apache-2.0',
     copyright: 'Ben Johnson',

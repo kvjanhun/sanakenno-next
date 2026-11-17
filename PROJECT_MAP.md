@@ -71,11 +71,12 @@ Two numbers identify a puzzle and are **never** interchangeable:
 
 Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 
-### 3. Production Swaps & Database Persistence
+### 3. Production Runtime & Database Persistence
 
-- Persistent volume mount `/data/sanakenno.db` preserves SQLite database state across restarts and enables continuous Litestream replication to Backblaze B2.
-- Dual-container configuration (`sanakenno-a` and `sanakenno-b`) on host ports 8081/8082 with Nginx upstream proxy enables zero-downtime hot swapping.
-- `commit.txt` stamping into `./dist/commit.txt` verifies end-to-end deployment parity.
+- Sanakenno runs as a single-instance Google Cloud Run service (`europe-north1`, `--max-instances 1`) backed by SQLite WAL on `/data/sanakenno.db`.
+- Startup (`scripts/entrypoint.sh`) restores the SQLite replica via Litestream (`litestream.yml`, Google Cloud Storage `LITESTREAM_BUCKET`) and continuously replicates WAL segments alongside the Node process (`packages/server/src/index.ts`).
+- `SIGTERM` and `SIGINT` handlers in `packages/server/src/index.ts` close incoming HTTP traffic, run `PRAGMA wal_checkpoint(TRUNCATE)`, and destroy the Kysely pool cleanly before container termination.
+- `GET /commit.txt` serves the stamped `./dist/commit.txt` SHA or `process.env.GIT_COMMIT` for deployment parity verification.
 
 ### 4. Language Convention
 

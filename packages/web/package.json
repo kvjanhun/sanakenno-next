@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sanakenno/server": "workspace:*",
     "@sanakenno/shared": "workspace:*",
     "@tanstack/react-query": "^5.69.0",
     "hono": "^4.7.4",
@@ -19,6 +18,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@sanakenno/server": "workspace:*",
     "@tailwindcss/vite": "^4.0.14",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

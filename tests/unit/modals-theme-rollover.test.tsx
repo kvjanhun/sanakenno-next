@@ -490,7 +490,6 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     expect(screen.getByText('CC BY 4.0')).toBeInTheDocument();
     expect(screen.getByText('Zod')).toBeInTheDocument();
     expect(screen.getByText('Argon2')).toBeInTheDocument();
-    expect(screen.getByText('Lucide Icons')).toBeInTheDocument();
     expect(screen.getByText('Litestream')).toBeInTheDocument();
   });
 });

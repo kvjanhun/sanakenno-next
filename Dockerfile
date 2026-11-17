@@ -2,7 +2,7 @@
 FROM node:22-alpine AS build
 
 RUN apk add --no-cache python3 make g++
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ FROM node:22-alpine AS runtime
 COPY --from=litestream/litestream:0.5 /usr/local/bin/litestream /usr/local/bin/litestream
 
 RUN apk add --no-cache python3 make g++ curl tzdata ca-certificates
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 
 RUN addgroup -S sanakenno && adduser -S sanakenno -G sanakenno
 
@@ -38,13 +38,14 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
 
-RUN pnpm install --frozen-lockfile && apk del python3 make g++
+RUN pnpm install --prod --frozen-lockfile && apk del python3 make g++
 
 # Copy built frontend
 COPY --from=build /app/packages/web/dist ./dist
 
 # Stamp the source commit into the frontend so deploy script and CI can verify
 ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
 RUN echo "$GIT_COMMIT" > ./dist/commit.txt
 
 # Copy shared and server sources and assets needed at runtime

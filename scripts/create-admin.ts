@@ -63,7 +63,7 @@ function prompt(question: string, hidden = false): Promise<string> {
 }
 
 async function main() {
-  const dbPath = process.env.DATABASE_PATH || './sanakenno.db';
+  const dbPath = process.env.DB_PATH || process.env.DATABASE_PATH || './sanakenno.db';
   const db = createDb(dbPath);
 
   try {

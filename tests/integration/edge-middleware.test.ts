@@ -142,4 +142,40 @@ describe('Cloud Run Edge Middleware & Static Serving', () => {
     expect(api404.status).toBe(404);
     expect(await api404.json()).toEqual({ error: 'Not found' });
   });
+
+  it('serves /commit.txt from GIT_COMMIT when commit.txt is absent or unknown, and prefers stamped SHA', async () => {
+    const commitPath = path.join(tempStaticDir, 'commit.txt');
+    const prevCommit = process.env.GIT_COMMIT;
+    try {
+      if (fs.existsSync(commitPath)) fs.unlinkSync(commitPath);
+      process.env.GIT_COMMIT = 'env-sha-1234';
+      const absentRes = await app.request('https://sanakenno.fi/commit.txt', {
+        headers: { Host: 'sanakenno.fi' },
+      });
+      expect(absentRes.status).toBe(200);
+      expect(absentRes.headers.get('cache-control')).toBe('no-store');
+      expect(absentRes.headers.get('content-type')).toContain('text/plain');
+      expect(await absentRes.text()).toBe('env-sha-1234');
+
+      fs.writeFileSync(commitPath, 'unknown\n');
+      const fallbackRes = await app.request('https://sanakenno.fi/commit.txt', {
+        headers: { Host: 'sanakenno.fi' },
+      });
+      expect(fallbackRes.status).toBe(200);
+      expect(fallbackRes.headers.get('cache-control')).toBe('no-store');
+      expect(fallbackRes.headers.get('content-type')).toContain('text/plain');
+      expect(await fallbackRes.text()).toBe('env-sha-1234');
+
+      fs.writeFileSync(commitPath, 'stamped-sha-5678\n');
+      const stampedRes = await app.request('https://sanakenno.fi/commit.txt', {
+        headers: { Host: 'sanakenno.fi' },
+      });
+      expect(stampedRes.status).toBe(200);
+      expect(await stampedRes.text()).toBe('stamped-sha-5678');
+    } finally {
+      if (fs.existsSync(commitPath)) fs.unlinkSync(commitPath);
+      if (prevCommit === undefined) delete process.env.GIT_COMMIT;
+      else process.env.GIT_COMMIT = prevCommit;
+    }
+  });
 });

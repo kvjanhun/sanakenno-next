@@ -1,6 +1,6 @@
 # Spec 32: Cloud Run Production Hygiene & Public README
 
-Status: approved
+Status: shipped
 Branch: spec/32-cloud-run-hygiene-and-public-readme
 
 ## 1. Objective

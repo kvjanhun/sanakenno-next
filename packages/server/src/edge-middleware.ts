@@ -79,6 +79,20 @@ export function findStaticDir(): string | null {
   return null;
 }
 
+function resolveCommitSha(staticDir: string | null): string {
+  if (staticDir) {
+    const commitFile = path.join(staticDir, 'commit.txt');
+    if (fs.existsSync(commitFile)) {
+      const content = fs.readFileSync(commitFile, 'utf8').trim();
+      if (content && content !== 'unknown') {
+        return content;
+      }
+    }
+  }
+  const envCommit = process.env.GIT_COMMIT?.trim();
+  return envCommit && envCommit.length > 0 ? envCommit : 'unknown';
+}
+
 /**
  * Create the complete production Hono application combining edge middleware,
  * typed `/api/*` routes, and static asset / root SPA serving.
@@ -92,6 +106,12 @@ export function createServerApp(
 
   app.use('*', edgeMiddleware);
   app.route('/', apiApp);
+
+  app.get('/commit.txt', (c) => {
+    c.header('Cache-Control', 'no-store');
+    c.header('Content-Type', 'text/plain; charset=utf-8');
+    return c.text(resolveCommitSha(staticDir), 200);
+  });
 
   if (staticDir && fs.existsSync(staticDir)) {
     const indexPath = path.join(staticDir, 'index.html');
