@@ -21,10 +21,11 @@ function walkFiles(dir: string, exts: string[]): string[] {
 }
 
 describe('Architectural Fitness Guardrails', () => {
-  it('keeps every source and test file under the 500-line monolith ceiling', () => {
+  it('keeps every source, script, and test file under the 500-line monolith ceiling', () => {
     const files = [
       ...walkFiles(path.join(ROOT, 'packages'), ['.ts', '.tsx']),
       ...walkFiles(path.join(ROOT, 'tests'), ['.ts', '.tsx']),
+      ...walkFiles(path.join(ROOT, 'scripts'), ['.ts', '.tsx']),
     ];
     const oversized = files
       .map((file) => ({
@@ -202,6 +203,26 @@ describe('Architectural Fitness Guardrails', () => {
           `specs/00-backlog.md status for ${relPrefix}${specFile} must match Status: ${status}`,
         ).toMatch(backlogRowRegex);
       }
+    }
+  });
+
+  it('validates .agent/skills/*/SKILL.md frontmatter and absence of retired test:e2e references', () => {
+    const skillsDir = path.join(ROOT, '.agent/skills');
+    const entries = fs
+      .readdirSync(skillsDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory());
+    expect(entries.length).toBeGreaterThan(0);
+
+    for (const entry of entries) {
+      const skillFile = path.join(skillsDir, entry.name, 'SKILL.md');
+      expect(fs.existsSync(skillFile), `${entry.name}/SKILL.md must exist`).toBe(true);
+      const content = fs.readFileSync(skillFile, 'utf8');
+      expect(content, `${entry.name}/SKILL.md must have valid YAML frontmatter`).toMatch(
+        /^---\n[\s\S]*?name:\s*\S+[\s\S]*?description:\s*.+[\s\S]*?\n---/m,
+      );
+      expect(content, `${entry.name}/SKILL.md must not reference retired test:e2e`).not.toContain(
+        'test:e2e',
+      );
     }
   });
 });

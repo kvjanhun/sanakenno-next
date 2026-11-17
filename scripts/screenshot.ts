@@ -1,408 +1,238 @@
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
+import {
+  buildTargetActionSteps,
+  isLightVariantAction,
+  SCREENSHOT_TARGETS,
+  type ScreenshotTarget,
+} from './screenshot-targets.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const OUT_DIR = path.join(ROOT, '.screenshots');
-const DEFAULT_URL = 'http://localhost:5173';
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+interface CdpSession {
+  send: (method: string, params?: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  close: () => void;
+}
 
 function findChrome(): string {
-  const envPath = process.env.CHROME_PATH;
-  if (envPath && fs.existsSync(envPath)) return envPath;
-
   const candidates = [
+    process.env.CHROME_PATH,
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     '/Applications/Chromium.app/Contents/MacOS/Chromium',
     '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
   ];
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-
-  throw new Error('Google Chrome binary not found. Set CHROME_PATH environment variable.');
+  const found = candidates.find((c): c is string => Boolean(c && fs.existsSync(c)));
+  if (!found) throw new Error('Chrome binary not found. Set CHROME_PATH env var.');
+  return found;
 }
 
-async function isServerRunning(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(1000) });
-    return res.ok || res.status === 404;
-  } catch {
-    return false;
-  }
+function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.unref();
+    srv.on('error', reject);
+    srv.listen(0, '127.0.0.1', () => {
+      const addr = srv.address();
+      srv.close(() =>
+        addr && typeof addr !== 'string' ? resolve(addr.port) : reject(new Error('No free port')),
+      );
+    });
+  });
 }
 
-async function waitForServer(url: string, maxAttempts = 30): Promise<void> {
-  for (let i = 0; i < maxAttempts; i++) {
-    if (await isServerRunning(url)) return;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`Timed out waiting for dev server at ${url}`);
-}
-
-async function captureWithCdp(
-  chrome: string,
+async function ensureServer(
+  spawned: ChildProcess[],
   url: string,
-  target: { name: string; width: number; height: number; mobile?: boolean; action?: string },
-  outPath: string,
+  pkgFilter: string,
+  requireOk: boolean,
+  extraEnv?: Record<string, string>,
 ): Promise<void> {
-  const port = 9333;
-  const proc = spawn(chrome, [
-    '--headless=new',
-    `--remote-debugging-port=${port}`,
-    '--disable-gpu',
-    url,
-  ]);
-
-  try {
-    let targets: Array<{ type: string; webSocketDebuggerUrl: string }> = [];
-    for (let i = 0; i < 30; i++) {
-      try {
-        const res = await fetch(`http://127.0.0.1:${port}/json`);
-        targets = await res.json();
-        if (targets.length > 0) break;
-      } catch {
-        await new Promise((r) => setTimeout(r, 200));
-      }
+  const check = () =>
+    fetch(url, { signal: AbortSignal.timeout(1000) })
+      .then((r) => (requireOk ? r.ok : r.ok || r.status === 404))
+      .catch(() => false);
+  if (await check()) return;
+  console.log(`Starting ${pkgFilter} (${url})...`);
+  const proc = spawn('pnpm', ['--filter', pkgFilter, 'dev'], {
+    cwd: ROOT,
+    env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
+    stdio: 'pipe',
+    detached: true,
+  });
+  for (let i = 0; i < 40; i++) {
+    if (await check()) {
+      spawned.push(proc);
+      return;
     }
-
-    const page = targets.find((t) => t.type === 'page');
-    if (!page) throw new Error('No page target found on Chrome remote debugging port');
-
-    const ws = new WebSocket(page.webSocketDebuggerUrl);
-    await new Promise((resolve, reject) => {
-      ws.onopen = resolve;
-      ws.onerror = reject;
-    });
-
-    let msgId = 1;
-    const send = (method: string, params: Record<string, unknown> = {}) =>
-      new Promise<Record<string, unknown>>((resolve) => {
-        const id = msgId++;
-        const onMsg = (event: MessageEvent) => {
-          const msg = JSON.parse(String(event.data));
-          if (msg.id === id) {
-            ws.removeEventListener('message', onMsg);
-            resolve(msg.result as Record<string, unknown>);
-          }
-        };
-        ws.addEventListener('message', onMsg);
-        ws.send(JSON.stringify({ id, method, params }));
-      });
-
-    await send('Emulation.setDeviceMetricsOverride', {
-      width: target.width,
-      height: target.height,
-      deviceScaleFactor: 2,
-      mobile: target.mobile ?? false,
-    });
-
-    await new Promise((r) => setTimeout(r, 1200));
-
-    if (target.action === 'theme-light' || target.action?.includes('-light')) {
-      await send('Runtime.evaluate', {
-        expression: `document.documentElement.setAttribute('data-theme', 'light')`,
-      });
-      await new Promise((r) => setTimeout(r, 200));
-    }
-
-    if (target.action === 'unlock-matrix') {
-      await send('Runtime.evaluate', {
-        expression: `
-          (async () => {
-            const showBtn = document.querySelector('[data-testid="show-hints-button"]');
-            if (showBtn) showBtn.click();
-            await new Promise((r) => setTimeout(r, 100));
-            const btn1 = document.querySelector('[data-testid="activate-hints-button"]');
-            if (btn1) btn1.click();
-            await new Promise((r) => setTimeout(r, 200));
-            const btn2 = document.querySelector('[data-testid="upgrade-tier-button"]');
-            if (btn2) btn2.click();
-          })()
-        `,
-        awaitPromise: true,
-      });
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    if (target.action === 'view-clues-closed') {
-      await send('Runtime.evaluate', {
-        expression: `
-          (async () => {
-            const showBtn = document.querySelector('[data-testid="show-hints-button"]');
-            if (showBtn) showBtn.click();
-            await new Promise((r) => setTimeout(r, 100));
-            const tab = document.querySelector('[data-testid="tier-tab-2"]');
-            if (tab) tab.click();
-          })()
-        `,
-        awaitPromise: true,
-      });
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    if (target.action === 'view-clues-open' || target.action === 'view-clues-open-typed') {
-      await send('Runtime.evaluate', {
-        expression: `
-          (async () => {
-            const showBtn = document.querySelector('[data-testid="show-hints-button"]');
-            if (showBtn) showBtn.click();
-            await new Promise((r) => setTimeout(r, 100));
-            const tab = document.querySelector('[data-testid="tier-tab-2"]');
-            if (tab) tab.click();
-            await new Promise((r) => setTimeout(r, 200));
-            const b1 = document.querySelector('[data-testid="unlock-pangrams-button"]');
-            if (b1) b1.click();
-            await new Promise((r) => setTimeout(r, 100));
-            const b2 = document.querySelector('[data-testid="unlock-pairs-button"]');
-            if (b2) b2.click();
-            await new Promise((r) => setTimeout(r, 100));
-            const b3 = document.querySelector('[data-testid="unlock-suffixes-button"]');
-            if (b3) b3.click();
-          })()
-        `,
-        awaitPromise: true,
-      });
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    if (target.action === 'view-clues-open-typed') {
-      await send('Runtime.evaluate', {
-        expression: `
-          (() => {
-            for (const char of 'huppu') {
-              window.dispatchEvent(new KeyboardEvent('keydown', { key: char, code: 'Key' + char.toUpperCase() }));
-            }
-          })()
-        `,
-        awaitPromise: false,
-      });
-      await new Promise((r) => setTimeout(r, 300));
-    }
-
-    if (target.action?.startsWith('view-archive')) {
-      if (target.action.includes('light')) {
-        await send('Runtime.evaluate', {
-          expression: `document.documentElement.setAttribute('data-theme', 'light')`,
-        });
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      await send('Runtime.evaluate', {
-        expression: `
-          (async () => {
-            const archiveBtn = document.querySelector('button[aria-label="Arkisto"]');
-            if (archiveBtn) archiveBtn.click();
-            await new Promise((r) => setTimeout(r, 400));
-          })()
-        `,
-        awaitPromise: true,
-      });
-      await new Promise((r) => setTimeout(r, 500));
-    }
-
-    if (target.action?.startsWith('view-stats')) {
-      const evalRes = await send('Runtime.evaluate', {
-        expression: `
-          (async () => {
-            ${
-              target.action.startsWith('view-stats')
-                ? `const sampleRecords = [];
-                   // 7 daily consecutive plays for Bronze streak
-                   for (let i = 0; i < 7; i++) {
-                     const d = new Date();
-                     d.setDate(d.getDate() - i);
-                     const dateStr = d.toISOString().slice(0, 10);
-                     sampleRecords.push({
-                       puzzle_number: i + 1,
-                       date: dateStr,
-                       best_rank: 'Onnistuja',
-                       best_score: 80,
-                       max_score: 100,
-                       words_found: i === 0 ? 600 : 0, // Hopea for total_words (target 500)
-                       pangrams_found: i === 0 ? 80 : 0, // Kulta for pangrams (target 77)
-                       long_words_count: i === 0 ? 110 : 0, // Timantti for long_word (target 100)
-                       hints_used: 1, // hint used so unassisted_master stays 0
-                       elapsed_ms: 60000,
-                       is_daily: true,
-                       played_at_date: dateStr,
-                     });
-                   }
-                   // 50 full boards for Mestari on full_board (target 50)
-                   for (let i = 0; i < 50; i++) {
-                     sampleRecords.push({
-                       puzzle_number: 100 + i,
-                       date: '2026-10-01',
-                       best_rank: 'Täysi kenno',
-                       best_score: 100,
-                       max_score: 100,
-                       words_found: 0,
-                       hints_used: 1,
-                       elapsed_ms: 60000,
-                       is_daily: false,
-                       played_at_date: '2026-10-01',
-                     });
-                   }
-                   const sampleStats = { version: 1, records: sampleRecords };
-                   window.localStorage.setItem('sanakenno_player_stats', JSON.stringify(sampleStats));`
-                : ''
-            }
-            const statsBtn = document.querySelector('button[aria-label="Tilastot"]');
-            if (statsBtn) statsBtn.click();
-            await new Promise((r) => setTimeout(r, 200));
-            ${
-              target.action.includes('achievements')
-                ? `const achTab = Array.from(document.querySelectorAll('button[role="tab"]')).find(b => b.textContent?.includes('Saavutukset'));
-                   if (achTab) achTab.click();`
-                : ''
-            }
-            ${
-              target.action.includes('bottom')
-                ? `await new Promise((r) => setTimeout(r, 100));
-                   const scrollContainer = document.querySelector('.overflow-y-auto');
-                   if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;`
-                : ''
-            }
-          })()
-        `,
-        awaitPromise: true,
-      });
-      if (evalRes && (evalRes as Record<string, unknown>).exceptionDetails) {
-        console.error(
-          'Stats evaluate error:',
-          (evalRes as Record<string, unknown>).exceptionDetails,
-        );
-      }
-      await new Promise((r) => setTimeout(r, 400));
-    }
-
-    if (target.action?.startsWith('view-announcement')) {
-      if (target.action.includes('light')) {
-        await send('Runtime.evaluate', {
-          expression: `document.documentElement.setAttribute('data-theme', 'light')`,
-        });
-        await new Promise((r) => setTimeout(r, 100));
-      }
-      const cmds: Record<string, string> = {
-        achievement: `window.sanakennoAnnounce?.('achievement', 'total_words', 'gold')`,
-        milestone: `window.sanakennoAnnounce?.('milestone', 50)`,
-        letter: `window.sanakennoAnnounce?.('letter', 'K', 7)`,
-      };
-      const key = Object.keys(cmds).find((k) => target.action?.includes(k)) ?? 'letter';
-      await send('Runtime.evaluate', { expression: cmds[key] });
-      await new Promise((r) => setTimeout(r, 350));
-    }
-
-    const result = (await send('Page.captureScreenshot', {
-      format: 'png',
-      clip: { x: 0, y: 0, width: target.width, height: target.height, scale: 1 },
-    })) as { data: string };
-
-    fs.writeFileSync(outPath, Buffer.from(result.data, 'base64'));
-    ws.close();
-  } finally {
-    proc.kill('SIGKILL');
+    await sleep(500);
   }
+  killProcessTree(proc);
+  throw new Error(`Timed out waiting for ${pkgFilter} at ${url}`);
+}
+
+function killProcessTree(proc: ChildProcess | null): void {
+  if (!proc || proc.killed) return;
+  try {
+    if (proc.pid) process.kill(-proc.pid, 'SIGTERM');
+    else proc.kill('SIGTERM');
+  } catch {
+    try {
+      proc.kill('SIGTERM');
+    } catch {
+      /* exited */
+    }
+  }
+}
+
+async function connectCdp(chrome: string, port: number, userDataDir: string) {
+  const proc = spawn(
+    chrome,
+    [
+      '--headless=new',
+      '--hide-scrollbars',
+      '--disable-gpu',
+      `--remote-debugging-port=${port}`,
+      `--user-data-dir=${userDataDir}`,
+      'about:blank',
+    ],
+    { stdio: 'ignore' },
+  );
+
+  let page: { type: string; webSocketDebuggerUrl: string } | undefined;
+  for (let i = 0; i < 40 && !page; i++) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/json`);
+      page = ((await res.json()) as Array<{ type: string; webSocketDebuggerUrl: string }>).find(
+        (t) => t.type === 'page',
+      );
+    } catch {
+      /* Chrome still starting */
+    }
+    if (!page) await sleep(200);
+  }
+  if (!page) {
+    proc.kill('SIGKILL');
+    throw new Error('No page target found on Chrome remote debugging port');
+  }
+
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => Object.assign(ws, { onopen: resolve, onerror: reject }));
+
+  let msgId = 1;
+  const send = (method: string, params: Record<string, unknown> = {}) =>
+    new Promise<Record<string, unknown>>((resolve, reject) => {
+      const id = msgId++;
+      const onMsg = (ev: MessageEvent) => {
+        const msg = JSON.parse(String(ev.data)) as {
+          id?: number;
+          result?: Record<string, unknown>;
+          error?: { message?: string };
+        };
+        if (msg.id !== id) return;
+        ws.removeEventListener('message', onMsg);
+        if (msg.error) reject(new Error(msg.error.message ?? `CDP error in ${method}`));
+        else resolve(msg.result ?? {});
+      };
+      ws.addEventListener('message', onMsg);
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+
+  await send('Page.enable');
+  return { proc, cdp: { send, close: () => ws.close() } };
+}
+
+async function waitForAppReady(cdp: CdpSession): Promise<void> {
+  const expr = `Boolean(!window.__sanakennoReloading && document.querySelector('[data-testid="show-hints-button"]'))`;
+  for (let i = 0; i < 60; i++) {
+    try {
+      const res = (await cdp.send('Runtime.evaluate', { expression: expr })) as {
+        result?: { value?: boolean };
+      };
+      if (res.result?.value) break;
+    } catch {
+      // Context destroyed mid-navigation
+    }
+    await sleep(150);
+  }
+  await sleep(250);
+}
+
+async function captureTarget(cdp: CdpSession, target: ScreenshotTarget): Promise<void> {
+  const outPath = path.join(OUT_DIR, `${target.name}.png`);
+  console.log(`Capturing ${target.name} (${target.width}x${target.height})...`);
+  const scheme = isLightVariantAction(target.action) ? 'light' : 'dark';
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: target.width,
+    height: target.height,
+    deviceScaleFactor: 2,
+    mobile: target.mobile,
+  });
+  await cdp.send('Emulation.setEmulatedMedia', {
+    media: '',
+    features: [{ name: 'prefers-color-scheme', value: scheme }],
+  });
+  await cdp.send('Runtime.evaluate', {
+    expression: `window.localStorage.clear(); document.documentElement.removeAttribute('data-theme'); document.documentElement.removeAttribute('data-palette'); window.__sanakennoReloading = true;`,
+  });
+  await cdp.send('Page.reload', { ignoreCache: true });
+  await waitForAppReady(cdp);
+
+  for (const step of buildTargetActionSteps(target.action)) {
+    const res = await cdp.send('Runtime.evaluate', {
+      expression: step.expression,
+      awaitPromise: step.awaitPromise,
+    });
+    if (res.exceptionDetails)
+      console.error(`Action error for ${target.name}:`, res.exceptionDetails);
+    if (step.delayAfterMs) await sleep(step.delayAfterMs);
+  }
+
+  const shot = (await cdp.send('Page.captureScreenshot', {
+    format: 'png',
+    clip: { x: 0, y: 0, width: target.width, height: target.height, scale: 1 },
+  })) as { data: string };
+  const buf = Buffer.from(shot.data, 'base64');
+  if (buf.length === 0) throw new Error(`Generated empty screenshot at ${outPath}`);
+  fs.writeFileSync(outPath, buf);
+  console.log(`Saved ${target.name}.png (${buf.length} bytes)`);
 }
 
 async function main() {
   const chrome = findChrome();
-  const url = process.env.APP_URL ?? DEFAULT_URL;
-
+  const url = process.env.APP_URL ?? 'http://localhost:5173';
+  const apiHealthUrl = process.env.API_HEALTH_URL ?? 'http://localhost:3001/api/health';
   fs.mkdirSync(OUT_DIR, { recursive: true });
-
-  let devServer: ChildProcess | null = null;
-  const alreadyRunning = await isServerRunning(url);
-
-  if (!alreadyRunning) {
-    console.log(`Starting dev server at ${url}...`);
-    devServer = spawn('pnpm', ['--filter', '@sanakenno/web', 'dev'], {
-      cwd: ROOT,
-      stdio: 'pipe',
-      detached: false,
-    });
-    await waitForServer(url);
-  }
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sanakenno-cdp-'));
+  const spawned: ChildProcess[] = [];
+  let chromeProc: ChildProcess | null = null;
+  let cdp: CdpSession | null = null;
 
   try {
-    const desk = (name: string, action?: string) => ({
-      name,
-      width: 1280,
-      height: 800,
-      mobile: false,
-      action,
-    });
-    const mob = (name: string, action?: string) => ({
-      name,
-      width: 390,
-      height: 844,
-      mobile: true,
-      action,
-    });
-    const targets = [
-      desk('desktop'),
-      desk('desktop-matrix', 'unlock-matrix'),
-      desk('desktop-clues-open', 'view-clues-open'),
-      desk('desktop-archive', 'view-archive'),
-      desk('desktop-stats-achievements', 'view-stats-achievements'),
-      desk('desktop-stats-summary', 'view-stats-summary'),
-      mob('mobile'),
-      mob('mobile-light', 'theme-light'),
-      mob('mobile-matrix', 'unlock-matrix'),
-      mob('mobile-archive', 'view-archive'),
-      mob('mobile-archive-light', 'view-archive-light'),
-      mob('mobile-stats-achievements', 'view-stats-achievements'),
-      mob('mobile-stats-achievements-light', 'view-stats-achievements-light'),
-      mob('mobile-stats-achievements-bottom', 'view-stats-achievements-bottom'),
-      mob('mobile-stats-achievements-light-bottom', 'view-stats-achievements-light-bottom'),
-      mob('mobile-stats-summary', 'view-stats-summary'),
-      mob('mobile-clues-closed', 'view-clues-closed'),
-      mob('mobile-clues-open', 'view-clues-open'),
-      mob('mobile-clues-typed', 'view-clues-open-typed'),
-      desk('desktop-announcement-achievement', 'view-announcement-achievement'),
-      mob('mobile-announcement-letter', 'view-announcement-letter'),
-      mob('mobile-announcement-milestone', 'view-announcement-milestone'),
-      mob('mobile-announcement-achievement-light', 'view-announcement-achievement-light'),
-    ];
-
-    for (const target of targets) {
-      const outPath = path.join(OUT_DIR, `${target.name}.png`);
-      console.log(`Capturing ${target.name} (${target.width}x${target.height}) to ${outPath}...`);
-
-      if (target.mobile || target.action) {
-        await captureWithCdp(chrome, url, target, outPath);
-      } else {
-        execFileSync(
-          chrome,
-          [
-            '--headless=new',
-            '--hide-scrollbars',
-            '--disable-gpu',
-            `--window-size=${target.width},${target.height}`,
-            '--virtual-time-budget=2000',
-            `--screenshot=${outPath}`,
-            url,
-          ],
-          { stdio: 'ignore' },
-        );
-      }
-
-      if (!fs.existsSync(outPath) || fs.statSync(outPath).size === 0) {
-        throw new Error(`Failed to generate screenshot at ${outPath}`);
-      }
-      console.log(`Saved ${target.name}.png (${fs.statSync(outPath).size} bytes)`);
-    }
-
-    console.log('\nVisual screenshots generated successfully:');
-    console.log(`  Desktop: ${path.join(OUT_DIR, 'desktop.png')}`);
-    console.log(`  Mobile:  ${path.join(OUT_DIR, 'mobile.png')}`);
+    await ensureServer(spawned, apiHealthUrl, '@sanakenno/server', true, { SEED_ON_BOOT: 'true' });
+    await ensureServer(spawned, url, '@sanakenno/web', false);
+    const conn = await connectCdp(chrome, await getFreePort(), userDataDir);
+    chromeProc = conn.proc;
+    cdp = conn.cdp;
+    await cdp.send('Page.navigate', { url });
+    await waitForAppReady(cdp);
+    for (const target of SCREENSHOT_TARGETS) await captureTarget(cdp, target);
+    console.log(`\nScreenshots ready in ${OUT_DIR}`);
   } finally {
-    if (devServer) {
-      console.log('Shutting down dev server...');
-      devServer.kill('SIGTERM');
+    cdp?.close();
+    chromeProc?.kill('SIGKILL');
+    try {
+      fs.rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
+    } catch {
+      /* ignore */
     }
+    spawned.forEach(killProcessTree);
   }
 }
 

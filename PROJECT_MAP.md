@@ -17,7 +17,8 @@ sanakenno-next/
     entrypoint.sh            # Container init & Litestream restore
     filter-kotus-wordlist.ts # Kotus dictionary filtering & hyphenated lemma extractor
     migrate-v1-db.ts         # Standalone 1.0 -> 2.0 SQLite snapshot & backfill migration CLI
-    screenshot.ts            # Headless Chrome mobile & desktop screenshot capture utility
+    screenshot-targets.ts    # Desktop/mobile screenshot scenario targets & CDP action builders
+    screenshot.ts            # Single-CDP headless Chrome screenshot runner with auto server boot
   .github/workflows/ci-web.yml# GitHub Actions CI & Cloud Run deploy workflow
   specs/                     # Sequenced specs driving autonomous implementation
     archive/                 # Shipped historical specs (superseded point-in-time slices)
