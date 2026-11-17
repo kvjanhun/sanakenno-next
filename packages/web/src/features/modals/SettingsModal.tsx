@@ -62,9 +62,28 @@ export function SettingsModal({
   const setPreference = useThemePreferenceStore((s) => s.setPreference);
   const scheme = resolveScheme(preference);
 
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true,
+  );
   const [timeRemaining, setTimeRemaining] = useState<string>('00:00:00');
   const [msRemaining, setMsRemaining] = useState<number>(0);
   const [licensesOpen, setLicensesOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const cloudActive = isLoggedIn && isOnline;
 
   useEffect(() => {
     if (!show) return;
@@ -218,13 +237,25 @@ export function SettingsModal({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 flex items-center justify-center shrink-0">
-                    <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                    </span>
+                    {cloudActive ? (
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                    ) : (
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                    )}
                   </div>
-                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                    Pilvitallennus aktiivinen
+                  <span
+                    className={
+                      cloudActive
+                        ? 'text-[11px] font-semibold text-emerald-600 dark:text-emerald-400'
+                        : 'text-[11px] font-semibold text-amber-600 dark:text-amber-400'
+                    }
+                  >
+                    {cloudActive
+                      ? 'Pilvitallennus aktiivinen'
+                      : 'Tallennettu tälle laitteelle (ei yhteyttä)'}
                   </span>
                 </div>
                 <div

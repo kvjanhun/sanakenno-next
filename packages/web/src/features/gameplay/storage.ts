@@ -5,6 +5,7 @@ import {
   STATS_STORAGE_KEY,
   updateStatsRecord,
   type PlayerStats,
+  type PuzzleResponse,
 } from '@sanakenno/shared';
 import { filterVisibleHintIds } from './hints.js';
 
@@ -12,6 +13,15 @@ export { STATS_STORAGE_KEY };
 
 /** Legacy single-slot storage key used prior to per-slot keying. */
 export const LEGACY_STATE_KEY = 'sanakenno_state';
+
+/** Bounded localStorage key storing recently fetched PuzzleResponse payloads for offline reopen. */
+export const PUZZLE_CACHE_STORAGE_KEY = 'sanakenno_puzzle_cache_v1';
+const MAX_CACHED_PUZZLES = 7;
+
+interface CachedPuzzleEntry {
+  puzzle: PuzzleResponse;
+  cachedAt: number;
+}
 
 /** Persisted puzzle progress shape stored under `sanakenno_state_<slot>`. */
 export interface PersistedPuzzleState {
@@ -177,4 +187,21 @@ export async function shareText(text: string): Promise<'share' | 'clipboard' | '
     // Fall through
   }
   return 'none';
+}
+
+/** Cache a fetched PuzzleResponse by date/key in localStorage (bounded to 7 recent entries). */
+export function saveCachedPuzzleResponse(dateKey: string, puzzle: PuzzleResponse): void {
+  const existing =
+    loadFromStorage<Record<string, CachedPuzzleEntry>>(PUZZLE_CACHE_STORAGE_KEY) ?? {};
+  existing[dateKey] = { puzzle, cachedAt: Date.now() };
+  const trimmed = Object.entries(existing)
+    .sort((a, b) => b[1].cachedAt - a[1].cachedAt)
+    .slice(0, MAX_CACHED_PUZZLES);
+  saveToStorage(PUZZLE_CACHE_STORAGE_KEY, Object.fromEntries(trimmed));
+}
+
+/** Load a previously cached PuzzleResponse for offline fallback, or null if absent. */
+export function loadCachedPuzzleResponse(dateKey: string): PuzzleResponse | null {
+  const existing = loadFromStorage<Record<string, CachedPuzzleEntry>>(PUZZLE_CACHE_STORAGE_KEY);
+  return existing?.[dateKey]?.puzzle ?? null;
 }

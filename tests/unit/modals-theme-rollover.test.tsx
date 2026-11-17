@@ -25,6 +25,7 @@ import { PuzzleWordsModal } from '../../packages/web/src/features/modals/PuzzleW
 import { RulesModal } from '../../packages/web/src/features/modals/RulesModal.js';
 import { SettingsModal } from '../../packages/web/src/features/modals/SettingsModal.js';
 import { StatsModal } from '../../packages/web/src/features/modals/StatsModal.js';
+import { useAuthStore } from '../../packages/web/src/features/player-sync/useAuthStore.js';
 import { ThemeSelector } from '../../packages/web/src/features/theme/ThemeSelector.js';
 import { ThemeToggle } from '../../packages/web/src/features/theme/ThemeToggle.js';
 import {
@@ -183,6 +184,7 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
   });
 
   it('renders SettingsModal with single sync management button and dual cloud/device indicator', () => {
+    useAuthStore.setState({ isLoggedIn: true });
     const onOpenSync = vi.fn();
     const { rerender } = render(
       <SettingsModal

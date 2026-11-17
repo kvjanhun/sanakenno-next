@@ -6,6 +6,21 @@ function runtimeRuleFor(sampleUrl: string) {
     if (rule.urlPattern instanceof RegExp) {
       return rule.urlPattern.test(sampleUrl);
     }
+    if (typeof rule.urlPattern === 'function') {
+      const url = new URL(sampleUrl, 'https://sanakenno.fi');
+      const matcher = rule.urlPattern as (ctx: {
+        url: URL;
+        request: Request;
+        sameOrigin: boolean;
+      }) => boolean;
+      return Boolean(
+        matcher({
+          url,
+          request: new Request(url),
+          sameOrigin: true,
+        }),
+      );
+    }
     return false;
   });
 }
@@ -65,5 +80,14 @@ describe('PWA configuration', () => {
       (entry) => entry instanceof RegExp && entry.test('/api/puzzle'),
     );
     expect(hasApiPattern).toBe(true);
+  });
+
+  it('disables devOptions service worker and scopes /api/ rule via URL pathname matcher', () => {
+    expect(pwaOptions.devOptions?.enabled).toBe(false);
+    const apiRule = runtimeRuleFor('/api/puzzle');
+    expect(typeof apiRule?.urlPattern).toBe('function');
+    expect(runtimeRuleFor('https://other-origin.example/assets/app.js')?.handler).not.toBe(
+      'NetworkOnly',
+    );
   });
 });

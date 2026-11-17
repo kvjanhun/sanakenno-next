@@ -1,6 +1,6 @@
 # Spec 31: True Offline PWA Play, Zoom Accessibility & Cloud Status Polish
 
-Status: approved
+Status: shipped
 Branch: spec/31-offline-pwa-zoom-accessibility-and-cloud-status
 
 ## 1. Objective

@@ -4,14 +4,14 @@ import type { VitePWAOptions } from 'vite-plugin-pwa';
 export const pwaOptions: Partial<VitePWAOptions> = {
   registerType: 'autoUpdate',
   devOptions: {
-    enabled: true,
+    enabled: false,
   },
   workbox: {
     navigateFallback: '/index.html',
     navigateFallbackDenylist: [/^\/api\//],
     runtimeCaching: [
       {
-        urlPattern: /^\/api\//,
+        urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/'),
         handler: 'NetworkOnly',
       },
       {

@@ -243,7 +243,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                 placeholder="Esim. 123-456"
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value)}
-                className="flex-1 px-3 py-1.5 rounded text-xs font-mono outline-none border"
+                className="flex-1 px-3 py-1.5 rounded text-base sm:text-xs font-mono outline-none border"
                 style={{
                   backgroundColor: 'var(--color-bg-primary)',
                   borderColor: 'var(--color-border)',
@@ -309,7 +309,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
             placeholder="nimi@esimerkki.fi"
             value={emailInput}
             onChange={(e) => setEmailInput(e.target.value)}
-            className="w-full px-3 py-2 rounded text-sm outline-none border"
+            className="w-full px-3 py-2 rounded text-base sm:text-sm outline-none border"
             style={{
               backgroundColor: 'var(--color-bg-secondary)',
               borderColor: 'var(--color-border)',

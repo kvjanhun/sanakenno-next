@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from '@sanakenno/shared';
 import { getRawStorage, loadFromStorage, saveToStorage } from '../gameplay/storage.js';
+import { notifyPreferenceChanged, registerPreferenceSyncCallback } from './preference-sync.js';
+
+export { notifyPreferenceChanged, registerPreferenceSyncCallback };
 
 export const PALETTE_STORAGE_KEY = 'sanakenno_palette';
 export const THEME_ID_STORAGE_KEY = 'sanakenno_theme_id';
@@ -66,17 +69,6 @@ function persistPalette(id: ThemeId): void {
 function applyPaletteToRoot(id: ThemeId): void {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-palette', id);
-}
-
-let onPreferenceChangedCallback: (() => void) | null = null;
-
-/** Register an optional callback invoked when local palette/theme preferences change. */
-export function registerPreferenceSyncCallback(cb: (() => void) | null): void {
-  onPreferenceChangedCallback = cb;
-}
-
-export function notifyPreferenceChanged(): void {
-  onPreferenceChangedCallback?.();
 }
 
 const initialId = readStoredPalette();

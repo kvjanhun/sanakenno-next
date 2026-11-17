@@ -26,7 +26,7 @@ import {
   saveToStorage,
   STATS_STORAGE_KEY,
 } from '../gameplay/storage.js';
-import { registerPreferenceSyncCallback } from '../theme/usePaletteStore.js';
+import { registerPreferenceSyncCallback } from '../theme/preference-sync.js';
 import {
   AUTH_TOKEN_STORAGE_KEY,
   buildLocalPreferences,
