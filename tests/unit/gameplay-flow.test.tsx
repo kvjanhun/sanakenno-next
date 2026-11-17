@@ -177,14 +177,8 @@ describe('Integrated Gameplay Flow (in-process)', () => {
       expect(screen.getByTestId('score-display')).toHaveTextContent('1 piste');
     });
     expect(screen.getByTestId('found-words-count')).toHaveTextContent('1');
-    const firstBanner = screen.getByTestId('announcement-banner');
-    expect(firstBanner).toHaveTextContent('Päivittäinen tapa');
-    const stickyWrapper = screen.getByTestId('score-display').closest('.sticky');
-    expect(stickyWrapper).toContainElement(firstBanner);
-    expect(firstBanner.parentElement).toHaveStyle({ position: 'absolute', top: '100%' });
-    expect(screen.getByTestId('hint-deck')).toHaveStyle({ height: '172px' });
-    fireEvent.click(firstBanner);
     expect(screen.queryByTestId('announcement-banner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('hint-deck')).toHaveStyle({ height: '172px' });
     expect(
       screen.getByRole('link', { name: 'Avaa sanan "kana" määritelmä Kotuksessa' }),
     ).toHaveAttribute('href', 'https://www.kielitoimistonsanakirja.fi/#/kana');

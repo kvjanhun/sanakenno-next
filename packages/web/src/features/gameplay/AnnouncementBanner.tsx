@@ -123,23 +123,13 @@ export function AnnouncementBanner(): React.JSX.Element | null {
           <span
             data-testid="announcement-tier-pill"
             className="shrink-0 text-xs font-bold px-2 py-0.5 rounded-md"
-            style={
-              activeAnnouncement.isUnlock
-                ? {
-                    background: `color-mix(in srgb, ${tone} 18%, transparent)`,
-                    color: tone,
-                    border: `1px solid color-mix(in srgb, ${tone} 40%, transparent)`,
-                  }
-                : {
-                    background: 'var(--color-bg-primary)',
-                    color: tone,
-                    border: `1px solid color-mix(in srgb, ${tone} 45%, var(--color-border))`,
-                  }
-            }
+            style={{
+              background: `color-mix(in srgb, ${tone} 18%, transparent)`,
+              color: tone,
+              border: `1px solid color-mix(in srgb, ${tone} 40%, transparent)`,
+            }}
           >
-            {activeAnnouncement.isUnlock
-              ? activeAnnouncement.tierName
-              : `Kohti: ${activeAnnouncement.tierName}`}
+            {activeAnnouncement.tierName}
           </span>
         ) : activeAnnouncement.metaPill ? (
           <span

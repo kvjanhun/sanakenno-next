@@ -31,8 +31,6 @@ export interface AcceptedWordContext {
   foundWords: Set<string>;
 }
 
-const NEAR_UNLOCK_PROGRESS_IDS = new Set(['pangrams', 'full_board', 'unassisted_master']);
-
 export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
   const {
     normalized,
@@ -157,13 +155,11 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     const newStreak = computeStreak(statsResult.updated.records);
     const prevEvals = evaluateAchievements(statsResult.previous, prevStreak);
     const newEvals = evaluateAchievements(statsResult.updated, newStreak);
-    const unlockedIds = new Set<string>();
 
     for (const newProg of newEvals) {
       const oldProg = prevEvals.find((p) => p.id === newProg.id);
       const oldTier = oldProg?.unlockedTier ?? 0;
       if (newProg.unlockedTier > oldTier && newProg.currentTier) {
-        unlockedIds.add(newProg.id);
         const unitSuffix = newProg.unit ? ` ${newProg.unit}` : '';
         ui.enqueueAnnouncement({
           kind: 'achievement',
@@ -173,34 +169,6 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
           subtitle: `Uusi saavutus · ${formatAnnouncementCount(newProg.currentTier.target)}${unitSuffix}`,
           tierKey: newProg.currentTier.key,
           tierName: newProg.currentTier.name,
-          isUnlock: true,
-        });
-      }
-    }
-
-    for (const newProg of newEvals) {
-      if (unlockedIds.has(newProg.id) || !newProg.nextTier) continue;
-      const oldProg = prevEvals.find((p) => p.id === newProg.id);
-      const oldVal = oldProg?.currentValue ?? 0;
-      const didAdvance = newProg.currentValue > oldVal;
-      if (!didAdvance) continue;
-
-      const isStreakAdvance = newProg.id === 'streak' && newStreak.current > prevStreak.current;
-      const isNearUnlock =
-        NEAR_UNLOCK_PROGRESS_IDS.has(newProg.id) &&
-        newProg.nextTier.target - newProg.currentValue === 1;
-
-      if (isStreakAdvance || isNearUnlock) {
-        const unitSuffix = newProg.unit ? ` ${newProg.unit}` : '';
-        ui.enqueueAnnouncement({
-          kind: 'achievement',
-          category: 'achievement_progress',
-          achievementId: newProg.id,
-          title: newProg.title,
-          subtitle: `Edistyminen · ${formatAnnouncementCount(newProg.currentValue)} / ${formatAnnouncementCount(newProg.nextTier.target)}${unitSuffix}`,
-          tierKey: newProg.nextTier.key,
-          tierName: newProg.nextTier.name,
-          isUnlock: false,
         });
       }
     }

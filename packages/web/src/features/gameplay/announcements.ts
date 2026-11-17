@@ -10,8 +10,7 @@ import { getTierToken } from '../modals/achievementIcons.js';
 
 export type AnnouncementKind = 'gameplay' | 'achievement';
 
-export type AnnouncementCategory =
-  'letter_cleared' | 'achievement_unlocked' | 'achievement_progress' | 'no_hint_milestone';
+export type AnnouncementCategory = 'letter_cleared' | 'achievement_unlocked' | 'no_hint_milestone';
 
 export interface GameplayAnnouncement {
   id: string;
@@ -27,13 +26,12 @@ export interface GameplayAnnouncement {
 export interface AchievementAnnouncement {
   id: string;
   kind: 'achievement';
-  category: 'achievement_unlocked' | 'achievement_progress';
+  category: 'achievement_unlocked';
   achievementId: AchievementId;
   title: string;
   subtitle: string;
   tierKey: AchievementTierKey;
   tierName: AchievementTierName;
-  isUnlock: boolean;
   durationMs?: number;
 }
 
@@ -101,23 +99,6 @@ export function triggerConsoleAnnouncement(
       subtitle: `Uusi saavutus · ${formatAnnouncementCount(tier.target)}${unitSuffix}`,
       tierKey: tier.key,
       tierName: tier.name,
-      isUnlock: true,
-    };
-  } else if (kindKey === 'progress') {
-    const def = findAchievementDef(args[0] ?? 'streak');
-    const tier = findTier(def, args[3] ?? 'bronze');
-    const targetVal = typeof args[2] === 'number' ? args[2] : tier.target;
-    const currentVal = typeof args[1] === 'number' ? args[1] : Math.max(1, targetVal - 1);
-    const unitSuffix = def.unit ? ` ${def.unit}` : '';
-    item = {
-      kind: 'achievement',
-      category: 'achievement_progress',
-      achievementId: def.id,
-      title: def.title,
-      subtitle: `Edistyminen · ${formatAnnouncementCount(currentVal)} / ${formatAnnouncementCount(targetVal)}${unitSuffix}`,
-      tierKey: tier.key,
-      tierName: tier.name,
-      isUnlock: false,
     };
   } else if (kindKey === 'milestone') {
     const pct = Number(args[0]) === 25 ? 25 : 50;

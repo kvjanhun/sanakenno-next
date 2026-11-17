@@ -43,19 +43,18 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     expect(screen.getByTestId('announcement-meta-pill')).toHaveTextContent('7/7');
   });
 
-  it('renders achievement announcement with actual title on line 1, progress on line 2, HexagonMedallion, tier token, and no truncation', () => {
+  it('renders achievement announcement with actual title on line 1, status on line 2, HexagonMedallion, tier token, and no truncation', () => {
     render(<AnnouncementBanner />);
 
     act(() => {
       useUiStore.getState().enqueueAnnouncement({
         kind: 'achievement',
-        category: 'achievement_progress',
+        category: 'achievement_unlocked',
         achievementId: 'streak',
         title: 'Päivittäinen tapa',
-        subtitle: 'Edistyminen · 6 / 7 päivää',
+        subtitle: 'Uusi saavutus · 7 päivää',
         tierKey: 'bronze',
         tierName: 'Pronssi',
-        isUnlock: false,
       });
     });
 
@@ -68,10 +67,10 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     const title = screen.getByTestId('announcement-title');
     const subtitle = screen.getByTestId('announcement-subtitle');
     expect(title).toHaveTextContent('Päivittäinen tapa');
-    expect(subtitle).toHaveTextContent('Edistyminen · 6 / 7 päivää');
+    expect(subtitle).toHaveTextContent('Uusi saavutus · 7 päivää');
     expect(title.className).not.toMatch(/\b(truncate|text-ellipsis|whitespace-nowrap)\b/);
     expect(subtitle.className).not.toMatch(/\b(truncate|text-ellipsis|whitespace-nowrap)\b/);
-    expect(screen.getByTestId('announcement-tier-pill')).toHaveTextContent('Kohti: Pronssi');
+    expect(screen.getByTestId('announcement-tier-pill')).toHaveTextContent('Pronssi');
   });
 
   it('queues simultaneous announcements FIFO and promotes sequentially on click or timer expiry', () => {
@@ -93,7 +92,6 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
         subtitle: 'Uusi saavutus · 1 000 sanaa',
         tierKey: 'gold',
         tierName: 'Kulta',
-        isUnlock: true,
       });
     });
 
@@ -165,15 +163,6 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     });
     expect(screen.getByTestId('announcement-title')).toHaveTextContent('Sanasampo');
     expect(screen.getByTestId('announcement-tier-pill')).toHaveTextContent('Kulta');
-
-    fireEvent.click(screen.getByTestId('announcement-banner'));
-    act(() => {
-      window.sanakennoAnnounce?.('progress', 'streak', 6, 7, 'bronze');
-    });
-    expect(screen.getByTestId('announcement-title')).toHaveTextContent('Päivittäinen tapa');
-    expect(screen.getByTestId('announcement-subtitle')).toHaveTextContent(
-      'Edistyminen · 6 / 7 päivää',
-    );
 
     fireEvent.click(screen.getByTestId('announcement-banner'));
     act(() => {

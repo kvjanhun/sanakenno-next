@@ -208,7 +208,6 @@ describe('useGameStore Achievements & Streak Integration', () => {
       subtitle: 'Uusi saavutus · 100 sanaa',
       tierKey: 'bronze',
       tierName: 'Pronssi',
-      isUnlock: true,
     });
 
     // Dismiss notification
@@ -223,7 +222,7 @@ describe('useGameStore Achievements & Streak Integration', () => {
     expect(useUiStore.getState().activeAnnouncement).toBeNull();
   });
 
-  it('queues an achievement_progress announcement when daily streak increments or a pangram reaches 1 away from a tier', async () => {
+  it('does not queue upcoming achievement progress announcements when daily streak increments or a pangram reaches 1 away from a tier', async () => {
     const today = getHelsinkiDateString();
     const yesterday = new Date(`${today}T12:00:00Z`);
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
@@ -261,29 +260,7 @@ describe('useGameStore Achievements & Streak Integration', () => {
     expect(useUiStore.getState().activeAnnouncement?.category).toBe('no_hint_milestone');
     useUiStore.getState().dismissAnnouncement();
 
-    // 2nd queued: Streak progress (2 / 7 päivää)
-    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
-      kind: 'achievement',
-      category: 'achievement_progress',
-      achievementId: 'streak',
-      title: 'Päivittäinen tapa',
-      subtitle: 'Edistyminen · 2 / 7 päivää',
-      tierKey: 'bronze',
-      tierName: 'Pronssi',
-      isUnlock: false,
-    });
-    useUiStore.getState().dismissAnnouncement();
-
-    // 3rd queued: Pangram near-unlock progress (6 / 7 pangrammia)
-    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
-      kind: 'achievement',
-      category: 'achievement_progress',
-      achievementId: 'pangrams',
-      title: 'Taitava #7',
-      subtitle: 'Edistyminen · 6 / 7 pangrammia',
-      tierKey: 'bronze',
-      tierName: 'Pronssi',
-      isUnlock: false,
-    });
+    // No upcoming achievement progress announcements are queued
+    expect(useUiStore.getState().activeAnnouncement).toBeNull();
   });
 });

@@ -287,7 +287,6 @@ async function captureWithCdp(
       }
       const cmds: Record<string, string> = {
         achievement: `window.sanakennoAnnounce?.('achievement', 'total_words', 'gold')`,
-        progress: `window.sanakennoAnnounce?.('progress', 'streak', 6, 7, 'bronze')`,
         milestone: `window.sanakennoAnnounce?.('milestone', 50)`,
         letter: `window.sanakennoAnnounce?.('letter', 'K', 7)`,
       };
@@ -365,7 +364,7 @@ async function main() {
       desk('desktop-announcement-achievement', 'view-announcement-achievement'),
       mob('mobile-announcement-letter', 'view-announcement-letter'),
       mob('mobile-announcement-milestone', 'view-announcement-milestone'),
-      mob('mobile-announcement-progress-light', 'view-announcement-progress-light'),
+      mob('mobile-announcement-achievement-light', 'view-announcement-achievement-light'),
     ];
 
     for (const target of targets) {
