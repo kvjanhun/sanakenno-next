@@ -1,6 +1,6 @@
 # Spec 30: True End-to-End Hono RPC & Zod Route Validation
 
-Status: approved
+Status: shipped
 Branch: spec/30-end-to-end-hono-rpc-and-zod-validation
 
 ## 1. Objective

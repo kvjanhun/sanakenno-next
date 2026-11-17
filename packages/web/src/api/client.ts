@@ -21,7 +21,7 @@ export * from './admin-client.js';
 
 /**
  * Single typed Hono RPC client for @sanakenno/web.
- * Direct fetch() calls outside src/api/ are forbidden by tests/architecture.test.ts.
+ * Direct HTTP calls must go through `apiClient`; raw `fetch` is forbidden by tests/architecture.test.ts.
  */
 export const apiClient = hc<AppType>('/');
 
@@ -74,13 +74,10 @@ export async function postPlayerAuthInit(): Promise<PlayerAuthInitResponse> {
 }
 
 export async function postPlayerTransferTicket(token: string): Promise<TransferTicketResponse> {
-  const res = await fetch('/api/player/auth/transfer/ticket', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(token),
-    },
-  });
+  const res = await apiClient.api.player.auth.transfer.ticket.$post(
+    {},
+    { headers: authHeaders(token) },
+  );
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, 'Koodin luominen epäonnistui'));
   }
@@ -91,14 +88,10 @@ export async function postPlayerTransferCreate(
   token: string,
   payload: { email: string; player_key?: string },
 ): Promise<void> {
-  const res = await fetch('/api/player/auth/transfer/create', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(token),
-    },
-    body: JSON.stringify(payload),
-  });
+  const res = await apiClient.api.player.auth.transfer.create.$post(
+    { json: payload },
+    { headers: authHeaders(token) },
+  );
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, 'Sähköpostin lähetys epäonnistui'));
   }
@@ -112,13 +105,12 @@ export async function postPlayerTransferUse(
   },
   currentToken?: string | null,
 ): Promise<TransferUseResponse> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {};
   if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
-  const res = await fetch('/api/player/auth/transfer/use', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  });
+  const res = await apiClient.api.player.auth.transfer.use.$post(
+    { json: payload },
+    Object.keys(headers).length > 0 ? { headers } : undefined,
+  );
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, 'Yhdistäminen epäonnistui'));
   }
@@ -140,73 +132,50 @@ export async function postPlayerLogout(token: string): Promise<void> {
 }
 
 export async function postSyncStats(token: string, record: StatsRecord): Promise<void> {
-  await fetch('/api/player/sync/stats', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(token),
-    },
-    body: JSON.stringify(record),
-  }).catch(() => undefined);
+  await apiClient.api.player.sync.stats
+    .$post({ json: record }, { headers: authHeaders(token) })
+    .catch(() => undefined);
 }
 
 export async function postSyncState(token: string, state: SyncPuzzleState): Promise<void> {
-  await fetch('/api/player/sync/state', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(token),
-    },
-    body: JSON.stringify(state),
-  }).catch(() => undefined);
+  await apiClient.api.player.sync.state
+    .$post({ json: state }, { headers: authHeaders(token) })
+    .catch(() => undefined);
 }
 
 export async function postSyncProgress(token: string, payload: SyncProgressPayload): Promise<void> {
-  const res = await fetch('/api/player/sync/progress', {
-    method: 'POST',
-    keepalive: true,
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(token),
+  const res = await apiClient.api.player.sync.progress.$post(
+    { json: payload },
+    {
+      headers: authHeaders(token),
+      init: { keepalive: true },
     },
-    body: JSON.stringify(payload),
-  });
+  );
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, 'Synkronointi epäonnistui'));
   }
 }
 
 export async function postSyncPreferences(token: string, prefs: PlayerPreferences): Promise<void> {
-  await fetch('/api/player/sync/preferences', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(token),
-    },
-    body: JSON.stringify(prefs),
-  }).catch(() => undefined);
+  await apiClient.api.player.sync.preferences
+    .$post({ json: prefs }, { headers: authHeaders(token) })
+    .catch(() => undefined);
 }
 
 export function postAchievement(payload: AchievementPayload): void {
-  void fetch('/api/achievement', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...optionalAuthHeaders() },
-    body: JSON.stringify(payload),
-  }).catch(() => undefined);
+  void apiClient.api.achievement
+    .$post({ json: payload }, { headers: optionalAuthHeaders() })
+    .catch(() => undefined);
 }
 
 export function postFailedGuess(payload: FailedGuessPayload): void {
-  void fetch('/api/failed-guess', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...optionalAuthHeaders() },
-    body: JSON.stringify(payload),
-  }).catch(() => undefined);
+  void apiClient.api['failed-guess']
+    .$post({ json: payload }, { headers: optionalAuthHeaders() })
+    .catch(() => undefined);
 }
 
 export function postWordFind(payload: WordFindPayload): void {
-  void fetch('/api/word-find', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...optionalAuthHeaders() },
-    body: JSON.stringify(payload),
-  }).catch(() => undefined);
+  void apiClient.api['word-find']
+    .$post({ json: payload }, { headers: optionalAuthHeaders() })
+    .catch(() => undefined);
 }

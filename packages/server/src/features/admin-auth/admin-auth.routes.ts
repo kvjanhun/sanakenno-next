@@ -1,9 +1,12 @@
+import { zValidator } from '@hono/zod-validator';
+import { AdminChangePasswordPayloadSchema, AdminLoginPayloadSchema } from '@sanakenno/shared';
 import argon2 from 'argon2';
 import { Hono, type Context, type Next } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
+import { zodErrorHook } from '../../lib/zod-validator.js';
 import { getClientIp, SlidingWindowRateLimiter } from '../player-auth/rate-limiter.js';
 import {
   requireAdminAuth,
@@ -59,39 +62,36 @@ export function createAdminAuthRoutes(db: Kysely<Database>) {
 
   return new Hono<{ Variables: AdminVariables }>()
     .use('*', securityHeaders)
-    .post('/login', loginRateLimiter, async (c) => {
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen pyyntö' }, 400);
-      }
+    .post(
+      '/login',
+      loginRateLimiter,
+      zValidator(
+        'json',
+        AdminLoginPayloadSchema,
+        zodErrorHook('Käyttäjätunnus ja salasana vaaditaan'),
+      ),
+      async (c) => {
+        const { username, password } = c.req.valid('json');
 
-      const username = typeof body['username'] === 'string' ? body['username'].trim() : '';
-      const password = typeof body['password'] === 'string' ? body['password'] : '';
+        const admin = await getAdminByUsername(db, username);
+        const hash = admin?.password_hash ?? DUMMY_HASH;
+        const valid = await argon2.verify(hash, password).catch(() => false);
 
-      if (!username || !password) {
-        return c.json({ error: 'Käyttäjätunnus ja salasana vaaditaan' }, 400);
-      }
+        if (!admin || !valid) {
+          return c.json({ error: 'Virheellinen käyttäjätunnus tai salasana' }, 401);
+        }
 
-      const admin = await getAdminByUsername(db, username);
-      const hash = admin?.password_hash ?? DUMMY_HASH;
-      const valid = await argon2.verify(hash, password).catch(() => false);
+        const { sessionId, csrfToken } = await runImmediateTransactionWithRetry(db, async (trx) => {
+          await cleanupExpiredAdminSessions(trx);
+          const session = await createAdminSession(trx, Number(admin.id));
+          await insertAdminLog(trx, Number(admin.id), 'login');
+          return session;
+        });
 
-      if (!admin || !valid) {
-        return c.json({ error: 'Virheellinen käyttäjätunnus tai salasana' }, 401);
-      }
-
-      const { sessionId, csrfToken } = await runImmediateTransactionWithRetry(db, async (trx) => {
-        await cleanupExpiredAdminSessions(trx);
-        const session = await createAdminSession(trx, Number(admin.id));
-        await insertAdminLog(trx, Number(admin.id), 'login');
-        return session;
-      });
-
-      setSessionCookie(c, sessionId);
-      return c.json({ status: 'ok' as const, csrfToken, username: admin.username }, 200);
-    })
+        setSessionCookie(c, sessionId);
+        return c.json({ status: 'ok' as const, csrfToken, username: admin.username }, 200);
+      },
+    )
     .post('/logout', async (c) => {
       const sessionId = getCookie(c, SESSION_COOKIE);
       if (sessionId) {
@@ -111,46 +111,50 @@ export function createAdminAuthRoutes(db: Kysely<Database>) {
         200,
       );
     })
-    .post('/change-password', authMiddleware, requireCsrf, async (c) => {
-      const admin = c.get('admin');
-      const sessionId = c.get('sessionId');
+    .post(
+      '/change-password',
+      authMiddleware,
+      requireCsrf,
+      zValidator(
+        'json',
+        AdminChangePasswordPayloadSchema,
+        zodErrorHook((err) => {
+          const issue = err.issues[0];
+          if (
+            issue?.path[0] === 'newPassword' &&
+            issue.code === 'too_small' &&
+            issue.minimum === 12
+          ) {
+            return { error: 'Uuden salasanan on oltava vähintään 12 merkkiä' };
+          }
+          return { error: 'Molemmat salasanat vaaditaan' };
+        }),
+      ),
+      async (c) => {
+        const admin = c.get('admin');
+        const sessionId = c.get('sessionId');
+        const { currentPassword, newPassword } = c.req.valid('json');
 
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen pyyntö' }, 400);
-      }
+        const adminRow = await getAdminById(db, admin.adminId);
+        if (!adminRow) {
+          return c.json({ error: 'Käyttäjää ei löydy' }, 404);
+        }
 
-      const currentPassword =
-        typeof body['currentPassword'] === 'string' ? body['currentPassword'] : '';
-      const newPassword = typeof body['newPassword'] === 'string' ? body['newPassword'] : '';
+        const valid = await argon2
+          .verify(adminRow.password_hash, currentPassword)
+          .catch(() => false);
+        if (!valid) {
+          return c.json({ error: 'Nykyinen salasana on väärin' }, 400);
+        }
 
-      if (!currentPassword || !newPassword) {
-        return c.json({ error: 'Molemmat salasanat vaaditaan' }, 400);
-      }
+        const newHash = await argon2.hash(newPassword);
+        await runImmediateTransactionWithRetry(db, async (trx) => {
+          await updateAdminPassword(trx, admin.adminId, newHash);
+          await deleteSessionsForAdmin(trx, admin.adminId, sessionId);
+          await insertAdminLog(trx, admin.adminId, 'change_password');
+        });
 
-      if (newPassword.length < 12) {
-        return c.json({ error: 'Uuden salasanan on oltava vähintään 12 merkkiä' }, 400);
-      }
-
-      const adminRow = await getAdminById(db, admin.adminId);
-      if (!adminRow) {
-        return c.json({ error: 'Käyttäjää ei löydy' }, 404);
-      }
-
-      const valid = await argon2.verify(adminRow.password_hash, currentPassword).catch(() => false);
-      if (!valid) {
-        return c.json({ error: 'Nykyinen salasana on väärin' }, 400);
-      }
-
-      const newHash = await argon2.hash(newPassword);
-      await runImmediateTransactionWithRetry(db, async (trx) => {
-        await updateAdminPassword(trx, admin.adminId, newHash);
-        await deleteSessionsForAdmin(trx, admin.adminId, sessionId);
-        await insertAdminLog(trx, admin.adminId, 'change_password');
-      });
-
-      return c.json({ status: 'ok' as const }, 200);
-    });
+        return c.json({ status: 'ok' as const }, 200);
+      },
+    );
 }

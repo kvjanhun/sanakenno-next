@@ -1,3 +1,9 @@
+import { zValidator } from '@hono/zod-validator';
+import {
+  AdminAchievementsQuerySchema,
+  AdminFailedGuessesQuerySchema,
+  AdminWordFindsQuerySchema,
+} from '@sanakenno/shared';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
@@ -22,8 +28,8 @@ export function createAdminAnalyticsRoutes(db: Kysely<Database>) {
   admin.use('*', requireAdminAuth(db));
 
   return admin
-    .get('/achievements', async (c) => {
-      const q = c.req.query();
+    .get('/achievements', zValidator('query', AdminAchievementsQuerySchema), async (c) => {
+      const q = c.req.valid('query') ?? {};
       const rawDays = q.days ? Number(q.days) : 7;
       const days = Math.min(90, Math.max(1, isNaN(rawDays) ? 7 : rawDays));
       const requestedMode = q.mode;
@@ -33,20 +39,20 @@ export function createAdminAnalyticsRoutes(db: Kysely<Database>) {
       const rows = await getAchievementRows(db, days);
       const result = groupAchievementsByDay(rows, mode, days);
 
-      return c.json(result);
+      return c.json(result, 200);
     })
-    .get('/failed-guesses', async (c) => {
-      const q = c.req.query();
+    .get('/failed-guesses', zValidator('query', AdminFailedGuessesQuerySchema), async (c) => {
+      const q = c.req.valid('query') ?? {};
       const rawDays = q.days ? Number(q.days) : 7;
       const days = Math.min(90, Math.max(1, isNaN(rawDays) ? 7 : rawDays));
 
       const rows = await getFailedGuessRows(db, days);
       const result = groupFailedGuessesByDay(rows, days);
 
-      return c.json(result);
+      return c.json(result, 200);
     })
-    .get('/word-finds', async (c) => {
-      const q = c.req.query();
+    .get('/word-finds', zValidator('query', AdminWordFindsQuerySchema), async (c) => {
+      const q = c.req.valid('query') ?? {};
       const rawPuzzleNumber = q.puzzle_number;
       const rawDisplayNumber = q.display_number;
 
@@ -94,15 +100,18 @@ export function createAdminAnalyticsRoutes(db: Kysely<Database>) {
       const totalFinds = words.reduce((sum, item) => sum + item.find_count, 0);
       const recordedWords = words.filter((item) => item.find_count > 0).length;
 
-      return c.json({
-        puzzle_number: slot,
-        display_number: puzzle.display_number,
-        center: puzzle.center,
-        letters: puzzle.all_letters,
-        total_words: words.length,
-        recorded_words: recordedWords,
-        total_finds: totalFinds,
-        words,
-      });
+      return c.json(
+        {
+          puzzle_number: slot,
+          display_number: puzzle.display_number,
+          center: puzzle.center,
+          letters: puzzle.all_letters,
+          total_words: words.length,
+          recorded_words: recordedWords,
+          total_finds: totalFinds,
+          words,
+        },
+        200,
+      );
     });
 }

@@ -37,13 +37,12 @@ describe('Architectural Fitness Guardrails', () => {
     expect(oversized).toEqual([]);
   });
 
-  it('forbids direct fetch() calls in @sanakenno/web outside src/api/', () => {
+  it('forbids direct fetch() calls anywhere in @sanakenno/web (use typed apiClient)', () => {
     const webFiles = walkFiles(path.join(ROOT, 'packages/web/src'), ['.ts', '.tsx']);
     const violations: string[] = [];
 
     for (const file of webFiles) {
       const rel = path.relative(ROOT, file).replaceAll('\\', '/');
-      if (rel.startsWith('packages/web/src/api/')) continue;
       const content = fs.readFileSync(file, 'utf8');
       if (/\bfetch\s*\(/.test(content)) {
         violations.push(rel);
@@ -102,6 +101,34 @@ describe('Architectural Fitness Guardrails', () => {
       const rel = path.relative(ROOT, file).replaceAll('\\', '/');
       const content = fs.readFileSync(file, 'utf8');
       if (/^\s*(?!return\b)[a-zA-Z_$][\w$]*\.(get|post|put|delete|patch)\s*\(/m.test(content)) {
+        violations.push(rel);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('requires @hono/zod-validator and @sanakenno/shared schemas across server route slices', () => {
+    const validatedRoutes = [
+      'packages/server/src/features/puzzle/puzzle.routes.ts',
+      'packages/server/src/features/puzzle/archive.routes.ts',
+      'packages/server/src/features/player-auth/player-auth.routes.ts',
+      'packages/server/src/features/player-sync/player-sync.routes.ts',
+      'packages/server/src/features/telemetry/telemetry.routes.ts',
+      'packages/server/src/features/admin-auth/admin-auth.routes.ts',
+      'packages/server/src/features/admin-puzzles/admin-puzzles.routes.ts',
+      'packages/server/src/features/admin-suggestions/admin-suggestions.routes.ts',
+      'packages/server/src/features/admin-analytics/admin-analytics.routes.ts',
+    ];
+    const violations: string[] = [];
+
+    for (const rel of validatedRoutes) {
+      const content = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      if (
+        !content.includes("from '@hono/zod-validator'") ||
+        !content.includes('zValidator(') ||
+        !content.includes("from '@sanakenno/shared'")
+      ) {
         violations.push(rel);
       }
     }

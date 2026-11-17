@@ -14,22 +14,41 @@ export type AdminSessionResponse = z.infer<typeof AdminSessionResponseSchema>;
 
 export const AdminChangePasswordPayloadSchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(12),
+  newPassword: z.string().min(1).min(12),
 });
 export type AdminChangePasswordPayload = z.infer<typeof AdminChangePasswordPayloadSchema>;
 
 export const AdminPuzzleSavePayloadSchema = z.object({
   slot: z.number().int().nonnegative().optional(),
-  letters: z.string().trim().min(7),
+  letters: z.union([z.string(), z.array(z.string())]),
   center: z.string().trim().length(1),
   force: z.boolean().optional(),
 });
 export type AdminPuzzleSavePayload = z.infer<typeof AdminPuzzleSavePayloadSchema>;
 
-export const AdminPuzzleSwapPayloadSchema = z.object({
-  slotA: z.number().int().nonnegative(),
-  slotB: z.number().int().nonnegative(),
-});
+export const AdminPuzzleSwapPayloadSchema = z
+  .object({
+    slotA: z.number().int().nonnegative().optional(),
+    slotB: z.number().int().nonnegative().optional(),
+    slot_a: z.number().int().nonnegative().optional(),
+    slot_b: z.number().int().nonnegative().optional(),
+  })
+  .refine(
+    (v) => {
+      const a = v.slotA ?? v.slot_a;
+      const b = v.slotB ?? v.slot_b;
+      return (
+        typeof a === 'number' &&
+        Number.isInteger(a) &&
+        a >= 0 &&
+        typeof b === 'number' &&
+        Number.isInteger(b) &&
+        b >= 0 &&
+        a !== b
+      );
+    },
+    { message: 'Molemmat slotit vaaditaan eri ei-negatiivisina kokonaislukuina' },
+  );
 export type AdminPuzzleSwapPayload = z.infer<typeof AdminPuzzleSwapPayloadSchema>;
 
 export const AdminPuzzleCenterPayloadSchema = z.object({
@@ -39,7 +58,7 @@ export const AdminPuzzleCenterPayloadSchema = z.object({
 export type AdminPuzzleCenterPayload = z.infer<typeof AdminPuzzleCenterPayloadSchema>;
 
 export const AdminPreviewPayloadSchema = z.object({
-  letters: z.string().trim().min(7),
+  letters: z.union([z.string(), z.array(z.string())]),
   center: z.string().trim().length(1),
 });
 export type AdminPreviewPayload = z.infer<typeof AdminPreviewPayloadSchema>;
@@ -150,7 +169,7 @@ export const AdminSuggestionRejectionSchema = z.object({
 export type AdminSuggestionRejection = z.infer<typeof AdminSuggestionRejectionSchema>;
 
 export const AdminSuggestionRejectionPayloadSchema = z.object({
-  letters: z.string().or(z.array(z.string())),
+  letters: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1)).min(1)]),
   center: z.string().trim().length(1),
 });
 export type AdminSuggestionRejectionPayload = z.infer<typeof AdminSuggestionRejectionPayloadSchema>;
@@ -203,3 +222,62 @@ export const AdminWordFindsResponseSchema = z.object({
   ),
 });
 export type AdminWordFindsResponse = z.infer<typeof AdminWordFindsResponseSchema>;
+
+export const AdminVariationsQuerySchema = z
+  .object({
+    slot: z.string().optional(),
+    display_number: z.string().optional(),
+    letters: z.string().optional(),
+  })
+  .optional();
+
+export const AdminScheduleQuerySchema = z
+  .object({
+    days: z.string().optional(),
+    start: z.string().optional(),
+  })
+  .optional();
+
+export const AdminCombinationsQuerySchema = z
+  .object({
+    requires: z.string().optional(),
+    excludes: z.string().optional(),
+    min_pangrams: z.string().optional(),
+    max_pangrams: z.string().optional(),
+    min_words: z.string().optional(),
+    max_words: z.string().optional(),
+    in_rotation: z.string().optional(),
+    sort: z.string().optional(),
+    order: z.string().optional(),
+    page: z.string().optional(),
+    per_page: z.string().optional(),
+  })
+  .optional();
+
+export const AdminSuggestionQuerySchema = z
+  .object({
+    declined: z.string().optional(),
+    min_words: z.string().optional(),
+    max_words: z.string().optional(),
+  })
+  .optional();
+
+export const AdminAchievementsQuerySchema = z
+  .object({
+    days: z.string().optional(),
+    mode: z.string().optional(),
+  })
+  .optional();
+
+export const AdminFailedGuessesQuerySchema = z
+  .object({
+    days: z.string().optional(),
+  })
+  .optional();
+
+export const AdminWordFindsQuerySchema = z
+  .object({
+    puzzle_number: z.string().optional(),
+    display_number: z.string().optional(),
+  })
+  .optional();

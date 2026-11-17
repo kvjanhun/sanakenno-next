@@ -60,8 +60,15 @@ export const TransferUseResponseSchema = SyncPayloadSchema.extend({
 
 export type TransferUseResponse = z.infer<typeof TransferUseResponseSchema>;
 
-export const SyncProgressPayloadSchema = PuzzleStateSchema.extend({
+export const SyncProgressPayloadSchema = z.object({
+  puzzle_number: z.number().int().nonnegative(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  found_words: z.array(z.string()),
+  score: z.number().int().nonnegative(),
+  hints_unlocked: z.array(z.string()),
+  started_at: z.number().int().nonnegative(),
+  total_paused_ms: z.number().int().nonnegative(),
+  score_before_hints: z.number().int().nonnegative().nullable(),
   max_score: z.number().int().nonnegative(),
   best_no_hint_score: z.number().int().nonnegative().optional(),
 });

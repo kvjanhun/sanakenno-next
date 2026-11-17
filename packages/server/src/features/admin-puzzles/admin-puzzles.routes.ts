@@ -1,8 +1,19 @@
-import { getHelsinkiDateString } from '@sanakenno/shared';
+import { zValidator } from '@hono/zod-validator';
+import {
+  AdminBlockWordPayloadSchema,
+  AdminPreviewPayloadSchema,
+  AdminPuzzleCenterPayloadSchema,
+  AdminPuzzleSavePayloadSchema,
+  AdminPuzzleSwapPayloadSchema,
+  AdminScheduleQuerySchema,
+  AdminVariationsQuerySchema,
+  getHelsinkiDateString,
+} from '@sanakenno/shared';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
+import { zodErrorHook } from '../../lib/zod-validator.js';
 import {
   requireAdminAuth,
   requireCsrf,
@@ -65,93 +76,93 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
 
   return new Hono<{ Variables: AdminVariables }>()
     .use('*', securityHeaders, authMiddleware, requireCsrf)
-    .post('/puzzle', async (c) => {
-      const admin = c.get('admin');
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen pyyntö' }, 400);
-      }
+    .post(
+      '/puzzle',
+      zValidator(
+        'json',
+        AdminPuzzleSavePayloadSchema,
+        zodErrorHook('Seitsemän uniikkia kirjainta ja keskuskirjain vaaditaan'),
+      ),
+      async (c) => {
+        const admin = c.get('admin');
+        const body = c.req.valid('json');
 
-      const letters = parseLetters(body['letters']);
-      const center = typeof body['center'] === 'string' ? body['center'].trim().toLowerCase() : '';
-      const force = Boolean(body['force']);
-      const requestedSlot =
-        typeof body['slot'] === 'number' && Number.isInteger(body['slot']) && body['slot'] >= 0
-          ? body['slot']
-          : undefined;
+        const letters = parseLetters(body.letters);
+        const center = body.center.trim().toLowerCase();
+        const force = Boolean(body.force);
+        const requestedSlot = body.slot;
 
-      if (!letters || !center) {
-        return c.json({ error: 'Seitsemän uniikkia kirjainta ja keskuskirjain vaaditaan' }, 400);
-      }
-
-      if (!letters.includes(center)) {
-        return c.json({ error: 'Keskuskirjaimen on oltava yksi kirjaimista' }, 400);
-      }
-
-      for (const ch of letters) {
-        if (!FINNISH_LETTERS.has(ch)) {
-          return c.json({ error: `Virheellinen kirjain: ${ch}` }, 400);
+        if (!letters || !center) {
+          return c.json({ error: 'Seitsemän uniikkia kirjainta ja keskuskirjain vaaditaan' }, 400);
         }
-      }
 
-      const lettersKey = normalizeLettersKey(letters);
-      const conflicts = await findDuplicateConflicts(db, lettersKey, requestedSlot);
+        if (!letters.includes(center)) {
+          return c.json({ error: 'Keskuskirjaimen on oltava yksi kirjaimista' }, 400);
+        }
 
-      const exact = conflicts.find((conflict) => conflict.center === center);
-      if (exact) {
+        for (const ch of letters) {
+          if (!FINNISH_LETTERS.has(ch)) {
+            return c.json({ error: `Virheellinen kirjain: ${ch}` }, 400);
+          }
+        }
+
+        const lettersKey = normalizeLettersKey(letters);
+        const conflicts = await findDuplicateConflicts(db, lettersKey, requestedSlot);
+
+        const exact = conflicts.find((conflict) => conflict.center === center);
+        if (exact) {
+          return c.json(
+            {
+              error: `Sama peli on jo kierrossa slotissa ${exact.slot} keskuksella "${center}".`,
+              duplicate: exact,
+            },
+            409,
+          );
+        }
+
+        if (conflicts.length > 0 && !force) {
+          const first = conflicts[0]!;
+          return c.json(
+            {
+              error: `Samat kirjaimet ovat jo pelissä slotissa ${first.slot} (keskus "${first.center}"). Luodaanko silti?`,
+              requires_force: true,
+              duplicate: first,
+            },
+            409,
+          );
+        }
+
+        const lettersString = letters.join(',');
+        const targetSlot = requestedSlot ?? (await nextFreeSlot(db));
+
+        await runImmediateTransactionWithRetry(db, async (trx) => {
+          await insertOrUpdatePuzzle(trx, targetSlot, lettersString, center);
+          await insertAdminLog(
+            trx,
+            admin.adminId,
+            requestedSlot !== undefined ? 'update_puzzle' : 'create_puzzle',
+            `slot=${targetSlot},letters=${lettersString},center=${center}`,
+          );
+        });
+
+        bumpPuzzleCacheGeneration();
+        const displayNumber = (await getDisplayNumber(db, targetSlot)) ?? targetSlot + 1;
+        const total = await totalPuzzles(db);
+
         return c.json(
           {
-            error: `Sama peli on jo kierrossa slotissa ${exact.slot} keskuksella "${center}".`,
-            duplicate: exact,
+            status: 'saved' as const,
+            slot: targetSlot,
+            display_number: displayNumber,
+            total_puzzles: total,
+            letters,
+            center,
+            is_new: requestedSlot === undefined,
           },
-          409,
+          200,
         );
-      }
-
-      if (conflicts.length > 0 && !force) {
-        const first = conflicts[0]!;
-        return c.json(
-          {
-            error: `Samat kirjaimet ovat jo pelissä slotissa ${first.slot} (keskus "${first.center}"). Luodaanko silti?`,
-            requires_force: true,
-            duplicate: first,
-          },
-          409,
-        );
-      }
-
-      const lettersString = letters.join(',');
-      const targetSlot = requestedSlot ?? (await nextFreeSlot(db));
-
-      await runImmediateTransactionWithRetry(db, async (trx) => {
-        await insertOrUpdatePuzzle(trx, targetSlot, lettersString, center);
-        await insertAdminLog(
-          trx,
-          admin.adminId,
-          requestedSlot !== undefined ? 'update_puzzle' : 'create_puzzle',
-          `slot=${targetSlot},letters=${lettersString},center=${center}`,
-        );
-      });
-
-      bumpPuzzleCacheGeneration();
-      const displayNumber = (await getDisplayNumber(db, targetSlot)) ?? targetSlot + 1;
-      const total = await totalPuzzles(db);
-
-      return c.json(
-        {
-          status: 'saved' as const,
-          slot: targetSlot,
-          display_number: displayNumber,
-          total_puzzles: total,
-          letters,
-          center,
-          is_new: requestedSlot === undefined,
-        },
-        200,
-      );
-    })
+      },
+    )
     .delete('/puzzle/:slot', async (c) => {
       const admin = c.get('admin');
       const slot = Number(c.req.param('slot'));
@@ -173,74 +184,66 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
       const total = await totalPuzzles(db);
       return c.json({ status: 'deleted' as const, slot, total_puzzles: total }, 200);
     })
-    .post('/puzzle/swap', async (c) => {
-      const admin = c.get('admin');
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen pyyntö' }, 400);
-      }
+    .post(
+      '/puzzle/swap',
+      zValidator(
+        'json',
+        AdminPuzzleSwapPayloadSchema,
+        zodErrorHook('Molemmat slotit vaaditaan eri ei-negatiivisina kokonaislukuina'),
+      ),
+      async (c) => {
+        const admin = c.get('admin');
+        const body = c.req.valid('json');
 
-      const rawSlotA = body['slotA'] ?? body['slot_a'];
-      const rawSlotB = body['slotB'] ?? body['slot_b'];
-      const slotA = Number(rawSlotA);
-      const slotB = Number(rawSlotB);
-      if (
-        !Number.isInteger(slotA) ||
-        !Number.isInteger(slotB) ||
-        slotA < 0 ||
-        slotB < 0 ||
-        slotA === slotB
-      ) {
-        return c.json(
-          { error: 'Molemmat slotit vaaditaan eri ei-negatiivisina kokonaislukuina' },
-          400,
-        );
-      }
+        const slotA = (body.slotA ?? body.slot_a)!;
+        const slotB = (body.slotB ?? body.slot_b)!;
 
-      await runImmediateTransactionWithRetry(db, async (trx) => {
-        await swapPuzzles(trx, slotA, slotB);
-        await insertAdminLog(trx, admin.adminId, 'swap_puzzles', `slotA=${slotA},slotB=${slotB}`);
-      });
+        await runImmediateTransactionWithRetry(db, async (trx) => {
+          await swapPuzzles(trx, slotA, slotB);
+          await insertAdminLog(trx, admin.adminId, 'swap_puzzles', `slotA=${slotA},slotB=${slotB}`);
+        });
 
-      bumpPuzzleCacheGeneration();
-      return c.json({ status: 'swapped' as const, slotA, slotB }, 200);
-    })
-    .post('/puzzle/center', async (c) => {
-      const admin = c.get('admin');
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen pyyntö' }, 400);
-      }
+        bumpPuzzleCacheGeneration();
+        return c.json({ status: 'swapped' as const, slotA, slotB }, 200);
+      },
+    )
+    .post(
+      '/puzzle/center',
+      zValidator(
+        'json',
+        AdminPuzzleCenterPayloadSchema,
+        zodErrorHook('Slotti ja yksittäinen keskuskirjain vaaditaan'),
+      ),
+      async (c) => {
+        const admin = c.get('admin');
+        const body = c.req.valid('json');
+        const slot = body.slot;
+        const center = body.center.trim().toLowerCase();
 
-      const slot = Number(body['slot']);
-      const center = typeof body['center'] === 'string' ? body['center'].trim().toLowerCase() : '';
+        const existing = await getPuzzleBySlot(db, slot);
+        if (!existing || existing.is_active === 0) {
+          return c.json({ error: 'Peliä ei löydy' }, 404);
+        }
 
-      if (!Number.isInteger(slot) || slot < 0 || !center || center.length !== 1) {
-        return c.json({ error: 'Slotti ja yksittäinen keskuskirjain vaaditaan' }, 400);
-      }
+        const letters = parseLetters(existing.letters);
+        if (!letters || !letters.includes(center)) {
+          return c.json({ error: 'Keskuskirjaimen on oltava yksi pelin kirjaimista' }, 400);
+        }
 
-      const existing = await getPuzzleBySlot(db, slot);
-      if (!existing || existing.is_active === 0) {
-        return c.json({ error: 'Peliä ei löydy' }, 404);
-      }
+        await runImmediateTransactionWithRetry(db, async (trx) => {
+          await updatePuzzleCenter(trx, slot, center);
+          await insertAdminLog(
+            trx,
+            admin.adminId,
+            'change_center',
+            `slot=${slot},center=${center}`,
+          );
+        });
 
-      const letters = parseLetters(existing.letters);
-      if (!letters || !letters.includes(center)) {
-        return c.json({ error: 'Keskuskirjaimen on oltava yksi pelin kirjaimista' }, 400);
-      }
-
-      await runImmediateTransactionWithRetry(db, async (trx) => {
-        await updatePuzzleCenter(trx, slot, center);
-        await insertAdminLog(trx, admin.adminId, 'change_center', `slot=${slot},center=${center}`);
-      });
-
-      bumpPuzzleCacheGeneration();
-      return c.json({ status: 'updated' as const, slot, center }, 200);
-    })
+        bumpPuzzleCacheGeneration();
+        return c.json({ status: 'updated' as const, slot, center }, 200);
+      },
+    )
     .get('/puzzle/slots', async (c) => {
       const slots = await getActiveSlots(db);
       const total = await totalPuzzles(db);
@@ -254,10 +257,11 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         200,
       );
     })
-    .get('/puzzle/variations', async (c) => {
-      const slotStr = c.req.query('slot');
-      const displayStr = c.req.query('display_number');
-      const lettersParam = c.req.query('letters');
+    .get('/puzzle/variations', zValidator('query', AdminVariationsQuerySchema), async (c) => {
+      const query = c.req.valid('query') ?? {};
+      const slotStr = query.slot;
+      const displayStr = query.display_number;
+      const lettersParam = query.letters;
 
       const blocked = await getBlockedWords(db);
 
@@ -326,68 +330,65 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
 
       return c.json({ error: 'Slotti, pelinumero tai kirjaimet vaaditaan' }, 400);
     })
-    .post('/preview', async (c) => {
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen pyyntö' }, 400);
-      }
+    .post(
+      '/preview',
+      zValidator(
+        'json',
+        AdminPreviewPayloadSchema,
+        zodErrorHook('Virheelliset kirjaimet tai keskuskirjain'),
+      ),
+      async (c) => {
+        const body = c.req.valid('json');
+        const letters = parseLetters(body.letters);
+        const center = body.center.trim().toLowerCase();
 
-      const letters = parseLetters(body['letters']);
-      const center = typeof body['center'] === 'string' ? body['center'].trim().toLowerCase() : '';
+        if (!letters || !center || !letters.includes(center)) {
+          return c.json({ error: 'Virheelliset kirjaimet tai keskuskirjain' }, 400);
+        }
 
-      if (!letters || !center || !letters.includes(center)) {
-        return c.json({ error: 'Virheelliset kirjaimet tai keskuskirjain' }, 400);
-      }
+        const blocked = await getBlockedWords(db);
+        const preview = computePuzzle(letters, center, blocked);
+        const variations = computeVariations(letters, blocked).map((v) => ({
+          ...v,
+          is_active: v.center === center,
+        }));
 
-      const blocked = await getBlockedWords(db);
-      const preview = computePuzzle(letters, center, blocked);
-      const variations = computeVariations(letters, blocked).map((v) => ({
-        ...v,
-        is_active: v.center === center,
-      }));
-
-      return c.json(
-        {
-          letters,
-          center,
-          words: preview.words,
-          max_score: preview.max_score,
-          word_count: preview.hint_data.word_count,
-          pangram_count: preview.hint_data.pangram_count,
-          hint_data: preview.hint_data,
-          variations,
-        },
-        200,
-      );
-    })
+        return c.json(
+          {
+            letters,
+            center,
+            words: preview.words,
+            max_score: preview.max_score,
+            word_count: preview.hint_data.word_count,
+            pangram_count: preview.hint_data.pangram_count,
+            hint_data: preview.hint_data,
+            variations,
+          },
+          200,
+        );
+      },
+    )
     .get('/blocked', async (c) => {
       const blocked = await getBlockedWordsList(db);
       return c.json({ blocked }, 200);
     })
-    .post('/block', async (c) => {
-      const admin = c.get('admin');
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen pyyntö' }, 400);
-      }
+    .post(
+      '/block',
+      zValidator('json', AdminBlockWordPayloadSchema, zodErrorHook('Estettävä sana vaaditaan')),
+      async (c) => {
+        const admin = c.get('admin');
+        const body = c.req.valid('json');
+        const word = body.word.trim().toLowerCase();
 
-      const word = typeof body['word'] === 'string' ? body['word'].trim().toLowerCase() : '';
-      if (!word) {
-        return c.json({ error: 'Estettävä sana vaaditaan' }, 400);
-      }
+        await runImmediateTransactionWithRetry(db, async (trx) => {
+          await insertBlockedWord(trx, word);
+          await insertAdminLog(trx, admin.adminId, 'block_word', `word=${word}`);
+        });
 
-      await runImmediateTransactionWithRetry(db, async (trx) => {
-        await insertBlockedWord(trx, word);
-        await insertAdminLog(trx, admin.adminId, 'block_word', `word=${word}`);
-      });
-
-      bumpPuzzleCacheGeneration();
-      return c.json({ status: 'blocked' as const, word }, 200);
-    })
+        bumpPuzzleCacheGeneration();
+        return c.json({ status: 'blocked' as const, word }, 200);
+      },
+    )
     .delete('/block/:id', async (c) => {
       const admin = c.get('admin');
       const id = Number(c.req.param('id'));
@@ -403,11 +404,12 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
       bumpPuzzleCacheGeneration();
       return c.json({ status: 'unblocked' as const, id }, 200);
     })
-    .get('/schedule', async (c) => {
-      const requestedDays = parseInt(c.req.query('days') || '14', 10);
+    .get('/schedule', zValidator('query', AdminScheduleQuerySchema), async (c) => {
+      const query = c.req.valid('query') ?? {};
+      const requestedDays = parseInt(query.days || '14', 10);
       const days = Math.min(90, Math.max(1, Number.isFinite(requestedDays) ? requestedDays : 14));
       const todayStr = getHelsinkiDateString();
-      const startParam = c.req.query('start');
+      const startParam = query.start;
       const startDateStr =
         startParam && /^\d{4}-\d{2}-\d{2}$/.test(startParam) ? startParam : todayStr;
 

@@ -27,6 +27,7 @@ sanakenno-next/
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer + Cloud Run edge middleware
       src/
         edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), Google security headers & PWA static serving
+        lib/                 # Shared server utilities (@hono/zod-validator error hook helper)
         db/                  # 17-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0005 migration runner (player_transfer_tickets), 1.0 backfill helper (backfill-stats.ts), deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)

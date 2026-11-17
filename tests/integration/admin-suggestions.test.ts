@@ -291,5 +291,24 @@ describe('Admin Suggestions & Combinations (Kysely + Hono integration)', () => {
       ).json()) as { rejections: Array<{ id: number }> };
       expect(listAfter.rejections.some((r) => r.id === rejected.id)).toBe(false);
     });
+
+    it('rejects empty letters payload on POST /api/admin/suggestion-rejections', async () => {
+      for (const payload of [
+        { letters: '', center: 'a' },
+        { letters: [], center: 'a' },
+      ]) {
+        const res = await harness.app.request('/api/admin/suggestion-rejections', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...adminHeaders(),
+          },
+          body: JSON.stringify(payload),
+        });
+        expect(res.status).toBe(400);
+        const body = (await res.json()) as { error: string };
+        expect(body.error).toBe('Kirjaimet ja keskuskirjain vaaditaan');
+      }
+    });
   });
 });

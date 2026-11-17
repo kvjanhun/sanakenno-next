@@ -18,14 +18,14 @@ export const HintDataSchema = z.object({
 });
 
 export const StatsRecordSchema = z.object({
-  puzzle_number: z.number().int().positive(),
+  puzzle_number: z.number().int().nonnegative(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   best_rank: z.string().min(1),
   best_score: z.number().int().nonnegative(),
-  max_score: z.number().int().nonnegative(),
-  words_found: z.number().int().nonnegative(),
-  hints_used: z.number().int().nonnegative(),
-  elapsed_ms: z.number().int().nonnegative(),
+  max_score: z.number().int().nonnegative().optional().default(0),
+  words_found: z.number().int().nonnegative().optional().default(0),
+  hints_used: z.number().int().nonnegative().optional().default(0),
+  elapsed_ms: z.number().int().nonnegative().optional().default(0),
   longest_word: z.string().optional(),
   pangrams_found: z.number().int().nonnegative().optional(),
   best_no_hint_score: z.number().int().nonnegative().optional(),
@@ -39,23 +39,26 @@ export const StatsRecordSchema = z.object({
 
 export const PlayerStatsSchema = z.object({
   records: z.array(StatsRecordSchema),
-  version: z.literal(1),
+  version: z.literal(1).optional().default(1),
 });
 
 export const PuzzleStateSchema = z.object({
-  puzzle_number: z.number().int().positive(),
+  puzzle_number: z.number().int().nonnegative(),
   found_words: z.array(z.string()),
-  score: z.number().int().nonnegative(),
-  hints_unlocked: z.array(z.string()),
-  started_at: z.number().int().nonnegative(),
-  total_paused_ms: z.number().int().nonnegative(),
-  score_before_hints: z.number().int().nonnegative().nullable(),
+  score: z.number().int().nonnegative().optional().default(0),
+  hints_unlocked: z.array(z.string()).optional().default([]),
+  started_at: z.number().int().nonnegative().optional().default(0),
+  total_paused_ms: z.number().int().nonnegative().optional().default(0),
+  score_before_hints: z.number().int().nonnegative().nullable().optional().default(null),
 });
 
 export const PlayerPreferencesSchema = z.object({
-  themeId: z.enum(THEME_IDS).optional(),
-  themePreference: z.enum(['light', 'dark', 'system']).optional(),
-  updated_at: z.string().min(1),
+  themeId: z.enum(THEME_IDS).optional().catch(undefined),
+  themePreference: z.enum(['light', 'dark', 'system']).optional().catch(undefined),
+  updated_at: z
+    .string()
+    .min(1)
+    .refine((value) => !Number.isNaN(Date.parse(value)), 'Virheellinen aikaleima'),
 });
 
 export const SyncPayloadSchema = z.object({

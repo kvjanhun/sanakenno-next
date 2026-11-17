@@ -1,7 +1,13 @@
-import { AdminSuggestionRejectionPayloadSchema } from '@sanakenno/shared';
+import { zValidator } from '@hono/zod-validator';
+import {
+  AdminCombinationsQuerySchema,
+  AdminSuggestionQuerySchema,
+  AdminSuggestionRejectionPayloadSchema,
+} from '@sanakenno/shared';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
+import { zodErrorHook } from '../../lib/zod-validator.js';
 import {
   requireAdminAuth,
   requireCsrf,
@@ -27,8 +33,8 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
   admin.use('*', requireAdminAuth(db));
 
   return admin
-    .get('/combinations', async (c) => {
-      const q = c.req.query();
+    .get('/combinations', zValidator('query', AdminCombinationsQuerySchema), async (c) => {
+      const q = c.req.valid('query') ?? {};
       const requires = q.requires;
       const excludes = q.excludes;
       const min_pangrams = q.min_pangrams ? Number(q.min_pangrams) : undefined;
@@ -69,16 +75,19 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
 
       const pages = Math.ceil(total / per_page);
 
-      return c.json({
-        combinations,
-        total,
-        page,
-        pages,
-        per_page,
-      });
+      return c.json(
+        {
+          combinations,
+          total,
+          page,
+          pages,
+          per_page,
+        },
+        200,
+      );
     })
-    .get('/suggestion', async (c) => {
-      const q = c.req.query();
+    .get('/suggestion', zValidator('query', AdminSuggestionQuerySchema), async (c) => {
+      const q = c.req.valid('query') ?? {};
       const declinedParam = q.declined ?? '';
       const clientDeclined = declinedParam
         .split(',')
@@ -100,50 +109,62 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Ei ehdotuksia saatavilla' }, 404);
       }
 
-      return c.json(suggestion);
+      return c.json(suggestion, 200);
     })
     .get('/suggestion-rejections', async (c) => {
       const rows = await getSuggestionRejections(db);
-      return c.json({
-        rejections: rows.map((r) => ({
-          id: Number(r.id),
-          letters_key: r.letters_key,
-          letters: Array.from(r.letters_key),
-          center: r.center,
-          rejected_at: r.rejected_at,
-        })),
-      });
+      return c.json(
+        {
+          rejections: rows.map((r) => ({
+            id: Number(r.id),
+            letters_key: r.letters_key,
+            letters: Array.from(r.letters_key),
+            center: r.center,
+            rejected_at: r.rejected_at,
+          })),
+        },
+        200,
+      );
     })
-    .post('/suggestion-rejections', requireCsrf, async (c) => {
-      let body: unknown;
-      try {
-        body = await c.req.json();
-      } catch {
-        return c.json({ error: 'Virheellinen JSON-pyyntö' }, 400);
-      }
+    .post(
+      '/suggestion-rejections',
+      requireCsrf,
+      zValidator(
+        'json',
+        AdminSuggestionRejectionPayloadSchema,
+        zodErrorHook('Kirjaimet ja keskuskirjain vaaditaan'),
+      ),
+      async (c) => {
+        const parsed = c.req.valid('json');
+        const lettersKey = normalizeLettersKey(parsed.letters);
+        if (!lettersKey) {
+          return c.json({ error: 'Kirjaimet ja keskuskirjain vaaditaan' }, 400);
+        }
+        const center = parsed.center.toLowerCase();
+        const row = await insertSuggestionRejection(db, lettersKey, center);
 
-      const parsed = AdminSuggestionRejectionPayloadSchema.safeParse(body);
-      if (!parsed.success) {
-        return c.json({ error: 'Kirjaimet ja keskuskirjain vaaditaan' }, 400);
-      }
+        const adminUser = c.get('admin');
+        if (adminUser?.adminId) {
+          await insertAdminLog(
+            db,
+            adminUser.adminId,
+            'suggestion_reject',
+            `${lettersKey}:${center}`,
+          );
+        }
 
-      const lettersKey = normalizeLettersKey(parsed.data.letters);
-      const center = parsed.data.center.toLowerCase();
-      const row = await insertSuggestionRejection(db, lettersKey, center);
-
-      const admin = c.get('admin');
-      if (admin?.adminId) {
-        await insertAdminLog(db, admin.adminId, 'suggestion_reject', `${lettersKey}:${center}`);
-      }
-
-      return c.json({
-        id: Number(row.id),
-        letters_key: row.letters_key,
-        letters: Array.from(row.letters_key),
-        center: row.center,
-        rejected_at: row.rejected_at,
-      });
-    })
+        return c.json(
+          {
+            id: Number(row.id),
+            letters_key: row.letters_key,
+            letters: Array.from(row.letters_key),
+            center: row.center,
+            rejected_at: row.rejected_at,
+          },
+          200,
+        );
+      },
+    )
     .delete('/suggestion-rejections/:id', requireCsrf, async (c) => {
       const id = Number(c.req.param('id'));
       if (isNaN(id) || id <= 0) {

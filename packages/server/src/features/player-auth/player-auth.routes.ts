@@ -1,8 +1,14 @@
-import type { PlayerStats, SyncPuzzleState } from '@sanakenno/shared';
+import { zValidator } from '@hono/zod-validator';
+import {
+  TransferCreatePayloadSchema,
+  TransferUsePayloadSchema,
+  type TransferCreatePayload,
+} from '@sanakenno/shared';
 import { Hono, type Context } from 'hono';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
+import { zodErrorHook } from '../../lib/zod-validator.js';
 import { bulkUpsertLocalData, fetchPlayerData } from '../player-sync/player-sync.queries.js';
 import {
   checkEmailRateLimit,
@@ -40,34 +46,27 @@ export {
 
 const PLAYER_KEY_HEX_RE = /^[0-9a-f]{64}$/i;
 
+const transferEmailErrorHook = zodErrorHook<{ Variables: PlayerVariables }>((err) => {
+  const field = err.issues[0]?.path[0];
+  if (field === 'player_key') return { error: 'Tunniste puuttuu' };
+  if (field === 'email') return { error: 'Sähköpostiosoite puuttuu' };
+  return { error: 'Virheellinen pyyntö' };
+});
+
 async function handleTransferEmail(
   db: Kysely<Database>,
   c: Context<{ Variables: PlayerVariables }>,
+  body: TransferCreatePayload,
 ) {
   const player = c.get('player');
-  let body: Record<string, unknown> = {};
-  try {
-    body = await c.req.json();
-  } catch {
-    // Ignore malformed JSON and validate fields below.
-  }
-
-  const email = typeof body['email'] === 'string' ? body['email'].trim() : '';
-  const playerKey = typeof body['player_key'] === 'string' ? body['player_key'].trim() : '';
-
-  if (body['player_key'] !== undefined && !playerKey) {
-    return c.json({ error: 'Tunniste puuttuu' }, 400);
-  }
+  const email = body.email.trim();
+  const playerKey = typeof body.player_key === 'string' ? body.player_key.trim() : '';
 
   if (playerKey && PLAYER_KEY_HEX_RE.test(playerKey)) {
     const row = await getPlayerById(db, player.playerId);
     if (!row || row.player_key_hash !== hashPlayerKey(playerKey)) {
       return c.json({ error: 'Virheellinen tunniste' }, 400);
     }
-  }
-
-  if (!email) {
-    return c.json({ error: 'Sähköpostiosoite puuttuu' }, 400);
   }
 
   const { allowed, error } = checkEmailRateLimit(email);
@@ -120,78 +119,83 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
         200,
       );
     })
-    .post('/auth/transfer/create', authMiddleware, transferCreateRateLimit, (c) =>
-      handleTransferEmail(db, c),
+    .post(
+      '/auth/transfer/create',
+      authMiddleware,
+      transferCreateRateLimit,
+      zValidator('json', TransferCreatePayloadSchema, transferEmailErrorHook),
+      (c) => handleTransferEmail(db, c, c.req.valid('json')),
     )
-    .post('/auth/transfer/email', authMiddleware, transferCreateRateLimit, (c) =>
-      handleTransferEmail(db, c),
+    .post(
+      '/auth/transfer/email',
+      authMiddleware,
+      transferCreateRateLimit,
+      zValidator('json', TransferCreatePayloadSchema, transferEmailErrorHook),
+      (c) => handleTransferEmail(db, c, c.req.valid('json')),
     )
-    .post('/auth/transfer/use', async (c) => {
-      let body: Record<string, unknown> = {};
-      try {
-        body = await c.req.json();
-      } catch {
-        // Ignore malformed JSON and validate token below.
-      }
+    .post(
+      '/auth/transfer/use',
+      zValidator(
+        'json',
+        TransferUsePayloadSchema,
+        zodErrorHook((err) => ({
+          error: err.issues[0]?.path[0] === 'token' ? 'Tunniste puuttuu' : 'Virheellinen pyyntö',
+        })),
+      ),
+      async (c) => {
+        const { token: rawToken, stats, puzzle_states: puzzleStates } = c.req.valid('json');
 
-      const rawToken = typeof body['token'] === 'string' ? body['token'].trim() : '';
-      if (!rawToken) {
-        return c.json({ error: 'Tunniste puuttuu' }, 400);
-      }
+        const ticket = await getTransferTicket(db, rawToken);
+        let playerId: number;
 
-      const ticket = await getTransferTicket(db, rawToken);
-      let playerId: number;
-
-      if (ticket) {
-        if (ticket.used_at !== null) {
-          return c.json({ error: 'Tunniste on jo käytetty' }, 400);
-        }
-        if (Date.parse(ticket.expires_at) <= Date.now()) {
-          return c.json({ error: 'Tunniste on vanhentunut' }, 400);
-        }
-        playerId = ticket.player_id;
-      } else {
-        const row = await getPlayerByKeyHash(db, hashPlayerKey(rawToken));
-        if (!row) {
-          return c.json({ error: 'Virheellinen tunniste' }, 400);
-        }
-        playerId = row.id;
-      }
-
-      const stats = body['stats'] as PlayerStats | undefined;
-      const puzzleStates = body['puzzle_states'] as SyncPuzzleState[] | undefined;
-
-      const authHeader = c.req.header('Authorization');
-      let existingSessionToken: string | null = null;
-      if (authHeader?.startsWith('Bearer ')) {
-        existingSessionToken = authHeader.slice(7).trim();
-      }
-
-      const { token, sessionCount } = await runImmediateTransactionWithRetry(db, async (trx) => {
         if (ticket) {
-          await markTransferTicketUsed(trx, ticket.id);
+          if (ticket.used_at !== null) {
+            return c.json({ error: 'Tunniste on jo käytetty' }, 400);
+          }
+          if (Date.parse(ticket.expires_at) <= Date.now()) {
+            return c.json({ error: 'Tunniste on vanhentunut' }, 400);
+          }
+          playerId = ticket.player_id;
+        } else {
+          const row = await getPlayerByKeyHash(db, hashPlayerKey(rawToken));
+          if (!row) {
+            return c.json({ error: 'Virheellinen tunniste' }, 400);
+          }
+          playerId = row.id;
         }
-        await bulkUpsertLocalData(trx, playerId, stats, puzzleStates);
-        await cleanupExpiredPlayerSessions(trx);
-        if (existingSessionToken) {
-          await deletePlayerSession(trx, existingSessionToken);
-        }
-        const newToken = await createPlayerSession(trx, playerId);
-        const count = await countActivePlayerSessions(trx, playerId);
-        return { token: newToken, sessionCount: count };
-      });
 
-      const playerData = await fetchPlayerData(db, playerId);
-      return c.json(
-        {
-          token,
-          player_id: playerId,
-          session_count: sessionCount,
-          ...playerData,
-        },
-        200,
-      );
-    })
+        const authHeader = c.req.header('Authorization');
+        let existingSessionToken: string | null = null;
+        if (authHeader?.startsWith('Bearer ')) {
+          existingSessionToken = authHeader.slice(7).trim();
+        }
+
+        const { token, sessionCount } = await runImmediateTransactionWithRetry(db, async (trx) => {
+          if (ticket) {
+            await markTransferTicketUsed(trx, ticket.id);
+          }
+          await bulkUpsertLocalData(trx, playerId, stats, puzzleStates);
+          await cleanupExpiredPlayerSessions(trx);
+          if (existingSessionToken) {
+            await deletePlayerSession(trx, existingSessionToken);
+          }
+          const newToken = await createPlayerSession(trx, playerId);
+          const count = await countActivePlayerSessions(trx, playerId);
+          return { token: newToken, sessionCount: count };
+        });
+
+        const playerData = await fetchPlayerData(db, playerId);
+        return c.json(
+          {
+            token,
+            player_id: playerId,
+            session_count: sessionCount,
+            ...playerData,
+          },
+          200,
+        );
+      },
+    )
     .post('/auth/rotate', authMiddleware, async (c) => {
       const player = c.get('player');
       const currentToken = c.get('playerToken');

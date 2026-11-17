@@ -44,3 +44,15 @@ export type ArchiveEntry = z.infer<typeof ArchiveEntrySchema>;
 export const ArchiveResponseSchema = z.array(ArchiveEntrySchema);
 
 export type ArchiveResponse = z.infer<typeof ArchiveResponseSchema>;
+
+export const PuzzleDateQuerySchema = z
+  .object({
+    date: z.string().optional(),
+  })
+  .optional();
+
+export const ArchiveQuerySchema = z
+  .object({
+    all: z.string().optional(),
+  })
+  .optional();

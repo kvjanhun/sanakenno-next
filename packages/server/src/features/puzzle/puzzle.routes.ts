@@ -1,12 +1,15 @@
 import {
   getHelsinkiDateString,
+  PuzzleDateQuerySchema,
   PuzzleResponseSchema,
   PuzzleWordsResponseSchema,
   type PuzzleResponse,
 } from '@sanakenno/shared';
+import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
+import { zodErrorHook } from '../../lib/zod-validator.js';
 import {
   getBlockedWords,
   getFullPuzzleBySlot,
@@ -43,27 +46,31 @@ function toPuzzleResponse(data: FullPuzzleData): PuzzleResponse {
  */
 export function createPuzzleRoutes(db: Kysely<Database>) {
   return new Hono()
-    .get('/', async (c) => {
-      const dateParam = c.req.query('date');
-      const todayHelsinki = getHelsinkiDateString();
+    .get(
+      '/',
+      zValidator('query', PuzzleDateQuerySchema, zodErrorHook('Invalid date parameter')),
+      async (c) => {
+        const dateParam = c.req.valid('query')?.date;
+        const todayHelsinki = getHelsinkiDateString();
 
-      if (dateParam !== undefined) {
-        if (!isValidIsoCalendarDate(dateParam)) {
-          return c.json({ error: 'Invalid date parameter' }, 400);
+        if (dateParam !== undefined) {
+          if (!isValidIsoCalendarDate(dateParam)) {
+            return c.json({ error: 'Invalid date parameter' }, 400);
+          }
+          if (dateParam > todayHelsinki) {
+            return c.json({ error: 'Future puzzle dates are not allowed' }, 400);
+          }
         }
-        if (dateParam > todayHelsinki) {
-          return c.json({ error: 'Future puzzle dates are not allowed' }, 400);
+
+        const targetDate = dateParam ?? todayHelsinki;
+        const data = await getFullPuzzleForDate(db, targetDate);
+        if (!data) {
+          return c.json({ error: 'Puzzle not found' }, 404);
         }
-      }
 
-      const targetDate = dateParam ?? todayHelsinki;
-      const data = await getFullPuzzleForDate(db, targetDate);
-      if (!data) {
-        return c.json({ error: 'Puzzle not found' }, 404);
-      }
-
-      return c.json(toPuzzleResponse(data), 200);
-    })
+        return c.json(toPuzzleResponse(data), 200);
+      },
+    )
     .get('/:number', async (c) => {
       const rawNumber = c.req.param('number');
       if (!/^\d+$/.test(rawNumber)) {
