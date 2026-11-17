@@ -194,6 +194,52 @@ export async function getDaysRemainingInCycle(
   return activeSlots.length - index;
 }
 
+export type SlotScheduleRelation = 'past' | 'today' | 'future' | 'inactive';
+
+/**
+ * Determine whether an active puzzle slot is scheduled for today, has already appeared
+ * since `epoch_date`, is strictly in the future of the current cycle, or is inactive.
+ */
+export async function getSlotScheduleRelation(
+  db: Kysely<Database>,
+  slot: number,
+  todayHelsinki: string | Date = new Date(),
+): Promise<SlotScheduleRelation> {
+  const activeSlots = await getActiveSlots(db);
+  if (!activeSlots.includes(slot)) {
+    return 'inactive';
+  }
+
+  const todayDateStr = normalizeHelsinkiDate(todayHelsinki);
+  const epochDateStr = await getEpochDate(db);
+  const daysSinceEpoch = Math.round(
+    (parseIsoDateUtcMs(todayDateStr) - parseIsoDateUtcMs(epochDateStr)) / 86_400_000,
+  );
+
+  const startSlot = activeSlots.find((s) => s >= 1) ?? activeSlots[0]!;
+  const startIndex = activeSlots.indexOf(startSlot);
+  const totalActive = activeSlots.length;
+  const todayIndex = (((startIndex + daysSinceEpoch) % totalActive) + totalActive) % totalActive;
+  if (activeSlots[todayIndex] === slot) {
+    return 'today';
+  }
+
+  if (daysSinceEpoch <= 0) {
+    return 'future';
+  }
+  if (daysSinceEpoch >= totalActive) {
+    return 'past';
+  }
+
+  for (let offset = 0; offset < daysSinceEpoch; offset += 1) {
+    const idx = (startIndex + offset) % totalActive;
+    if (activeSlots[idx] === slot) {
+      return 'past';
+    }
+  }
+  return 'future';
+}
+
 /**
  * Fetch the raw active puzzle row for a given slot, or null if missing/inactive.
  */

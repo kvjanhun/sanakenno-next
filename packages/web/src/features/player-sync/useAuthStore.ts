@@ -26,6 +26,7 @@ import {
   saveToStorage,
   STATS_STORAGE_KEY,
 } from '../gameplay/storage.js';
+import { registerPreferenceSyncCallback } from '../theme/usePaletteStore.js';
 import {
   AUTH_TOKEN_STORAGE_KEY,
   buildLocalPreferences,
@@ -235,7 +236,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       );
 
       saveToStorage(AUTH_TOKEN_STORAGE_KEY, res.token);
-      saveToStorage(PLAYER_KEY_STORAGE_KEY, token);
+      const isPermanentKey = /^[0-9a-f]{64}$/i.test(token);
+      if (isPermanentKey) {
+        saveToStorage(PLAYER_KEY_STORAGE_KEY, token);
+      } else {
+        removeFromStorage(PLAYER_KEY_STORAGE_KEY);
+      }
       const count = res.session_count ?? 1;
       if (count > 1) {
         saveToStorage(LINKED_STATE_STORAGE_KEY, 'true');
@@ -246,7 +252,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         isLoggedIn: true,
         playerId: res.player_id,
-        playerKey: token,
+        playerKey: isPermanentKey ? token : null,
         sessionCount: count,
         isLinked: count > 1,
         isLoading: false,
@@ -391,6 +397,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 if (typeof window !== 'undefined') {
+  registerPreferenceSyncCallback(() => {
+    void useAuthStore.getState().syncPreferences();
+  });
+
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       void useAuthStore.getState().flushPendingSync();

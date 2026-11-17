@@ -222,7 +222,7 @@ describe('useGameStore Achievements & Streak Integration', () => {
     expect(useUiStore.getState().activeAnnouncement).toBeNull();
   });
 
-  it('does not queue upcoming achievement progress announcements when daily streak increments or a pangram reaches 1 away from a tier', async () => {
+  it('queues achievement_progress announcements when daily streak increments or pangram count reaches nextTierTarget - 1', async () => {
     const today = getHelsinkiDateString();
     const yesterday = new Date(`${today}T12:00:00Z`);
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
@@ -260,7 +260,123 @@ describe('useGameStore Achievements & Streak Integration', () => {
     expect(useUiStore.getState().activeAnnouncement?.category).toBe('no_hint_milestone');
     useUiStore.getState().dismissAnnouncement();
 
-    // No upcoming achievement progress announcements are queued
+    // 2nd queued: Daily streak progress (2 / 7 päivää)
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'achievement',
+      category: 'achievement_progress',
+      achievementId: 'streak',
+      subtitle: 'Edistyminen · 2 / 7 päivää',
+      isUnlock: false,
+    });
+    useUiStore.getState().dismissAnnouncement();
+
+    // 3rd queued: Pangram near-unlock progress (6 / 7 pangrammia)
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'achievement',
+      category: 'achievement_progress',
+      achievementId: 'pangrams',
+      subtitle: 'Edistyminen · 6 / 7 pangrammia',
+      isUnlock: false,
+    });
+    useUiStore.getState().dismissAnnouncement();
+
     expect(useUiStore.getState().activeAnnouncement).toBeNull();
+  });
+
+  it('displays current streak (not historical best) when streak advances with best > current and fires near-unlock progress for full_board', async () => {
+    const today = getHelsinkiDateString();
+    const yesterday = new Date(`${today}T12:00:00Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    // Historical 10-day streak (Pronssi already unlocked, Hopea target = 30), plus 1 existing full board (1 away from full_board Pronssi target = 2)
+    //Wait: full_board Pronssi is 2, so reaching 1 full board hits nextTierTarget - 1 = 1!
+    const historicalRecords: PlayerStats['records'] = [];
+    for (let i = 0; i < 10; i++) {
+      const d = new Date('2026-01-10T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() + i);
+      const ds = d.toISOString().slice(0, 10);
+      historicalRecords.push({
+        puzzle_number: 500 + i,
+        date: ds,
+        best_rank: 'Hyvä alku',
+        best_score: 10,
+        max_score: 100,
+        words_found: 2,
+        hints_used: 1,
+        elapsed_ms: 1000,
+        is_daily: true,
+        played_at_date: ds,
+      });
+    }
+    historicalRecords.push({
+      puzzle_number: 1,
+      date: yesterdayStr,
+      best_rank: 'Hyvä alku',
+      best_score: 10,
+      max_score: 100,
+      words_found: 2,
+      hints_used: 1,
+      elapsed_ms: 1000,
+      is_daily: true,
+      played_at_date: yesterdayStr,
+    });
+    saveToStorage(STATS_STORAGE_KEY, { version: 1, records: historicalRecords });
+
+    // Build a 1-word puzzle with max_score = 1 so submitting 'kana' completes a full board (0 -> 1 = 2 - 1)
+    const oneWordHash = await hashWord('kana');
+    const fullBoardPuzzle: PuzzleResponse = {
+      center: 'a',
+      letters: ['a', 'e', 'i', 'k', 'l', 'n', 's'],
+      word_hashes: [oneWordHash],
+      hint_data: {
+        word_count: 1,
+        pangram_count: 0,
+        by_letter: { k: 1 },
+        by_length: { '4': 1 },
+        by_pair: { ka: 1 },
+      },
+      max_score: 1,
+      puzzle_number: 10,
+      display_number: 1,
+      total_puzzles: 10,
+      date: today,
+    };
+
+    await useGameStore.getState().loadPuzzle(fullBoardPuzzle);
+    // Unlock a hint first so unassisted_master doesn't also unlock on full board
+    useGameStore.getState().unlockHint('letters');
+
+    for (const char of 'kana') {
+      useGameStore.getState().addLetter(char);
+    }
+    await useGameStore.getState().submitWord();
+
+    // 1st: letter_cleared for K
+    expect(useUiStore.getState().activeAnnouncement?.category).toBe('letter_cleared');
+    useUiStore.getState().dismissAnnouncement();
+
+    // 2nd: streak progress shows current (2 / 30), NOT historical best (10 / 30)
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'achievement',
+      category: 'achievement_progress',
+      achievementId: 'streak',
+      subtitle: 'Edistyminen · 2 / 30 päivää',
+      tierKey: 'silver',
+      tierName: 'Hopea',
+      isUnlock: false,
+    });
+    useUiStore.getState().dismissAnnouncement();
+
+    // 3rd: full_board hits nextTierTarget - 1 (1 / 2 kertaa)
+    expect(useUiStore.getState().activeAnnouncement).toMatchObject({
+      kind: 'achievement',
+      category: 'achievement_progress',
+      achievementId: 'full_board',
+      subtitle: 'Edistyminen · 1 / 2 kertaa',
+      tierKey: 'bronze',
+      tierName: 'Pronssi',
+      isUnlock: false,
+    });
   });
 });

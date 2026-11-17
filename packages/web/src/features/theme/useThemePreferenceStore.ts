@@ -79,6 +79,9 @@ export const useThemePreferenceStore = create<ThemePreferenceState>()((set) => (
   setPreference: (pref: ThemePreference) => {
     const next = isValidThemePreference(pref) ? pref : 'system';
     persistPreference(next);
+    if (typeof window !== 'undefined') {
+      saveToStorage('sanakenno_preferences_updated_at', new Date().toISOString());
+    }
     applyThemeToRoot(next);
     set({ preference: next });
     notifyPreferenceChanged();

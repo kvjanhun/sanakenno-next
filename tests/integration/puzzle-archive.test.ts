@@ -294,6 +294,9 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
           .execute();
       }
 
+      // Advance time past full active cycle so all seeded slots 10..24 have appeared in rotation
+      vi.setSystemTime(new Date('2026-02-15T10:00:00Z'));
+
       // Request each puzzle from 10 to 24 sequentially to load them into cache
       for (let s = 10; s <= 24; s++) {
         const res = await harness.client.api.puzzle[':number'].$get({

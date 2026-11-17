@@ -1,6 +1,6 @@
 # Spec 29: API Spoiler Lock, Rate-Limit & Sync Hardening
 
-Status: approved
+Status: shipped
 Branch: spec/29-api-spoiler-lock-rate-limit-and-sync-hardening
 
 ## 1. Objective

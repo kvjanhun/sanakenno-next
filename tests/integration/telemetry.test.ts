@@ -175,5 +175,31 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('prevents invalid Bearer tokens from bypassing IP rate limiting on /api/word-find', async () => {
+      for (let i = 0; i < 60; i++) {
+        const res = await harness.app.request('/api/word-find', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '203.0.113.77',
+            Authorization: `Bearer forged-token-${i}`,
+          },
+          body: JSON.stringify({ word: 'kana', puzzle_number: 1 }),
+        });
+        expect(res.status).toBe(200);
+      }
+
+      const blockedRes = await harness.app.request('/api/word-find', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.77',
+          Authorization: 'Bearer forged-token-bypass-attempt',
+        },
+        body: JSON.stringify({ word: 'kana', puzzle_number: 1 }),
+      });
+      expect(blockedRes.status).toBe(429);
+    });
   });
 });

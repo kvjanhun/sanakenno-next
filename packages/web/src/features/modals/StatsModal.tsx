@@ -14,6 +14,7 @@ import { ShareIcon } from '../gameplay/icons.js';
 import { loadFromStorage } from '../gameplay/storage.js';
 import { useGameStore } from '../gameplay/useGameStore.js';
 import { useUiStore } from '../gameplay/useUiStore.js';
+import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { AchievementsList } from './AchievementsList.js';
 import { TrophyIcon } from './achievementIcons.js';
 import { backfillNoHintStats } from './backfillStats.js';
@@ -46,6 +47,7 @@ export function StatsModal({
 
   useEffect(() => {
     if (show) {
+      void useAuthStore.getState().flushPendingSync();
       const loaded = loadFromStorage<PlayerStats>(STATS_STORAGE_KEY);
       setStats(backfillNoHintStats(loaded ?? emptyStats()));
     }

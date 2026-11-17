@@ -42,6 +42,13 @@ export function requirePlayerAuth(
   };
 }
 
+const INIT_PLAYER_RATE_LIMIT = 20;
+const INIT_PLAYER_WINDOW_MS = 15 * 60 * 1000;
+export const initPlayerLimiter = new SlidingWindowRateLimiter({
+  windowMs: INIT_PLAYER_WINDOW_MS,
+  maxRequests: INIT_PLAYER_RATE_LIMIT,
+});
+
 const TRANSFER_CREATE_RATE_LIMIT = 3;
 const TRANSFER_CREATE_WINDOW_MS = 15 * 60 * 1000;
 export const transferCreateLimiter = new SlidingWindowRateLimiter({
@@ -59,8 +66,21 @@ const emailRateLimitMap = new Map<string, EmailRateEntry>();
 const EMAIL_COOLDOWN_MS = 10 * 60 * 1000;
 const EMAIL_DAILY_LIMIT = 10;
 
+export function resetInitPlayerRateLimit(): void {
+  initPlayerLimiter.reset();
+}
+
 export function resetTransferCreateRateLimit(): void {
   transferCreateLimiter.reset();
+  initPlayerLimiter.reset();
+}
+
+export function initPlayerRateLimit(c: Context, next: Next) {
+  const ip = getClientIp(c);
+  if (!initPlayerLimiter.isAllowed(ip)) {
+    return c.json({ error: 'Liian monta yritystä, odota hetki' }, 429);
+  }
+  return next();
 }
 
 export function resetEmailRateLimit(): void {

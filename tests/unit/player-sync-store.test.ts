@@ -2,6 +2,8 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   AUTH_TOKEN_STORAGE_KEY,
   LINKED_STATE_STORAGE_KEY,
+  PLAYER_KEY_STORAGE_KEY,
+  PREFERENCES_UPDATED_AT_KEY,
   applyServerPreferences,
   buildLocalPreferences,
   gatherLocalData,
@@ -338,6 +340,7 @@ describe('Player Sync & Reconcile (Web Store)', () => {
   });
 
   it('useTransfer updates sessionCount from server response and bypasses if token matches', async () => {
+    const validKey = 'a'.repeat(64);
     const clientModule = await import('../../packages/web/src/api/client.js');
     const mockTransfer = vi.spyOn(clientModule, 'postPlayerTransferUse');
     mockTransfer.mockResolvedValueOnce({
@@ -348,15 +351,51 @@ describe('Player Sync & Reconcile (Web Store)', () => {
       puzzle_states: [],
     });
 
-    await useAuthStore.getState().useTransfer('new-player-key');
+    await useAuthStore.getState().useTransfer(validKey);
 
     expect(useAuthStore.getState().sessionCount).toBe(5);
     expect(useAuthStore.getState().isLinked).toBe(true);
-    expect(useAuthStore.getState().playerKey).toBe('new-player-key');
+    expect(useAuthStore.getState().playerKey).toBe(validKey);
+    expect(loadFromStorage(PLAYER_KEY_STORAGE_KEY)).toBe(validKey);
 
     // Calling again with the same playerKey should bypass postPlayerTransferUse
     mockTransfer.mockClear();
-    await useAuthStore.getState().useTransfer('new-player-key');
+    await useAuthStore.getState().useTransfer(validKey);
     expect(mockTransfer).not.toHaveBeenCalled();
+  });
+
+  it('useTransfer clears playerKey when redeeming a 6-digit PIN instead of a 64-hex player key', async () => {
+    saveToStorage(PLAYER_KEY_STORAGE_KEY, 'b'.repeat(64));
+    const clientModule = await import('../../packages/web/src/api/client.js');
+    const mockTransfer = vi.spyOn(clientModule, 'postPlayerTransferUse');
+    mockTransfer.mockResolvedValueOnce({
+      token: 'pin-session-token',
+      player_id: 7,
+      session_count: 2,
+      stats: { version: 1, records: [] },
+      puzzle_states: [],
+    });
+
+    await useAuthStore.getState().useTransfer('123-456');
+
+    expect(useAuthStore.getState().playerKey).toBeNull();
+    expect(loadFromStorage(PLAYER_KEY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('updates sanakenno_preferences_updated_at and triggers syncPreferences on palette/theme change', () => {
+    const syncSpy = vi.fn().mockResolvedValue(undefined);
+    useAuthStore.setState({
+      syncPreferences: syncSpy,
+    } as unknown as Partial<ReturnType<typeof useAuthStore.getState>>);
+
+    usePaletteStore.getState().setThemeId('meri');
+    const firstTs = loadFromStorage<string>(PREFERENCES_UPDATED_AT_KEY);
+    expect(firstTs).toBeTruthy();
+    expect(syncSpy).toHaveBeenCalledTimes(1);
+
+    useThemePreferenceStore.getState().setPreference('light');
+    const secondTs = loadFromStorage<string>(PREFERENCES_UPDATED_AT_KEY);
+    expect(secondTs).toBeTruthy();
+    expect(syncSpy).toHaveBeenCalledTimes(2);
   });
 });

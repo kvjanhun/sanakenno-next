@@ -4,6 +4,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
+import { getClientIp, SlidingWindowRateLimiter } from '../player-auth/rate-limiter.js';
 import {
   requireAdminAuth,
   requireCsrf,
@@ -22,26 +23,22 @@ import {
   updateAdminPassword,
 } from './admin-auth.queries.js';
 
-const loginRateLimitMap = new Map<string, number>();
 const LOGIN_RATE_LIMIT = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+export const loginLimiter = new SlidingWindowRateLimiter({
+  windowMs: LOGIN_WINDOW_MS,
+  maxRequests: LOGIN_RATE_LIMIT,
+});
 
 export function resetLoginRateLimit(): void {
-  loginRateLimitMap.clear();
-}
-
-function getClientIp(c: Context): string {
-  return (
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('x-real-ip') || 'unknown'
-  );
+  loginLimiter.reset();
 }
 
 function loginRateLimiter(c: Context, next: Next) {
   const ip = getClientIp(c);
-  const count = loginRateLimitMap.get(ip) || 0;
-  if (count >= LOGIN_RATE_LIMIT) {
+  if (!loginLimiter.isAllowed(ip)) {
     return c.json({ error: 'Liian monta yritystä, odota hetki' }, 429);
   }
-  loginRateLimitMap.set(ip, count + 1);
   return next();
 }
 

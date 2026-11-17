@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConnectBanner } from '../../packages/web/src/features/player-sync/ConnectBanner.js';
 import { SettingsModal } from '../../packages/web/src/features/modals/SettingsModal.js';
+import { StatsModal } from '../../packages/web/src/features/modals/StatsModal.js';
 import { SyncModal } from '../../packages/web/src/features/player-sync/SyncModal.js';
 import { useAuthStore } from '../../packages/web/src/features/player-sync/useAuthStore.js';
 
@@ -193,20 +194,27 @@ describe('Player Sync UI Components', () => {
       });
     });
 
-    it('refreshes session count when SettingsModal or SyncModal is opened with show: true', () => {
+    it('flushes pending sync and refreshes session count when SettingsModal or SyncModal opens', () => {
       const mockRefresh = vi.fn().mockResolvedValue(undefined);
+      const mockFlush = vi.fn().mockResolvedValue(undefined);
       useAuthStore.setState({
         refreshSessionCount: mockRefresh,
+        flushPendingSync: mockFlush,
       } as unknown as Partial<ReturnType<typeof useAuthStore.getState>>);
 
       const { unmount } = render(<SyncModal show={true} onClose={() => {}} />);
       expect(mockRefresh).toHaveBeenCalledTimes(1);
+      expect(mockFlush).toHaveBeenCalledTimes(1);
 
       unmount();
       mockRefresh.mockClear();
+      mockFlush.mockClear();
 
       render(<SettingsModal show={true} onClose={() => {}} />);
       expect(mockRefresh).toHaveBeenCalledTimes(1);
+
+      render(<StatsModal show={true} onClose={() => {}} />);
+      expect(mockFlush).toHaveBeenCalledTimes(1);
     });
 
     it('renders privacy disclosure section in SettingsModal and expands GDPR details on click', () => {

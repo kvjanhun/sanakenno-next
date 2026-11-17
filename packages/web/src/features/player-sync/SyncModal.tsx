@@ -30,6 +30,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
 
   useEffect(() => {
     if (show) {
+      void useAuthStore.getState().flushPendingSync();
       void useAuthStore.getState().refreshSessionCount();
       setIsTicketLoading(true);
       void useAuthStore

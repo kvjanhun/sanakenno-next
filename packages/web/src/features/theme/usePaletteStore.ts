@@ -95,6 +95,9 @@ export const usePaletteStore = create<PaletteState>()((set) => ({
   setThemeId: (id: ThemeId) => {
     const next = isValidThemeId(id) ? id : DEFAULT_THEME_ID;
     persistPalette(next);
+    if (typeof window !== 'undefined') {
+      saveToStorage('sanakenno_preferences_updated_at', new Date().toISOString());
+    }
     applyPaletteToRoot(next);
     set({ themeId: next });
     notifyPreferenceChanged();

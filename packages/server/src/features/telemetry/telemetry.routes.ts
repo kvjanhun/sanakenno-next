@@ -3,7 +3,12 @@ import { Hono, type Context, type Next } from 'hono';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
-import { getRateLimitKey, SlidingWindowRateLimiter } from '../player-auth/rate-limiter.js';
+import {
+  getClientIp,
+  getRateLimitKey,
+  SlidingWindowRateLimiter,
+} from '../player-auth/rate-limiter.js';
+import { validatePlayerToken } from '../player-auth/player-auth.queries.js';
 import { getFullPuzzleBySlot, getFullPuzzleForDate } from '../puzzle/puzzle.queries.js';
 import {
   insertAchievement,
@@ -39,9 +44,27 @@ export function resetTelemetryRateLimits(): void {
   wordFindLimiter.reset();
 }
 
-function createRateLimiterMiddleware(limiter: SlidingWindowRateLimiter, errorMessage: string) {
-  return (c: Context, next: Next) => {
-    const key = getRateLimitKey(c);
+async function getVerifiedTelemetryRateLimitKey(db: Kysely<Database>, c: Context): Promise<string> {
+  const auth = c.req.header('Authorization') || c.req.header('authorization');
+  if (auth?.startsWith('Bearer ')) {
+    const token = auth.slice(7).trim();
+    if (token) {
+      const session = await validatePlayerToken(db, token);
+      if (session) {
+        return getRateLimitKey(c);
+      }
+    }
+  }
+  return `ip:${getClientIp(c)}`;
+}
+
+function createRateLimiterMiddleware(
+  db: Kysely<Database>,
+  limiter: SlidingWindowRateLimiter,
+  errorMessage: string,
+) {
+  return async (c: Context, next: Next) => {
+    const key = await getVerifiedTelemetryRateLimitKey(db, c);
     if (!limiter.isAllowed(key)) {
       return c.json({ error: errorMessage }, 429);
     }
@@ -53,17 +76,15 @@ function isNonNegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0;
 }
 
-const achievementRateLimiter = createRateLimiterMiddleware(
-  achievementLimiter,
-  'Rate limit exceeded',
-);
-const failedGuessRateLimiter = createRateLimiterMiddleware(failedGuessLimiter, 'Too many requests');
-const wordFindRateLimiter = createRateLimiterMiddleware(wordFindLimiter, 'Too many requests');
-
 /**
  * Mount `POST /api/achievement`.
  */
 export function createAchievementRoutes(db: Kysely<Database>) {
+  const achievementRateLimiter = createRateLimiterMiddleware(
+    db,
+    achievementLimiter,
+    'Rate limit exceeded',
+  );
   return new Hono().post('/', achievementRateLimiter, async (c) => {
     let body: Record<string, unknown>;
     try {
@@ -132,6 +153,11 @@ export function createAchievementRoutes(db: Kysely<Database>) {
  * Mount `POST /api/failed-guess`.
  */
 export function createFailedGuessRoutes(db: Kysely<Database>) {
+  const failedGuessRateLimiter = createRateLimiterMiddleware(
+    db,
+    failedGuessLimiter,
+    'Too many requests',
+  );
   return new Hono().post('/', failedGuessRateLimiter, async (c) => {
     let body: Record<string, unknown>;
     try {
@@ -191,6 +217,7 @@ export function createFailedGuessRoutes(db: Kysely<Database>) {
  * Mount `POST /api/word-find`.
  */
 export function createWordFindRoutes(db: Kysely<Database>) {
+  const wordFindRateLimiter = createRateLimiterMiddleware(db, wordFindLimiter, 'Too many requests');
   return new Hono().post('/', wordFindRateLimiter, async (c) => {
     let body: Record<string, unknown>;
     try {

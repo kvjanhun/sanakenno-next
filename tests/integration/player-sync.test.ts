@@ -453,7 +453,7 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       expect(state?.found_words.sort()).toEqual(['aasi', 'kana', 'kissa']);
       expect(state?.hints_unlocked).toContain('grid');
       expect(state?.hints_unlocked).toContain('two_letter');
-      expect(state?.score).toBe(5);
+      expect(state?.score).toBe(7);
     });
 
     it('stores and syncs player preferences with last-write-wins updated_at timestamp', async () => {

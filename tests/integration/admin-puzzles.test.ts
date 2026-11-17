@@ -1,5 +1,5 @@
 import argon2 from 'argon2';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAdminUser } from '../../packages/server/src/features/admin-auth/admin-auth.queries.js';
 import { resetLoginRateLimit } from '../../packages/server/src/features/admin-auth/admin-auth.routes.js';
 import {
@@ -112,6 +112,51 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         json: { username: 'admin', password: 'new-secure-password-1234' },
       });
       expect(loginRes.status).toBe(200);
+    });
+
+    it('enforces sliding-window rate limit on admin login and resets after window expires', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-04-10T10:00:00Z'));
+      resetLoginRateLimit();
+
+      try {
+        for (let i = 0; i < 5; i++) {
+          const res = await harness.app.request('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Forwarded-For': '198.51.100.88',
+            },
+            body: JSON.stringify({ username: 'admin', password: 'wrong-password' }),
+          });
+          expect(res.status).toBe(401);
+        }
+
+        const blocked = await harness.app.request('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '198.51.100.88',
+          },
+          body: JSON.stringify({ username: 'admin', password: 'correct-horse-battery-staple' }),
+        });
+        expect(blocked.status).toBe(429);
+
+        // Advance past 15-minute sliding window
+        vi.advanceTimersByTime(15 * 60 * 1000 + 1000);
+
+        const allowedAgain = await harness.app.request('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Forwarded-For': '198.51.100.88',
+          },
+          body: JSON.stringify({ username: 'admin', password: 'correct-horse-battery-staple' }),
+        });
+        expect(allowedAgain.status).toBe(200);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

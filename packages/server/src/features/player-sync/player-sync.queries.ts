@@ -4,6 +4,7 @@ import {
   mergePuzzleState,
   mergeStatsRecord,
   rankForScore,
+  recalcScore,
   THEME_IDS,
   type PlayerPreferences,
   type PlayerStats,
@@ -129,6 +130,10 @@ export async function readPuzzleState(
   };
 }
 
+function capScoreBeforeHints(val: number | null, score: number): number | null {
+  return val !== null ? Math.min(val, score) : null;
+}
+
 /**
  * Merge and store a single puzzle state for a player.
  */
@@ -137,8 +142,38 @@ export async function mergeAndStorePuzzleState(
   playerId: number,
   incoming: SyncPuzzleState,
 ): Promise<SyncPuzzleState> {
-  const existing = await readPuzzleState(db, playerId, incoming.puzzle_number);
-  const merged = existing ? mergePuzzleState(existing, incoming) : incoming;
+  const puzzle = await getFullPuzzleBySlot(db, incoming.puzzle_number);
+  const allLetters = puzzle ? new Set<string>([puzzle.center, ...puzzle.letters]) : null;
+  let sanitizedIncoming = incoming;
+  if (puzzle && allLetters) {
+    const validWordSet = new Set(puzzle.words);
+    const validWords = Array.from(
+      new Set(
+        incoming.found_words
+          .map((word) => word.trim().toLowerCase().replaceAll('-', ''))
+          .filter((word) => validWordSet.has(word)),
+      ),
+    );
+    const recalculatedScore = recalcScore(validWords, allLetters);
+    sanitizedIncoming = {
+      ...incoming,
+      found_words: validWords,
+      score: recalculatedScore,
+      score_before_hints: capScoreBeforeHints(incoming.score_before_hints, recalculatedScore),
+    };
+  }
+
+  const existing = await readPuzzleState(db, playerId, sanitizedIncoming.puzzle_number);
+  const mergedRaw = existing ? mergePuzzleState(existing, sanitizedIncoming) : sanitizedIncoming;
+  let merged = mergedRaw;
+  if (allLetters) {
+    const mergedScore = recalcScore(mergedRaw.found_words, allLetters);
+    merged = {
+      ...mergedRaw,
+      score: mergedScore,
+      score_before_hints: capScoreBeforeHints(mergedRaw.score_before_hints, mergedScore),
+    };
+  }
 
   if (!existing) {
     await db
@@ -311,7 +346,7 @@ export async function deriveStatsFromProgress(
   const allLetters = puzzle
     ? new Set<string>([puzzle.center, ...puzzle.letters])
     : new Set<string>();
-  const maxScore = payload.max_score > 0 ? payload.max_score : (puzzle?.max_score ?? 0);
+  const maxScore = puzzle ? puzzle.max_score : payload.max_score;
   const longestWord = mergedState.found_words.reduce(
     (longest, word) => (word.length > longest.length ? word : longest),
     '',
@@ -326,6 +361,11 @@ export async function deriveStatsFromProgress(
       : 0;
 
   const longWordsCount = mergedState.found_words.filter((word) => word.length >= 10).length;
+  const noHintCap =
+    mergedState.hints_unlocked.length > 0
+      ? (mergedState.score_before_hints ?? 0)
+      : mergedState.score;
+  const cappedClientNoHint = Math.min(payload.best_no_hint_score ?? 0, noHintCap);
 
   return {
     puzzle_number: payload.puzzle_number,
@@ -338,10 +378,7 @@ export async function deriveStatsFromProgress(
     elapsed_ms: elapsedMs,
     longest_word: longestWord,
     pangrams_found: pangramsFound,
-    best_no_hint_score: Math.max(
-      payload.best_no_hint_score ?? 0,
-      deriveBestNoHintScore(mergedState),
-    ),
+    best_no_hint_score: Math.max(cappedClientNoHint, deriveBestNoHintScore(mergedState)),
     long_words_count: longWordsCount,
   };
 }

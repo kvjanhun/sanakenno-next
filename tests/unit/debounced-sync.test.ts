@@ -174,4 +174,61 @@ describe('Debounced Progress Sync', () => {
     expect(postSpy).toHaveBeenCalledTimes(1);
     expect(postSpy).toHaveBeenCalledWith('test-bearer-token', payload);
   });
+
+  it('retains failed payloads in pendingSyncQueue on HTTP 500 or network error and retries via real postSyncProgress', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'Palvelinvirhe' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 'synced' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    saveToStorage(AUTH_TOKEN_STORAGE_KEY, 'test-bearer-token');
+
+    const payload: SyncProgressPayload = {
+      puzzle_number: 6,
+      date: '2026-04-14',
+      found_words: ['kissa'],
+      score: 5,
+      max_score: 50,
+      hints_unlocked: [],
+      started_at: 1000,
+      total_paused_ms: 0,
+      score_before_hints: 5,
+      best_no_hint_score: 5,
+    };
+
+    useAuthStore.getState().syncProgressDebounced(payload);
+
+    // 1st attempt gets HTTP 500 -> postSyncProgress throws -> payload stays queued
+    await useAuthStore.getState().flushPendingSync();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // 2nd attempt hits network rejection -> payload stays queued
+    await useAuthStore.getState().flushPendingSync();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    // 3rd attempt gets 200 OK -> payload drains from queue
+    await useAuthStore.getState().flushPendingSync();
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      '/api/player/sync/progress',
+      expect.objectContaining({
+        method: 'POST',
+        keepalive: true,
+      }),
+    );
+
+    // Subsequent flush does nothing because queue is empty
+    await useAuthStore.getState().flushPendingSync();
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
 });

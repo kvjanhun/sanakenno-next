@@ -6,8 +6,10 @@ import type { Database } from '../../db/schema.js';
 import { bulkUpsertLocalData, fetchPlayerData } from '../player-sync/player-sync.queries.js';
 import {
   checkEmailRateLimit,
+  initPlayerRateLimit,
   requirePlayerAuth,
   resetEmailRateLimit,
+  resetInitPlayerRateLimit,
   resetTransferCreateRateLimit,
   setEmailRateLimitEntry,
   transferCreateRateLimit,
@@ -29,7 +31,14 @@ import {
 } from './player-auth.queries.js';
 import { sendTransferLink } from './send-transfer-link.js';
 
-export { resetEmailRateLimit, resetTransferCreateRateLimit, setEmailRateLimitEntry };
+export {
+  resetEmailRateLimit,
+  resetInitPlayerRateLimit,
+  resetTransferCreateRateLimit,
+  setEmailRateLimitEntry,
+};
+
+const PLAYER_KEY_HEX_RE = /^[0-9a-f]{64}$/i;
 
 async function handleTransferEmail(
   db: Kysely<Database>,
@@ -50,7 +59,7 @@ async function handleTransferEmail(
     return c.json({ error: 'Tunniste puuttuu' }, 400);
   }
 
-  if (playerKey) {
+  if (playerKey && PLAYER_KEY_HEX_RE.test(playerKey)) {
     const row = await getPlayerById(db, player.playerId);
     if (!row || row.player_key_hash !== hashPlayerKey(playerKey)) {
       return c.json({ error: 'Virheellinen tunniste' }, 400);
@@ -91,7 +100,7 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
   const authMiddleware = requirePlayerAuth(db);
 
   return new Hono<{ Variables: PlayerVariables }>()
-    .post('/auth/init', async (c) => {
+    .post('/auth/init', initPlayerRateLimit, async (c) => {
       const { playerId, playerKey, token } = await runImmediateTransactionWithRetry(db, (trx) =>
         createPlayerIdentity(trx),
       );

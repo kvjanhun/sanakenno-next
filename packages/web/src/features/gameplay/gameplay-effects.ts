@@ -159,8 +159,8 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     for (const newProg of newEvals) {
       const oldProg = prevEvals.find((p) => p.id === newProg.id);
       const oldTier = oldProg?.unlockedTier ?? 0;
+      const unitSuffix = newProg.unit ? ` ${newProg.unit}` : '';
       if (newProg.unlockedTier > oldTier && newProg.currentTier) {
-        const unitSuffix = newProg.unit ? ` ${newProg.unit}` : '';
         ui.enqueueAnnouncement({
           kind: 'achievement',
           category: 'achievement_unlocked',
@@ -169,7 +169,36 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
           subtitle: `Uusi saavutus · ${formatAnnouncementCount(newProg.currentTier.target)}${unitSuffix}`,
           tierKey: newProg.currentTier.key,
           tierName: newProg.currentTier.name,
+          isUnlock: true,
         });
+      } else if (newProg.nextTier) {
+        const oldVal = oldProg?.currentValue ?? 0;
+        const newVal = newProg.currentValue;
+        const nearTarget = newProg.nextTier.target - 1;
+        const isStreakAdvance =
+          newProg.id === 'streak' &&
+          prevStreak.current >= 1 &&
+          newStreak.current > prevStreak.current;
+        const isNearMilestone =
+          (newProg.id === 'pangrams' ||
+            newProg.id === 'full_board' ||
+            newProg.id === 'unassisted_master') &&
+          oldVal < nearTarget &&
+          newVal === nearTarget;
+
+        if (isStreakAdvance || isNearMilestone) {
+          const displayVal = newProg.id === 'streak' ? newStreak.current : newVal;
+          ui.enqueueAnnouncement({
+            kind: 'achievement',
+            category: 'achievement_progress',
+            achievementId: newProg.id,
+            title: newProg.title,
+            subtitle: `Edistyminen · ${formatAnnouncementCount(displayVal)} / ${formatAnnouncementCount(newProg.nextTier.target)}${unitSuffix}`,
+            tierKey: newProg.nextTier.key,
+            tierName: newProg.nextTier.name,
+            isUnlock: false,
+          });
+        }
       }
     }
   }

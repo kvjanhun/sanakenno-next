@@ -162,7 +162,7 @@ export async function postSyncState(token: string, state: SyncPuzzleState): Prom
 }
 
 export async function postSyncProgress(token: string, payload: SyncProgressPayload): Promise<void> {
-  await fetch('/api/player/sync/progress', {
+  const res = await fetch('/api/player/sync/progress', {
     method: 'POST',
     keepalive: true,
     headers: {
@@ -170,7 +170,10 @@ export async function postSyncProgress(token: string, payload: SyncProgressPaylo
       ...authHeaders(token),
     },
     body: JSON.stringify(payload),
-  }).catch(() => undefined);
+  });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, 'Synkronointi epäonnistui'));
+  }
 }
 
 export async function postSyncPreferences(token: string, prefs: PlayerPreferences): Promise<void> {
