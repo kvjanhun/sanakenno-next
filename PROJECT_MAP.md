@@ -32,8 +32,8 @@ sanakenno-next/
         features/
           health/            # System health & rotation headroom (GET /api/health)
           puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
-          player-auth/       # Passwordless player Bearer auth, session TTL, 15-min transfer tickets & 6-digit PIN pairing (POST /api/player/auth/transfer/ticket), Resend EU support, sliding-window rate limiters, active device count (POST /api/player/auth/*, GET /api/player/me)
-          player-sync/       # Monotonic cross-device progress sync (GET /api/player/sync, POST /api/player/sync/*)
+          player-auth/       # Passwordless player Bearer auth, session TTL, 15-min transfer tickets & 6-digit PIN pairing (POST /api/player/auth/transfer/ticket, /create, /use), Resend EU support, sliding-window rate limiters, active device count (GET /api/player/me)
+          player-sync/       # Monotonic cross-device progress & preference sync (GET /api/player/sync, POST /api/player/sync/progress, POST /api/player/sync/preferences)
           telemetry/         # Hardened public gameplay telemetry with sliding-window rate limiters & wordlist validation (POST /api/achievement, /api/failed-guess, /api/word-find)
           admin-auth/        # Argon2id admin cookie session auth & CSRF guardrails (POST /api/auth/*)
           admin-puzzles/     # Puzzle CRUD, swap, center override, preview, blocked words & 14-day schedule (POST/GET/DELETE /api/admin/*)
@@ -42,10 +42,10 @@ sanakenno-next/
     web/                     # @sanakenno/web — React 19 + TanStack Query + Hono RPC client
       src/
         api/                 # Typed Hono RPC client (hc<AppType>), split into client.ts and admin-client.ts
-        pwa.config.ts        # PWA manifest, service worker registration & Workbox runtime caching
+        pwa.config.ts        # PWA manifest, service worker registration, Workbox runtime caching & vite:preloadError recovery
         features/
           gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AnnouncementBanner), announcements, gameplay-effects.ts, offline puzzle cache (storage.ts / usePuzzleQuery.ts), useMidnightRollover, and hybrid state
-          modals/            # Code-split modals via React.lazy() (ModalShell, ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal) and PrivacySection (GDPR Art. 13 & localStorage disclosure)
+          modals/            # Statically bundled player modals (ModalShell, ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal) and PrivacySection (GDPR Art. 13 & localStorage disclosure)
           player-sync/       # Player auth store with debounced sync queue and keepalive, monotonic sync reconciliation, 6-digit PIN SyncModal, ConnectBanner
           theme/             # 6-palette CSS custom property theme system (usePaletteStore, useThemePreferenceStore, preference-sync, ThemeSelector, ThemeToggle)
           admin/             # Code-split admin panel (AdminLayout, LoginPage, PuzzleEditor, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
@@ -91,5 +91,5 @@ Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 ### 6. Daily Streak Integrity & Milestone Separation
 
 - **Milestones (`NoHintMilestone`):** Per-puzzle unassisted point markers (25%, 50%, 70%) on the progress bar.
-- **Achievements (`ACHIEVEMENT_DEFINITIONS`):** Long-term player badges across 6 categories with 5 tiers each (Pronssi, Hopea, Kulta, Timantti, Mestari).
+- **Achievements (`ACHIEVEMENT_DEFINITIONS`):** Long-term player badges across 6 categories with 5 tiers each (Pronssi, Hopea, Kulta, Timantti, Mestari). `AnnouncementBanner` only announces unlocked achievement tiers (`achievement_unlocked`), letter-cleared callouts (`letter_cleared`), and 25%/50% unassisted milestones (`no_hint_milestone`)—never intermediate achievement progress nudges.
 - **Streak ("Putki"):** Strictly measures consecutive calendar days in `Europe/Helsinki` on which the player solved words in the active daily puzzle. Archive plays never advance or create streaks.

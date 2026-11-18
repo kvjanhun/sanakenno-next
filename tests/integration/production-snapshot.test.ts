@@ -153,17 +153,22 @@ describe.skipIf(!hasProdDbSnapshot)('Production 1.0 Snapshot Verification', () =
       'Content-Type': 'application/json',
     };
 
-    const stateRes = await app.request('/api/player/sync/state', {
+    const progressRes = await app.request('/api/player/sync/progress', {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
         puzzle_number: 1,
+        date: '2026-10-28',
         found_words: ['sana', 'kenno'],
         score: 42,
+        max_score: 100,
         hints_unlocked: [],
+        started_at: 1000,
+        total_paused_ms: 0,
+        score_before_hints: 42,
       }),
     });
-    expect(stateRes.status).toBe(200);
+    expect(progressRes.status).toBe(200);
 
     const failGuessRes = await app.request('/api/failed-guess', {
       method: 'POST',

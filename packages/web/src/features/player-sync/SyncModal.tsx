@@ -30,6 +30,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
 
   useEffect(() => {
     if (show) {
+      useAuthStore.getState().clearError();
       void useAuthStore.getState().flushPendingSync();
       void useAuthStore.getState().refreshSessionCount();
       setIsTicketLoading(true);
@@ -243,7 +244,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                 placeholder="Esim. 123-456"
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value)}
-                className="flex-1 px-3 py-1.5 rounded text-base sm:text-xs font-mono outline-none border"
+                className="flex-1 min-w-0 px-3 py-1.5 rounded text-base sm:text-xs font-mono outline-none border"
                 style={{
                   backgroundColor: 'var(--color-bg-primary)',
                   borderColor: 'var(--color-border)',
@@ -254,7 +255,7 @@ export function SyncModal({ show, onClose }: SyncModalProps): React.JSX.Element 
                 type="button"
                 onClick={handleUseCode}
                 disabled={isLoading || !codeInput.trim()}
-                className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer disabled:opacity-50"
+                className="px-3 py-1.5 rounded text-xs font-medium cursor-pointer shrink-0 disabled:opacity-50"
                 style={{ backgroundColor: 'var(--color-accent)', color: 'var(--color-on-accent)' }}
               >
                 {isLoading ? 'Yhdistetään...' : 'Yhdistä'}

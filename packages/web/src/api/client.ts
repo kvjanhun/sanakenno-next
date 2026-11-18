@@ -8,7 +8,6 @@ import type {
   PlayerMeResponse,
   PlayerPreferences,
   PlayerStats,
-  StatsRecord,
   SyncPayload,
   SyncProgressPayload,
   SyncPuzzleState,
@@ -128,18 +127,6 @@ export async function postPlayerRotate(token: string): Promise<PlayerAuthRotateR
 export async function postPlayerLogout(token: string): Promise<void> {
   await apiClient.api.player.auth.logout
     .$post({}, { headers: authHeaders(token) })
-    .catch(() => undefined);
-}
-
-export async function postSyncStats(token: string, record: StatsRecord): Promise<void> {
-  await apiClient.api.player.sync.stats
-    .$post({ json: record }, { headers: authHeaders(token) })
-    .catch(() => undefined);
-}
-
-export async function postSyncState(token: string, state: SyncPuzzleState): Promise<void> {
-  await apiClient.api.player.sync.state
-    .$post({ json: state }, { headers: authHeaders(token) })
     .catch(() => undefined);
 }
 

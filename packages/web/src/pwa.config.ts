@@ -64,3 +64,27 @@ export const pwaOptions: Partial<VitePWAOptions> = {
     ],
   },
 };
+
+export const CHUNK_RELOAD_SESSION_KEY = 'sanakenno_chunk_reload_v1';
+
+/**
+ * Recover gracefully from stale dynamic import chunks after a PWA/Service Worker update
+ * by performing a single reload when online instead of letting React unmount the root tree.
+ */
+export function installChunkLoadErrorHandler(
+  win: Pick<Window, 'addEventListener' | 'sessionStorage' | 'navigator'> & {
+    location: Pick<Location, 'reload'>;
+  } = window,
+): void {
+  win.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    if (win.navigator.onLine === false) return;
+    try {
+      if (win.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY) === '1') return;
+      win.sessionStorage.setItem(CHUNK_RELOAD_SESSION_KEY, '1');
+    } catch {
+      // Ignore sessionStorage restrictions
+    }
+    win.location.reload();
+  });
+}

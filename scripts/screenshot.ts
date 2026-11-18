@@ -6,7 +6,7 @@ import path from 'node:path';
 import {
   buildTargetActionSteps,
   isLightVariantAction,
-  SCREENSHOT_TARGETS,
+  selectScreenshotTargets,
   type ScreenshotTarget,
 } from './screenshot-targets.js';
 
@@ -179,7 +179,7 @@ async function captureTarget(cdp: CdpSession, target: ScreenshotTarget): Promise
     features: [{ name: 'prefers-color-scheme', value: scheme }],
   });
   await cdp.send('Runtime.evaluate', {
-    expression: `window.localStorage.clear(); document.documentElement.removeAttribute('data-theme'); document.documentElement.removeAttribute('data-palette'); window.__sanakennoReloading = true;`,
+    expression: `(() => { const t = localStorage.getItem('sanakenno_auth_token'), k = localStorage.getItem('sanakenno_player_key'); localStorage.clear(); if (t) localStorage.setItem('sanakenno_auth_token', t); if (k) localStorage.setItem('sanakenno_player_key', k); document.documentElement.removeAttribute('data-theme'); document.documentElement.removeAttribute('data-palette'); window.__sanakennoReloading = true; })()`,
   });
   await cdp.send('Page.reload', { ignoreCache: true });
   await waitForAppReady(cdp);
@@ -222,7 +222,8 @@ async function main() {
     cdp = conn.cdp;
     await cdp.send('Page.navigate', { url });
     await waitForAppReady(cdp);
-    for (const target of SCREENSHOT_TARGETS) await captureTarget(cdp, target);
+    const targets = selectScreenshotTargets(process.argv.slice(2));
+    for (const target of targets) await captureTarget(cdp, target);
     console.log(`\nScreenshots ready in ${OUT_DIR}`);
   } finally {
     cdp?.close();

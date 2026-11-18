@@ -182,9 +182,8 @@ describe('Player Sync & Reconcile (Web Store)', () => {
     expect(pushed).toBe(false);
   });
 
-  it('pushes local records absent or ahead of server on pull', async () => {
-    const pushedStats: unknown[] = [];
-    const pushedStates: unknown[] = [];
+  it('pushes local records absent or ahead of server on pull via syncProgress', async () => {
+    const pushedPayloads: unknown[] = [];
 
     const localData = {
       stats: {
@@ -200,6 +199,8 @@ describe('Player Sync & Reconcile (Web Store)', () => {
             hints_used: 0,
             elapsed_ms: 30000,
             pangrams_found: 1,
+            is_daily: true,
+            played_at_date: '2026-04-10',
           },
           {
             puzzle_number: 3, // absent on server
@@ -258,18 +259,20 @@ describe('Player Sync & Reconcile (Web Store)', () => {
     };
 
     const res = pushLocalDataAheadOfServer(localData, serverPayload, {
-      syncStatsRecord: async (r) => {
-        pushedStats.push(r);
-      },
-      syncPuzzleState: async (s) => {
-        pushedStates.push(s);
+      syncProgress: async (p) => {
+        pushedPayloads.push(p);
       },
     });
 
-    expect(res.pushedStats).toBe(2); // both puzzle 1 (ahead) and puzzle 3 (absent)
-    expect(res.pushedStates).toBe(1); // puzzle 1 ahead
-    expect(pushedStats).toHaveLength(2);
-    expect(pushedStates).toHaveLength(1);
+    expect(res.pushedPuzzles).toBe(2); // both puzzle 1 (ahead) and puzzle 3 (absent)
+    expect(pushedPayloads).toHaveLength(2);
+    expect(pushedPayloads[0]).toMatchObject({
+      puzzle_number: 1,
+      date: '2026-04-10',
+      found_words: ['aasi', 'kana', 'kukko'],
+      is_daily: true,
+      played_at_date: '2026-04-10',
+    });
   });
 
   it('logout preserves local progress by default or with clearLocalProgress: false', async () => {

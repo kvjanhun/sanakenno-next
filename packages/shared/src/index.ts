@@ -84,8 +84,6 @@ export {
   TransferUsePayloadSchema,
   TransferUseResponseSchema,
   SyncProgressPayloadSchema,
-  SyncStatsPayloadSchema,
-  SyncStatePayloadSchema,
   SyncPreferencesPayloadSchema,
   AchievementPayloadSchema,
   FailedGuessPayloadSchema,

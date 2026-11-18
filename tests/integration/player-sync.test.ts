@@ -256,45 +256,38 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       const player = await createPlayer();
       const headers = { Authorization: `Bearer ${player.token}` };
 
-      const res = await harness.client.api.player.auth.transfer.email.$post(
+      const res = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'test@example.com', player_key: player.player_key } },
         { headers },
       );
       expect(res.status).toBe(200);
       const data = (await res.json()) as { status: string };
       expect(data.status).toBe('ok');
-
-      // Also works via /auth/transfer/create route
-      const resCreate = await harness.client.api.player.auth.transfer.create.$post(
-        { json: { email: 'test2@example.com', player_key: player.player_key } },
-        { headers },
-      );
-      expect(resCreate.status).toBe(200);
     });
 
     it('rejects transfer email with missing fields, invalid player_key, or unauthenticated', async () => {
       const player = await createPlayer();
       const headers = { Authorization: `Bearer ${player.token}` };
 
-      const missingKey = await harness.client.api.player.auth.transfer.email.$post(
+      const missingKey = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'test@example.com', player_key: '' } },
         { headers },
       );
       expect(missingKey.status).toBe(400);
 
-      const wrongKey = await harness.client.api.player.auth.transfer.email.$post(
+      const wrongKey = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'test@example.com', player_key: '0'.repeat(64) } },
         { headers },
       );
       expect(wrongKey.status).toBe(400);
 
-      const missingEmail = await harness.client.api.player.auth.transfer.email.$post(
+      const missingEmail = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: '', player_key: player.player_key } },
         { headers },
       );
       expect(missingEmail.status).toBe(400);
 
-      const unauth = await harness.client.api.player.auth.transfer.email.$post(
+      const unauth = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'test@example.com', player_key: player.player_key } },
         { headers: {} },
       );
@@ -309,14 +302,14 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       const headers = { Authorization: `Bearer ${player.token}` };
 
       // 1. First call with email succeeds
-      const res1 = await harness.client.api.player.auth.transfer.email.$post(
+      const res1 = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'cooldown@example.com', player_key: player.player_key } },
         { headers },
       );
       expect(res1.status).toBe(200);
 
       // 2. Immediate second call with same email is blocked by 10-minute cooldown
-      const resCooldown = await harness.client.api.player.auth.transfer.email.$post(
+      const resCooldown = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'cooldown@example.com', player_key: player.player_key } },
         { headers },
       );
@@ -325,14 +318,14 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       expect(cooldownData.error).toContain('Odota');
 
       // 3. Different email succeeds (IP request 3)
-      const res2 = await harness.client.api.player.auth.transfer.email.$post(
+      const res2 = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'user2@example.com', player_key: player.player_key } },
         { headers },
       );
       expect(res2.status).toBe(200);
 
       // 4. 4th request from same IP hits IP rate limit (limit = 3)
-      const resIpBlocked = await harness.client.api.player.auth.transfer.email.$post(
+      const resIpBlocked = await harness.client.api.player.auth.transfer.create.$post(
         { json: { email: 'user3@example.com', player_key: player.player_key } },
         { headers },
       );
@@ -343,49 +336,49 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
   });
 
   describe('Cross-device monotonic sync endpoints', () => {
-    it('merges stats monotonically (never downgrading best_score or rank)', async () => {
+    it('merges puzzle state union and derived stats monotonically via POST /api/player/sync/progress', async () => {
       const player = await createPlayer();
       const headers = { Authorization: `Bearer ${player.token}` };
 
-      // Push initial stats
-      await harness.client.api.player.sync.stats.$post(
+      await harness.client.api.player.sync.progress.$post(
         {
           json: {
             puzzle_number: 1,
             date: '2026-04-10',
-            best_rank: 'Sanavalmis',
-            best_score: 60,
+            found_words: ['aasi', 'kana', 'kansallinen'],
+            score: 20,
             max_score: 100,
-            words_found: 10,
-            hints_used: 0,
-            elapsed_ms: 20000,
-            pangrams_found: 1,
-            longest_word: 'mansikka',
+            hints_unlocked: ['grid'],
+            started_at: 1000,
+            total_paused_ms: 0,
+            score_before_hints: 20,
+            best_no_hint_score: 20,
+            is_daily: true,
+            played_at_date: '2026-04-10',
           },
         },
         { headers },
       );
 
-      // Attempt to push worse stats for the same puzzle
-      await harness.client.api.player.sync.stats.$post(
+      // Second device pushes fewer words + one new word ('kissa')
+      await harness.client.api.player.sync.progress.$post(
         {
           json: {
             puzzle_number: 1,
             date: '2026-04-10',
-            best_rank: 'Hyvä alku',
-            best_score: 20,
+            found_words: ['kissa', 'kana'],
+            score: 6,
             max_score: 100,
-            words_found: 3,
-            hints_used: 2,
-            elapsed_ms: 40000,
-            pangrams_found: 0,
-            longest_word: 'apila',
+            hints_unlocked: ['two_letter'],
+            started_at: 500,
+            total_paused_ms: 100,
+            score_before_hints: 2,
+            best_no_hint_score: 2,
           },
         },
         { headers },
       );
 
-      // Pull synced data
       const pullRes = await harness.client.api.player.sync.$get({}, { headers });
       expect(pullRes.status).toBe(200);
       const data = (await pullRes.json()) as {
@@ -395,53 +388,11 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
             best_rank: string;
             longest_word: string;
             pangrams_found: number;
+            words_found: number;
+            is_daily: boolean;
+            played_at_date?: string;
           }>;
         };
-      };
-
-      const record = data.stats.records[0];
-      expect(record?.best_score).toBe(60);
-      expect(record?.best_rank).toBe('Sanavalmis');
-      expect(record?.longest_word).toBe('mansikka');
-      expect(record?.pangrams_found).toBe(1);
-    });
-
-    it('merges puzzle state union of found words', async () => {
-      const player = await createPlayer();
-      const headers = { Authorization: `Bearer ${player.token}` };
-
-      await harness.client.api.player.sync.state.$post(
-        {
-          json: {
-            puzzle_number: 1,
-            found_words: ['aasi', 'kana'],
-            score: 2,
-            hints_unlocked: ['grid'],
-            started_at: 1000,
-            total_paused_ms: 0,
-            score_before_hints: 2,
-          },
-        },
-        { headers },
-      );
-
-      await harness.client.api.player.sync.state.$post(
-        {
-          json: {
-            puzzle_number: 1,
-            found_words: ['kissa', 'kana'],
-            score: 5,
-            hints_unlocked: ['two_letter'],
-            started_at: 500,
-            total_paused_ms: 100,
-            score_before_hints: 2,
-          },
-        },
-        { headers },
-      );
-
-      const pullRes = await harness.client.api.player.sync.$get({}, { headers });
-      const data = (await pullRes.json()) as {
         puzzle_states: Array<{
           found_words: string[];
           hints_unlocked: string[];
@@ -450,10 +401,19 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
       };
 
       const state = data.puzzle_states[0];
-      expect(state?.found_words.sort()).toEqual(['aasi', 'kana', 'kissa']);
+      expect(state?.found_words.sort()).toEqual(['aasi', 'kana', 'kansallinen', 'kissa']);
       expect(state?.hints_unlocked).toContain('grid');
       expect(state?.hints_unlocked).toContain('two_letter');
-      expect(state?.score).toBe(7);
+      // 'aasi' (1) + 'kana' (1) + 'kansallinen' (11 + 7 = 18) + 'kissa' (5) = 25
+      expect(state?.score).toBe(25);
+
+      const record = data.stats.records[0];
+      expect(record?.best_score).toBe(25);
+      expect(record?.words_found).toBe(4);
+      expect(record?.longest_word).toBe('kansallinen');
+      expect(record?.pangrams_found).toBe(1);
+      expect(record?.is_daily).toBe(true);
+      expect(record?.played_at_date).toBe('2026-04-10');
     });
 
     it('stores and syncs player preferences with last-write-wins updated_at timestamp', async () => {

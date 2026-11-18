@@ -5,15 +5,12 @@ import {
   mergeStatsRecord,
   rankForScore,
   recalcScore,
-  THEME_IDS,
   type PlayerPreferences,
   type PlayerStats,
   type StatsRecord,
   type SyncPayload,
   type SyncProgressPayload,
   type SyncPuzzleState,
-  type ThemeId,
-  type ThemePreference,
 } from '@sanakenno/shared';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
@@ -38,35 +35,6 @@ export async function readPlayerPreferences(
   } catch {
     return null;
   }
-}
-
-/**
- * Validate and sanitize raw preferences body.
- */
-export function sanitizePreferences(body: Record<string, unknown>): PlayerPreferences | null {
-  const themeIdRaw = body['themeId'];
-  const themePrefRaw = body['themePreference'];
-  const updatedAtRaw = body['updated_at'];
-
-  let themeId: ThemeId | undefined;
-  if (typeof themeIdRaw === 'string' && (THEME_IDS as readonly string[]).includes(themeIdRaw)) {
-    themeId = themeIdRaw as ThemeId;
-  }
-
-  let themePreference: ThemePreference | undefined;
-  if (themePrefRaw === 'light' || themePrefRaw === 'dark' || themePrefRaw === 'system') {
-    themePreference = themePrefRaw;
-  }
-
-  if (typeof updatedAtRaw !== 'string' || Number.isNaN(Date.parse(updatedAtRaw))) {
-    return null;
-  }
-
-  return {
-    themeId,
-    themePreference,
-    updated_at: updatedAtRaw,
-  };
 }
 
 /**
@@ -266,13 +234,40 @@ export async function mergeAndStoreStatsRecord(
   playerId: number,
   incoming: StatsRecord,
 ): Promise<StatsRecord> {
-  const existing = await readStatsRecord(db, playerId, incoming.puzzle_number);
-  const merged: StatsRecord = existing
-    ? {
-        ...mergeStatsRecord(existing, incoming),
-        max_score: Math.max(existing.max_score, incoming.max_score),
-      }
-    : incoming;
+  const puzzle = await getFullPuzzleBySlot(db, incoming.puzzle_number);
+  const maxScore = puzzle ? puzzle.max_score : incoming.max_score;
+  const cappedScore = Math.min(incoming.best_score, maxScore);
+  const sanitizedIncoming: StatsRecord = {
+    ...incoming,
+    max_score: maxScore,
+    best_score: cappedScore,
+    best_rank: rankForScore(cappedScore, maxScore),
+    words_found: puzzle
+      ? Math.min(incoming.words_found, puzzle.words.length)
+      : incoming.words_found,
+    pangrams_found: puzzle
+      ? Math.min(incoming.pangrams_found ?? 0, puzzle.hint_data.pangram_count)
+      : (incoming.pangrams_found ?? 0),
+    best_no_hint_score:
+      incoming.best_no_hint_score !== undefined
+        ? Math.min(incoming.best_no_hint_score, cappedScore)
+        : undefined,
+  };
+
+  const existing = await readStatsRecord(db, playerId, sanitizedIncoming.puzzle_number);
+  const mergedBase = existing ? mergeStatsRecord(existing, sanitizedIncoming) : sanitizedIncoming;
+  const mergedMaxScore = puzzle
+    ? puzzle.max_score
+    : existing
+      ? Math.max(existing.max_score, sanitizedIncoming.max_score)
+      : sanitizedIncoming.max_score;
+  const mergedScore = Math.min(mergedBase.best_score, mergedMaxScore);
+  const merged: StatsRecord = {
+    ...mergedBase,
+    max_score: mergedMaxScore,
+    best_score: mergedScore,
+    best_rank: rankForScore(mergedScore, mergedMaxScore),
+  };
 
   const longestWordOrNull =
     merged.longest_word && merged.longest_word.length > 0 ? merged.longest_word : null;
@@ -380,6 +375,8 @@ export async function deriveStatsFromProgress(
     pangrams_found: pangramsFound,
     best_no_hint_score: Math.max(cappedClientNoHint, deriveBestNoHintScore(mergedState)),
     long_words_count: longWordsCount,
+    is_daily: payload.is_daily,
+    played_at_date: payload.played_at_date,
   };
 }
 

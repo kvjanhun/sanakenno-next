@@ -118,4 +118,74 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
     expect(data.stats.records[0]?.best_score).toBe(6);
     expect(data.stats.records[0]?.best_no_hint_score).toBe(6);
   });
+
+  it('caps tampered stats records against puzzle max_score and word count on POST /api/player/auth/transfer/use', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as { player_key: string; token: string };
+
+    const useRes = await harness.client.api.player.auth.transfer.use.$post({
+      json: {
+        token: player.player_key,
+        stats: {
+          records: [
+            {
+              puzzle_number: 1,
+              date: '2026-04-10',
+              best_rank: 'Täysi kenno',
+              best_score: 99999,
+              max_score: 99999,
+              words_found: 9999,
+              hints_used: 0,
+              elapsed_ms: 5000,
+              pangrams_found: 999,
+              best_no_hint_score: 99999,
+            },
+          ],
+        },
+      },
+    });
+    expect(useRes.status).toBe(200);
+    const body = (await useRes.json()) as {
+      stats: {
+        records: Array<{
+          best_score: number;
+          max_score: number;
+          words_found: number;
+          pangrams_found: number;
+          best_no_hint_score: number;
+          best_rank: string;
+        }>;
+      };
+    };
+
+    const rec = body.stats.records[0]!;
+    expect(rec.max_score).toBeLessThan(99999);
+    expect(rec.best_score).toBe(rec.max_score);
+    expect(rec.best_no_hint_score).toBe(rec.max_score);
+    expect(rec.words_found).toBeLessThan(9999);
+    expect(rec.pangrams_found).toBeLessThan(999);
+    expect(rec.best_rank).toBe('Täysi kenno');
+  });
+
+  it('returns 404 for removed legacy sync/stats, sync/state, and auth/transfer/email routes', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as { token: string };
+    const headers = {
+      Authorization: `Bearer ${player.token}`,
+      'Content-Type': 'application/json',
+    };
+
+    for (const path of [
+      '/api/player/sync/stats',
+      '/api/player/sync/state',
+      '/api/player/auth/transfer/email',
+    ]) {
+      const res = await harness.app.request(path, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(404);
+    }
+  });
 });

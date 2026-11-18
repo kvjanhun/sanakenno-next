@@ -1,5 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArchiveModal } from '../modals/ArchiveModal.js';
+import { PuzzleWordsModal } from '../modals/PuzzleWordsModal.js';
+import { RulesModal } from '../modals/RulesModal.js';
+import { SettingsModal } from '../modals/SettingsModal.js';
+import { StatsModal } from '../modals/StatsModal.js';
 import { ConnectBanner } from '../player-sync/ConnectBanner.js';
+import { SyncModal } from '../player-sync/SyncModal.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { usePaletteStore } from '../theme/usePaletteStore.js';
 import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
@@ -20,25 +26,6 @@ import { usePuzzleQuery } from './usePuzzleQuery.js';
 import { useScrollBoundaryGuard } from './useScrollBoundaryGuard.js';
 import { useUiStore } from './useUiStore.js';
 import { WordInput } from './WordInput.js';
-
-const ArchiveModal = lazy(() =>
-  import('../modals/ArchiveModal.js').then((m) => ({ default: m.ArchiveModal })),
-);
-const PuzzleWordsModal = lazy(() =>
-  import('../modals/PuzzleWordsModal.js').then((m) => ({ default: m.PuzzleWordsModal })),
-);
-const RulesModal = lazy(() =>
-  import('../modals/RulesModal.js').then((m) => ({ default: m.RulesModal })),
-);
-const SettingsModal = lazy(() =>
-  import('../modals/SettingsModal.js').then((m) => ({ default: m.SettingsModal })),
-);
-const StatsModal = lazy(() =>
-  import('../modals/StatsModal.js').then((m) => ({ default: m.StatsModal })),
-);
-const SyncModal = lazy(() =>
-  import('../player-sync/SyncModal.js').then((m) => ({ default: m.SyncModal })),
-);
 
 export function GameplayView(): React.JSX.Element {
   const viewingPuzzleDate = useUiStore((s) => s.viewingPuzzleDate);
@@ -280,61 +267,59 @@ export function GameplayView(): React.JSX.Element {
         </div>
       </header>
 
-      <Suspense fallback={null}>
-        {showRules && (
-          <RulesModal show={showRules} onClose={() => useUiStore.getState().setShowRules(false)} />
-        )}
-        {showSettings && (
-          <SettingsModal
-            show={showSettings}
-            onClose={() => useUiStore.getState().setShowSettings(false)}
-            onOpenSync={() => {
-              useUiStore.getState().setShowSettings(false);
-              useUiStore.getState().setShowAuth(true);
-            }}
-            isLinked={isLinked}
-            sessionCount={sessionCount}
-          />
-        )}
-        {showAuth && (
-          <SyncModal show={showAuth} onClose={() => useUiStore.getState().setShowAuth(false)} />
-        )}
-        {showArchive && (
-          <ArchiveModal
-            show={showArchive}
-            onClose={() => useUiStore.getState().setShowArchive(false)}
-            onSelectPuzzle={(_puzzleNumber, date) => {
-              useUiStore.getState().setViewingPuzzleDate(date);
-              useUiStore.getState().setShowArchive(false);
-            }}
-            onRevealAnswers={(puzzleNumber, displayNumber) => {
-              useUiStore.getState().setShowArchive(false);
-              setRevealPuzzle({ puzzleNumber, displayNumber });
-            }}
-            currentPuzzleNumber={puzzle?.puzzle_number ?? null}
-          />
-        )}
-        {revealPuzzle !== null && (
-          <PuzzleWordsModal
-            show={revealPuzzle !== null}
-            onClose={() => setRevealPuzzle(null)}
-            onBack={() => {
-              setRevealPuzzle(null);
-              useUiStore.getState().setShowArchive(true);
-            }}
-            puzzleNumber={revealPuzzle?.puzzleNumber ?? null}
-            displayNumber={revealPuzzle?.displayNumber}
-          />
-        )}
-        {showStats && (
-          <StatsModal
-            show={showStats}
-            onClose={() => useUiStore.getState().setShowStats(false)}
-            onShare={handleShare}
-            shareCopied={shareCopied}
-          />
-        )}
-      </Suspense>
+      {showRules && (
+        <RulesModal show={showRules} onClose={() => useUiStore.getState().setShowRules(false)} />
+      )}
+      {showSettings && (
+        <SettingsModal
+          show={showSettings}
+          onClose={() => useUiStore.getState().setShowSettings(false)}
+          onOpenSync={() => {
+            useUiStore.getState().setShowSettings(false);
+            useUiStore.getState().setShowAuth(true);
+          }}
+          isLinked={isLinked}
+          sessionCount={sessionCount}
+        />
+      )}
+      {showAuth && (
+        <SyncModal show={showAuth} onClose={() => useUiStore.getState().setShowAuth(false)} />
+      )}
+      {showArchive && (
+        <ArchiveModal
+          show={showArchive}
+          onClose={() => useUiStore.getState().setShowArchive(false)}
+          onSelectPuzzle={(_puzzleNumber, date) => {
+            useUiStore.getState().setViewingPuzzleDate(date);
+            useUiStore.getState().setShowArchive(false);
+          }}
+          onRevealAnswers={(puzzleNumber, displayNumber) => {
+            useUiStore.getState().setShowArchive(false);
+            setRevealPuzzle({ puzzleNumber, displayNumber });
+          }}
+          currentPuzzleNumber={puzzle?.puzzle_number ?? null}
+        />
+      )}
+      {revealPuzzle !== null && (
+        <PuzzleWordsModal
+          show={revealPuzzle !== null}
+          onClose={() => setRevealPuzzle(null)}
+          onBack={() => {
+            setRevealPuzzle(null);
+            useUiStore.getState().setShowArchive(true);
+          }}
+          puzzleNumber={revealPuzzle?.puzzleNumber ?? null}
+          displayNumber={revealPuzzle?.displayNumber}
+        />
+      )}
+      {showStats && (
+        <StatsModal
+          show={showStats}
+          onClose={() => useUiStore.getState().setShowStats(false)}
+          onShare={handleShare}
+          shareCopied={shareCopied}
+        />
+      )}
       <ConnectBanner token={connectToken} onClose={() => setConnectToken(null)} />
 
       <main

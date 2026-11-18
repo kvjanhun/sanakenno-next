@@ -1,9 +1,4 @@
-import {
-  type StatsRecord,
-  type SyncProgressPayload,
-  type SyncPuzzleState,
-  type TransferTicketResponse,
-} from '@sanakenno/shared';
+import { type SyncProgressPayload, type TransferTicketResponse } from '@sanakenno/shared';
 import { create } from 'zustand';
 import {
   fetchPlayerMe,
@@ -16,8 +11,6 @@ import {
   postPlayerTransferUse,
   postSyncPreferences,
   postSyncProgress,
-  postSyncState,
-  postSyncStats,
 } from '../../api/client.js';
 import {
   getRawStorage,
@@ -54,8 +47,6 @@ export interface AuthState {
   rotatePlayerKey: () => Promise<void>;
   clearError: () => void;
   logout: (options?: { clearLocalProgress?: boolean }) => Promise<void>;
-  syncStatsRecord: (record: StatsRecord) => Promise<void>;
-  syncPuzzleState: (state: SyncPuzzleState) => Promise<void>;
   syncProgress: (payload: SyncProgressPayload) => Promise<void>;
   syncProgressDebounced: (payload: SyncProgressPayload) => void;
   flushPendingSync: () => Promise<void>;
@@ -125,8 +116,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const localBefore = gatherLocalData();
         const changed = pullAndMergeData(syncData, () => void get().syncPreferences());
         pushLocalDataAheadOfServer(localBefore, syncData, {
-          syncStatsRecord: (rec) => get().syncStatsRecord(rec),
-          syncPuzzleState: (st) => get().syncPuzzleState(st),
+          syncProgress: (payload) =>
+            get()
+              .syncProgress(payload)
+              .catch(() => undefined),
         });
         if (changed && typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
@@ -334,18 +327,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('sanakenno:sync-reload'));
     }
-  },
-
-  syncStatsRecord: async (record: StatsRecord) => {
-    const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
-    if (!token) return;
-    await postSyncStats(token, record);
-  },
-
-  syncPuzzleState: async (state: SyncPuzzleState) => {
-    const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
-    if (!token) return;
-    await postSyncState(token, state);
   },
 
   syncProgress: async (payload: SyncProgressPayload) => {

@@ -1,5 +1,6 @@
 import {
   emptyStats,
+  getHelsinkiDateString,
   isPuzzleStateBetterThanServer,
   isStatsRecordBetterThanServer,
   mergePuzzleState,
@@ -7,8 +8,8 @@ import {
   STATS_STORAGE_KEY,
   type PlayerPreferences,
   type PlayerStats,
-  type StatsRecord,
   type SyncPayload,
+  type SyncProgressPayload,
   type SyncPuzzleState,
 } from '@sanakenno/shared';
 import { filterVisibleHintIds } from '../gameplay/hints.js';
@@ -169,13 +170,17 @@ export function pushLocalDataAheadOfServer(
   local: ReturnType<typeof gatherLocalData>,
   server: SyncPayload,
   actions: {
-    syncStatsRecord: (record: StatsRecord) => Promise<void>;
-    syncPuzzleState: (state: SyncPuzzleState) => Promise<void>;
+    syncProgress: (payload: SyncProgressPayload) => Promise<void>;
   },
-): { pushedStats: number; pushedStates: number } {
-  let pushedStats = 0;
-  let pushedStates = 0;
+): { pushedPuzzles: number } {
+  let pushedPuzzles = 0;
 
+  const localStatsByPuzzle = new Map(
+    local.stats.records.map((record) => [record.puzzle_number, record]),
+  );
+  const localStatesByPuzzle = new Map(
+    local.puzzle_states.map((state) => [state.puzzle_number, state]),
+  );
   const serverStatsByPuzzle = new Map(
     (server.stats?.records ?? []).map((record) => [record.puzzle_number, record]),
   );
@@ -183,19 +188,43 @@ export function pushLocalDataAheadOfServer(
     (server.puzzle_states ?? []).map((state) => [state.puzzle_number, state]),
   );
 
-  for (const record of local.stats.records) {
-    if (isStatsRecordBetterThanServer(record, serverStatsByPuzzle.get(record.puzzle_number))) {
-      void actions.syncStatsRecord(record);
-      pushedStats++;
+  const candidatePuzzles = new Set<number>([
+    ...localStatsByPuzzle.keys(),
+    ...localStatesByPuzzle.keys(),
+  ]);
+
+  for (const puzzleNumber of candidatePuzzles) {
+    const localRecord = localStatsByPuzzle.get(puzzleNumber);
+    const localState = localStatesByPuzzle.get(puzzleNumber);
+    const serverRecord = serverStatsByPuzzle.get(puzzleNumber);
+    const serverState = serverStatesByPuzzle.get(puzzleNumber);
+
+    const statsAhead = Boolean(
+      localRecord && isStatsRecordBetterThanServer(localRecord, serverRecord),
+    );
+    const stateAhead = Boolean(
+      localState && isPuzzleStateBetterThanServer(localState, serverState),
+    );
+
+    if (statsAhead || stateAhead) {
+      void actions.syncProgress({
+        puzzle_number: puzzleNumber,
+        date: localRecord?.date ?? serverRecord?.date ?? getHelsinkiDateString(),
+        found_words: localState?.found_words ?? [],
+        score: localState?.score ?? localRecord?.best_score ?? 0,
+        hints_unlocked: localState?.hints_unlocked ?? [],
+        started_at: localState?.started_at ?? 0,
+        total_paused_ms: localState?.total_paused_ms ?? 0,
+        score_before_hints:
+          localState?.score_before_hints ?? localRecord?.best_no_hint_score ?? null,
+        max_score: localRecord?.max_score ?? serverRecord?.max_score ?? 100,
+        best_no_hint_score: localRecord?.best_no_hint_score,
+        is_daily: localRecord?.is_daily,
+        played_at_date: localRecord?.played_at_date,
+      });
+      pushedPuzzles++;
     }
   }
 
-  for (const state of local.puzzle_states) {
-    if (isPuzzleStateBetterThanServer(state, serverStatesByPuzzle.get(state.puzzle_number))) {
-      void actions.syncPuzzleState(state);
-      pushedStates++;
-    }
-  }
-
-  return { pushedStats, pushedStates };
+  return { pushedPuzzles };
 }

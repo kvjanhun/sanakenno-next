@@ -23,9 +23,9 @@ This repository is operated **agent-first**. You (the agent) work autonomously i
      - **Blast Radius:** Shipped specs, feature slices, DB tables, and RPC endpoints.
      - **Proof:** Total test counts + key E2E/integration proofs.
      - **Curator Prompt:** Any final UX/product judgment call.
-6. **Mandatory Agent Visual Verification for UI Changes:**
-   - Whenever a slice touches `.tsx` files, CSS stylesheets, or Tailwind tokens, the agent MUST run `pnpm run screenshot` and visually inspect the output using `read_file`.
-   - The Curation Brief must include confirmation that mobile (390px) and desktop (1280px) screenshots were inspected.
+### 6. Mandatory Agent Visual Verification for UI Changes:
+   - Whenever a slice touches `.tsx` files, CSS stylesheets, or Tailwind tokens, the agent MUST run `pnpm run screenshot` (passing area/modal filters such as `pnpm run screenshot settings sync` when specific modals or panels are modified) and visually inspect the output using `read_file`.
+   - The Curation Brief must include confirmation that mobile (390px) and desktop (1280px) screenshots of the affected views were inspected.
 
 ---
 
@@ -50,7 +50,7 @@ Enforced mechanically by [`tests/architecture.test.ts`](tests/architecture.test.
 pnpm run check:agent     # Full mechanical gate: typecheck + lint + test:arch + test:unit + build
 pnpm run test:arch       # Run architectural fitness tests only
 pnpm run test:unit       # Run Vitest unit + in-memory SQLite integration tests
-pnpm run screenshot      # Capture desktop (1280px) & mobile (390px) screenshots to .screenshots/
+pnpm run screenshot      # Capture baseline desktop (1280px) & mobile (390px) screenshots (pass area/modal filters e.g. `settings sync` or `all`)
 pnpm run db:seed         # Seed local development SQLite database
 pnpm run dev             # Start local Hono API (:3001) + Vite web (:5173)
 ```
@@ -64,6 +64,7 @@ Every fact lives in **one** file:
 - **How to work here (rules, commands, agent workflow):** `AGENTS.md` (`CLAUDE.md` and `GEMINI.md` are symlinks to `AGENTS.md`).
 - **What exists now (structure, data flows, domain invariants):** [`PROJECT_MAP.md`](PROJECT_MAP.md).
 - **What is planned or in progress:** [`specs/00-backlog.md`](specs/00-backlog.md) and individual `specs/NN-*.md` files.
+- **Historical slice archive (`specs/archive/`):** Immutable point-in-time records of shipped slices. **Newer specs and `main` always win**—never audit current code against `specs/archive/*` or re-implement behavior from an archived spec that was superseded by a later spec or commit. Update [`PROJECT_MAP.md`](PROJECT_MAP.md) whenever a domain or UX invariant changes.
 - **Public intro & quickstart:** [`README.md`](README.md).
 
 Docs state what is true _now_—never write changelog prose ("used to", "previously", "was moved") in documentation.

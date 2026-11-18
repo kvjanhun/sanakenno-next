@@ -4,7 +4,6 @@ import {
   PlayerPreferencesSchema,
   PlayerStatsSchema,
   PuzzleStateSchema,
-  StatsRecordSchema,
   SyncPayloadSchema,
 } from './domain.js';
 
@@ -71,10 +70,13 @@ export const SyncProgressPayloadSchema = z.object({
   score_before_hints: z.number().int().nonnegative().nullable(),
   max_score: z.number().int().nonnegative(),
   best_no_hint_score: z.number().int().nonnegative().optional(),
+  is_daily: z.boolean().optional(),
+  played_at_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
-export const SyncStatsPayloadSchema = StatsRecordSchema;
-export const SyncStatePayloadSchema = PuzzleStateSchema;
 export const SyncPreferencesPayloadSchema = PlayerPreferencesSchema;
 
 export const AchievementPayloadSchema = z.object({

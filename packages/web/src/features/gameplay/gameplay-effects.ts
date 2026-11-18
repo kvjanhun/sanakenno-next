@@ -169,44 +169,16 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
           subtitle: `Uusi saavutus · ${formatAnnouncementCount(newProg.currentTier.target)}${unitSuffix}`,
           tierKey: newProg.currentTier.key,
           tierName: newProg.currentTier.name,
-          isUnlock: true,
         });
-      } else if (newProg.nextTier) {
-        const oldVal = oldProg?.currentValue ?? 0;
-        const newVal = newProg.currentValue;
-        const nearTarget = newProg.nextTier.target - 1;
-        const isStreakAdvance =
-          newProg.id === 'streak' &&
-          prevStreak.current >= 1 &&
-          newStreak.current > prevStreak.current;
-        const isNearMilestone =
-          (newProg.id === 'pangrams' ||
-            newProg.id === 'full_board' ||
-            newProg.id === 'unassisted_master') &&
-          oldVal < nearTarget &&
-          newVal === nearTarget;
-
-        if (isStreakAdvance || isNearMilestone) {
-          const displayVal = newProg.id === 'streak' ? newStreak.current : newVal;
-          ui.enqueueAnnouncement({
-            kind: 'achievement',
-            category: 'achievement_progress',
-            achievementId: newProg.id,
-            title: newProg.title,
-            subtitle: `Edistyminen · ${formatAnnouncementCount(displayVal)} / ${formatAnnouncementCount(newProg.nextTier.target)}${unitSuffix}`,
-            tierKey: newProg.nextTier.key,
-            tierName: newProg.nextTier.name,
-            isUnlock: false,
-          });
-        }
       }
     }
   }
 
   // Debounced cloud sync
+  const todayHelsinki = getHelsinkiDateString();
   const syncPayload = {
     puzzle_number: puzzle.puzzle_number,
-    date: ui.viewingPuzzleDate ?? getHelsinkiDateString(),
+    date: ui.viewingPuzzleDate ?? todayHelsinki,
     found_words: [...newFoundWords],
     score: newScore,
     hints_unlocked: visibleHintsUnlocked,
@@ -215,6 +187,8 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     score_before_hints: scoreBeforeHints,
     max_score: puzzle.max_score,
     best_no_hint_score: bestNoHintScore,
+    is_daily: isDaily,
+    played_at_date: todayHelsinki,
   };
 
   useAuthStore.getState().syncProgressDebounced(syncPayload);

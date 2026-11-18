@@ -59,8 +59,7 @@ Close the public API spoiler and rate-limit vulnerabilities and repair silent cl
   - Write `saveToStorage('sanakenno_preferences_updated_at', new Date().toISOString())` inside `setThemeId` and `setPreference` before calling `notifyPreferenceChanged()`.
 - **`SyncModal.tsx` & `StatsModal.tsx`:**
   - Call `void useAuthStore.getState().flushPendingSync()` when `show` transitions to `true`.
-- **`announcements.ts` & `gameplay-effects.ts`:**
-  - Add `'achievement_progress'` to `AnnouncementCategory` and `AchievementAnnouncement` (with `isUnlock?: boolean`) and emit progress announcements in `handleAcceptedWordEffects` when daily streak advances (`newStreak.current > prevStreak.current` without unlocking a tier) or when `pangrams`, `full_board`, or `unassisted_master` reaches `nextTierTarget - 1`, matching Spec 27 §3.2. Also support `'progress'` in `triggerConsoleAnnouncement`.
+- *(Note: The `achievement_progress` re-addition originally included here was superseded and removed in Spec 33 to preserve commit `d5a1c0a`.)*
 
 ## 4. Acceptance Criteria (Test Catalog)
 

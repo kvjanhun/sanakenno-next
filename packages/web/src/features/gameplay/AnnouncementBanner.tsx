@@ -129,9 +129,7 @@ export function AnnouncementBanner(): React.JSX.Element | null {
               border: `1px solid color-mix(in srgb, ${tone} 40%, transparent)`,
             }}
           >
-            {activeAnnouncement.isUnlock === false
-              ? `Kohti: ${activeAnnouncement.tierName}`
-              : activeAnnouncement.tierName}
+            {activeAnnouncement.tierName}
           </span>
         ) : activeAnnouncement.metaPill ? (
           <span

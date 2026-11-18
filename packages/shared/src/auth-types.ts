@@ -32,6 +32,8 @@ export interface SyncProgressPayload extends SyncPuzzleState {
   date: string;
   max_score: number;
   best_no_hint_score?: number;
+  is_daily?: boolean;
+  played_at_date?: string;
 }
 
 /** Valid identifiers for the color palette ("Väriteema") selection. */

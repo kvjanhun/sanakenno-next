@@ -127,13 +127,6 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
       (c) => handleTransferEmail(db, c, c.req.valid('json')),
     )
     .post(
-      '/auth/transfer/email',
-      authMiddleware,
-      transferCreateRateLimit,
-      zValidator('json', TransferCreatePayloadSchema, transferEmailErrorHook),
-      (c) => handleTransferEmail(db, c, c.req.valid('json')),
-    )
-    .post(
       '/auth/transfer/use',
       zValidator(
         'json',

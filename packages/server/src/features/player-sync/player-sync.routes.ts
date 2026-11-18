@@ -1,10 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import {
-  SyncPreferencesPayloadSchema,
-  SyncProgressPayloadSchema,
-  SyncStatePayloadSchema,
-  SyncStatsPayloadSchema,
-} from '@sanakenno/shared';
+import { SyncPreferencesPayloadSchema, SyncProgressPayloadSchema } from '@sanakenno/shared';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
@@ -31,36 +26,6 @@ export function createPlayerSyncRoutes(db: Kysely<Database>) {
       const data = await fetchPlayerData(db, player.playerId);
       return c.json(data, 200);
     })
-    .post(
-      '/stats',
-      authMiddleware,
-      zValidator('json', SyncStatsPayloadSchema, zodErrorHook('Virheellinen pyyntö')),
-      async (c) => {
-        const player = c.get('player');
-        const payload = c.req.valid('json');
-
-        await runImmediateTransactionWithRetry(db, (trx) =>
-          mergeAndStoreStatsRecord(trx, player.playerId, payload),
-        );
-
-        return c.json({ status: 'synced' as const }, 200);
-      },
-    )
-    .post(
-      '/state',
-      authMiddleware,
-      zValidator('json', SyncStatePayloadSchema, zodErrorHook('Virheellinen pyyntö')),
-      async (c) => {
-        const player = c.get('player');
-        const payload = c.req.valid('json');
-
-        await runImmediateTransactionWithRetry(db, (trx) =>
-          mergeAndStorePuzzleState(trx, player.playerId, payload),
-        );
-
-        return c.json({ status: 'synced' as const }, 200);
-      },
-    )
     .post(
       '/progress',
       authMiddleware,

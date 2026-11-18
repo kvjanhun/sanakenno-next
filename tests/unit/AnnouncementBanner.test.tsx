@@ -174,20 +174,6 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     );
     expect(screen.getByTestId('announcement-meta-pill')).toHaveTextContent('50 %');
 
-    fireEvent.click(screen.getByTestId('announcement-banner'));
-    act(() => {
-      window.sanakennoAnnounce?.('progress', 'streak', 6, 7, 'bronze');
-    });
-    expect(screen.getByTestId('announcement-banner')).toHaveAttribute(
-      'data-announcement-category',
-      'achievement_progress',
-    );
-    expect(screen.getByTestId('announcement-title')).toHaveTextContent('Päivittäinen tapa');
-    expect(screen.getByTestId('announcement-subtitle')).toHaveTextContent(
-      'Edistyminen · 6 / 7 päivää',
-    );
-    expect(screen.getByTestId('announcement-tier-pill')).toHaveTextContent('Kohti: Pronssi');
-
     unmount();
     expect(window.sanakennoAnnounce).toBeUndefined();
   });

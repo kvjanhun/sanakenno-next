@@ -86,12 +86,8 @@ Define a unified announcement union in `packages/web/src/features/gameplay/annou
    - Emits `kind: 'gameplay'`, `category: 'letter_cleared'`, `badgeText: firstLetter.toUpperCase()`, `title: "Kaikki ${L}-alkuiset sanat löydetty!"`, `metaPill: "${totalForLetter}/${totalForLetter}"`.
 3. **Achievement Tier Unlocked (`achievement_unlocked`):**
    - Fired when `newProg.unlockedTier > oldTier && newProg.currentTier`.
-   - Emits `kind: 'achievement'`, `category: 'achievement_unlocked'`, `isUnlock: true`, `title: newProg.title`, `subtitle: "Uusi saavutus · ${target}${unitSuffix}"`, `tierKey`, `tierName`.
-4. **Achievement Progress Nudge (`achievement_progress`):**
-   - Fired on meaningful non-unlock progress steps without spamming every word:
-     - Daily streak extended (`newStreak.current > prevStreak.current`) -> `title: "Päivittäinen tapa"`, `subtitle: "Edistyminen · ${current} / ${nextTarget} päivää"`, `isUnlock: false`, targeting the next streak tier.
-     - Near-unlock milestone (when crossing to 1 unit away for `pangrams`, `full_board`, or `unassisted_master`, without crossing into an unlock on the same word) -> `title: newProg.title`, `subtitle: "Edistyminen · ${currentValue} / ${nextTarget} ${unit}"`, `isUnlock: false`.
-5. **Unassisted Milestone Reached (`no_hint_milestone`):**
+   - Emits `kind: 'achievement'`, `category: 'achievement_unlocked'`, `title: newProg.title`, `subtitle: "Uusi saavutus · ${target}${unitSuffix}"`, `tierKey`, `tierName`. (Intermediate `achievement_progress` nudges were retired in `d5a1c0a` / Spec 33 so only actual tier unlocks trigger achievement banners.)
+4. **Unassisted Milestone Reached (`no_hint_milestone`):**
    - Fired when `visibleHintsUnlocked.length === 0` and a word pushes `newScore` across the 25% (`"Omin avuin"`) or 50% (`"Avuitta taitava"`) `NO_HINT_MILESTONES` threshold for the first time in the puzzle (70% continues to show the `Celebration` dialog).
    - Uses two rows: `title: highestCrossed.name`, `subtitle: "${highestCrossed.pct} % pisteistä ilman apuja!"`, `metaPill: "${highestCrossed.pct} %"`.
 
