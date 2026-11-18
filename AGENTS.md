@@ -15,7 +15,7 @@ This repository is operated **agent-first**. You (the agent) work autonomously i
 3. **Mechanical Gate Per Slice (`pnpm check:agent`):**
    - No slice may be merged to `main` until `pnpm run check:agent` passes 100% (TypeScript across Kysely + Hono RPC + React, ESLint/Prettier, `tests/architecture.test.ts`, Vitest unit/integration, and production build).
 4. **Independent Critic Audit Per Slice (`critic-audit`):**
-   - Before merging any slice to `main`, invoke a read-only subagent using the `critic-audit` skill to verify the diff against the spec, check for scope creep, and confirm test honesty. Self-heal any blocker findings before merging (`Status: shipped`) and advancing to the next `approved` spec.
+   - Before merging any slice to `main`, invoke a read-only subagent using the `critic-audit` skill to verify the diff against the spec, check for scope creep, and confirm new or updated tests honestly prove the spec's behavioral criteria (without mocking away what is being tested or asserting static styling/types). Self-heal any blocker findings before merging (`Status: shipped`) and advancing to the next `approved` spec.
 5. **The 1-Screen Curation Brief (<25 lines) at Queue Completion:**
    - Never dump long logs or 1,000-line essays after an autonomous run.
    - Once all `approved` specs are `shipped`, present a single **Curation Brief** in **under 25 lines**:

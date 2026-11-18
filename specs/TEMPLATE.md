@@ -6,7 +6,7 @@ Reference (1.0): <paths in /Users/erezac/Projects/sanakenno if applicable>
 
 ## 1. Objective
 
-One or two sentences stating what capability this vertical slice adds.
+One or two sentences stating what capability this vertical slice adds or improves.
 
 ## 2. Invariants & Non-Goals
 
@@ -20,9 +20,17 @@ One or two sentences stating what capability this vertical slice adds.
 - **Hono RPC Routes (`@sanakenno/server`):**
 - **Frontend Slice (`@sanakenno/web`):**
 
-## 4. Acceptance Criteria (Test Catalog)
+## 4. Acceptance Criteria & Verification
 
-- [ ] Unit / Domain: ...
-- [ ] Integration (Kysely + Hono in-memory SQLite): ...
-- [ ] Conventional UI (React Testing Library in Vitest): ...
-- [ ] Visual Inspection (`pnpm run screenshot` mobile + desktop): ...
+Include only layers carrying real behavioral risk; delete inapplicable bullets. Skip tests for styling/layout (verified visually), static copy/docs, trivial pass-throughs, and compiler-checked types — never add tautological mocks or CSS/HTML string checks.
+
+### New / Updated Tests (real boundaries, not mock-only)
+
+- [ ] **Unit / Domain (`tests/unit/...`):** <new/updated test for non-trivial logic, edge cases, or bug regression>
+- [ ] **Integration (`tests/integration/...`):** <new/updated test using real Hono + Zod + in-memory Kysely SQLite for contract & failure paths>
+- [ ] **UI Interaction (`tests/unit/...`):** <new/updated RTL test for meaningful user flows or state transitions>
+
+### Visual & Mechanical Gate
+
+- [ ] **Visual Inspection (`pnpm run screenshot <areas>`):** <affected views inspected at 390px & 1280px, if UI/CSS touched>
+- [ ] **Mechanical Gate:** `pnpm run check:agent` passes 100%

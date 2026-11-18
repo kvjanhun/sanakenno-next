@@ -19,7 +19,7 @@ Precondition: One or more specs in `specs/00-backlog.md` have `Status: approved`
 ## For Each `approved` Spec (`specs/NN-<slug>.md`):
 
 1. **Mark `in-progress`:** Use `edit_file` to set `Status: in-progress` in `specs/NN-<slug>.md` and `specs/00-backlog.md`.
-2. **Implement Vertical Slice & Tests:** Write code and tests using `write_file` / `edit_file` following `AGENTS.md` boundaries.
+2. **Implement Vertical Slice & Tests:** Write code and create/update the tests listed under `## 4` (`New / Updated Tests`) using `write_file` / `edit_file` following `AGENTS.md` boundaries. Exercise real boundaries (real Hono + Zod, in-memory Kysely SQLite, RTL user flows) and never add tautological mocks or CSS/HTML string checks.
 3. **Visual & Mechanical Gate:** If UI/CSS or screenshot scripts were touched, run `pnpm --dir /Users/erezac/Projects/sanakenno-next run screenshot` (with matching area/modal filters if modals or specific panels changed) and inspect `.screenshots/mobile.png`, `.screenshots/desktop.png`, and any targeted modal/area PNGs with `read_file`. Run `pnpm --dir /Users/erezac/Projects/sanakenno-next run format` and `pnpm --dir /Users/erezac/Projects/sanakenno-next run check:agent` as separate single commands. Fix any failures.
 4. **Independent Critic Audit:** Invoke a read-only `research` subagent (`critic-audit`) using only `read_file` (never `run_command`). Fix any blocker findings.
 5. **Finalize (`curate-accept`) & Advance Immediately:** Set `Status: shipped` in `specs/NN-<slug>.md`, move `specs/NN-<slug>.md` to `specs/archive/NN-<slug>.md`, update `specs/00-backlog.md` and `PROJECT_MAP.md`, re-run `pnpm --dir /Users/erezac/Projects/sanakenno-next run check:agent`, and immediately start the next `approved` spec without stopping.
