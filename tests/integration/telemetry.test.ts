@@ -1,5 +1,10 @@
 import type { RankName } from '@sanakenno/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  DEFAULT_SEED_WORDS,
+  invalidatePuzzleCache,
+  setWordlist,
+} from '../../packages/server/src/features/puzzle/wordlist.js';
 import { resetTelemetryRateLimits } from '../../packages/server/src/features/telemetry/telemetry.routes.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
@@ -8,6 +13,7 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
 
   beforeEach(async () => {
     resetTelemetryRateLimits();
+    setWordlist([...DEFAULT_SEED_WORDS, 'kissa']);
     harness = createTestHarness();
     await harness.db
       .insertInto('puzzles')
@@ -20,6 +26,8 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
 
   afterEach(async () => {
     resetTelemetryRateLimits();
+    setWordlist(DEFAULT_SEED_WORDS);
+    invalidatePuzzleCache();
     await harness.destroy();
   });
 

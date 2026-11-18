@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { computeStreak, evaluateAchievements } from '@sanakenno/shared';
 import SQLite from 'better-sqlite3';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../packages/server/src/app.js';
 import {
   createDb,
@@ -11,11 +11,20 @@ import {
 } from '../../packages/server/src/db/connection.js';
 import { BASELINE_SQL } from '../../packages/server/src/db/baseline-sql.js';
 import { migrateV1DatabaseFile } from '../../packages/server/src/db/migrate-v1.js';
+import {
+  DEFAULT_SEED_WORDS,
+  invalidatePuzzleCache,
+  setWordlist,
+} from '../../packages/server/src/features/puzzle/wordlist.js';
 
 const V1_SCHEMA_PATH = process.env.V1_SCHEMA_PATH;
 
 describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
   const tempFiles: string[] = [];
+
+  beforeEach(() => {
+    setWordlist([...DEFAULT_SEED_WORDS, 'kieli', 'kielitieteilijä']);
+  });
 
   function makeTempDbPath(): string {
     const file = path.join(
@@ -27,6 +36,8 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
   }
 
   afterEach(() => {
+    setWordlist(DEFAULT_SEED_WORDS);
+    invalidatePuzzleCache();
     for (const file of tempFiles.splice(0)) {
       for (const suffix of ['', '-wal', '-shm']) {
         if (fs.existsSync(file + suffix)) {

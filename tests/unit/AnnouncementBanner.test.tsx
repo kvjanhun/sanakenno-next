@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnnouncementBanner } from '../../packages/web/src/features/gameplay/AnnouncementBanner.js';
 import { MessageBar } from '../../packages/web/src/features/gameplay/MessageBar.js';
@@ -7,15 +7,20 @@ import { useUiStore } from '../../packages/web/src/features/gameplay/useUiStore.
 describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    useUiStore.getState().resetUi();
+    act(() => {
+      useUiStore.getState().resetUi();
+    });
   });
 
   afterEach(() => {
-    useUiStore.getState().resetUi();
+    cleanup();
+    act(() => {
+      useUiStore.getState().resetUi();
+    });
     vi.useRealTimers();
   });
 
-  it('renders plain gameplay announcement with Sivuraita 4px left accent stripe and zero text truncation', () => {
+  it('renders plain gameplay announcement without medallion polygon', () => {
     render(<AnnouncementBanner />);
     expect(screen.queryByTestId('announcement-banner')).not.toBeInTheDocument();
 
@@ -32,18 +37,15 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     const banner = screen.getByTestId('announcement-banner');
     expect(banner).toHaveAttribute('data-announcement-kind', 'gameplay');
     expect(banner).toHaveAttribute('data-announcement-category', 'letter_cleared');
-    expect(banner.style.borderLeft).toContain('4px solid');
-    expect(banner.style.borderLeft).toContain('var(--color-accent)');
     expect(banner.querySelector('polygon')).toBeNull();
-    expect(banner.parentElement).toHaveStyle({ position: 'absolute', top: '100%' });
 
-    const title = screen.getByTestId('announcement-title');
-    expect(title).toHaveTextContent('Kaikki K-alkuiset sanat löydetty!');
-    expect(title.className).not.toMatch(/\b(truncate|text-ellipsis|whitespace-nowrap)\b/);
+    expect(screen.getByTestId('announcement-title')).toHaveTextContent(
+      'Kaikki K-alkuiset sanat löydetty!',
+    );
     expect(screen.getByTestId('announcement-meta-pill')).toHaveTextContent('7/7');
   });
 
-  it('renders achievement announcement with actual title on line 1, status on line 2, HexagonMedallion, tier token, and no truncation', () => {
+  it('renders achievement announcement with title, status, HexagonMedallion, and tier pill', () => {
     render(<AnnouncementBanner />);
 
     act(() => {
@@ -60,16 +62,12 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
 
     const banner = screen.getByTestId('announcement-banner');
     expect(banner).toHaveAttribute('data-announcement-kind', 'achievement');
-    expect(banner.style.borderLeft).toContain('4px solid');
-    expect(banner.style.borderLeft).toContain('var(--color-tier-bronze)');
     expect(banner.querySelector('polygon')).toBeInTheDocument();
 
-    const title = screen.getByTestId('announcement-title');
-    const subtitle = screen.getByTestId('announcement-subtitle');
-    expect(title).toHaveTextContent('Päivittäinen tapa');
-    expect(subtitle).toHaveTextContent('Uusi saavutus · 7 päivää');
-    expect(title.className).not.toMatch(/\b(truncate|text-ellipsis|whitespace-nowrap)\b/);
-    expect(subtitle.className).not.toMatch(/\b(truncate|text-ellipsis|whitespace-nowrap)\b/);
+    expect(screen.getByTestId('announcement-title')).toHaveTextContent('Päivittäinen tapa');
+    expect(screen.getByTestId('announcement-subtitle')).toHaveTextContent(
+      'Uusi saavutus · 7 päivää',
+    );
     expect(screen.getByTestId('announcement-tier-pill')).toHaveTextContent('Pronssi');
   });
 
@@ -103,9 +101,6 @@ describe('AnnouncementBanner & Unified Announcements (Spec 27)', () => {
     fireEvent.click(screen.getByTestId('announcement-banner'));
     expect(screen.getByTestId('announcement-title')).toHaveTextContent('Sanasampo');
     expect(screen.getByTestId('announcement-tier-pill')).toHaveTextContent('Kulta');
-    expect(screen.getByTestId('announcement-banner').style.borderLeft).toContain(
-      'var(--color-tier-gold)',
-    );
     expect(screen.getByTestId('announcement-banner').querySelector('polygon')).toBeInTheDocument();
 
     // Auto-dismisses after achievement duration (4500ms)

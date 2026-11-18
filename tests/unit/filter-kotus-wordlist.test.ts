@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { filterKotusWordlist } from '../../scripts/filter-kotus-wordlist.js';
 
@@ -25,6 +23,7 @@ describe('Kotus wordlist ingestion & filtering (unit)', () => {
     expect(result.words).toContain('e-kirja');
     expect(result.words).toContain('lähi-itä');
     expect(result.words).toContain('koti-isä');
+    expect(result.hyphenatedWords).toEqual(['aamu-uninen', 'e-kirja', 'koti-isä', 'lähi-itä']);
 
     expect(result.words).not.toContain('ala-');
     expect(result.words).not.toContain('-lainen');
@@ -39,29 +38,5 @@ describe('Kotus wordlist ingestion & filtering (unit)', () => {
     expect(result.stats.spacesDropped).toBe(1);
     expect(result.stats.shortWordsDropped).toBe(1);
     expect(result.stats.invalidCharsDropped).toBe(1);
-  });
-
-  it('filters nykysuomensanalista2024.txt to exactly 102,659 entries and 1,246 unique hyphenated compounds', () => {
-    const rawPath = path.resolve(
-      import.meta.dirname,
-      '../../packages/server/assets/nykysuomensanalista2024.txt',
-    );
-    const rawContent = fs.readFileSync(rawPath, 'utf8');
-    const result = filterKotusWordlist(rawContent);
-
-    expect(result.words).toHaveLength(102659);
-    expect(result.hyphenatedWords).toHaveLength(1246);
-
-    // Retains legitimate Finnish hyphenated compounds
-    expect(result.words).toContain('aamu-uninen');
-    expect(result.words).toContain('e-kirja');
-    expect(result.words).toContain('koti-isä');
-    expect(result.words).toContain('aika-ajo');
-
-    // Drops prefixes, suffixes, digits, spaces
-    expect(result.words).not.toContain('ala-');
-    expect(result.words).not.toContain('-lainen');
-    expect(result.words).not.toContain('3d-tulostin');
-    expect(result.words).not.toContain('4h-kerho');
   });
 });

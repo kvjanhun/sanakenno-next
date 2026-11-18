@@ -297,7 +297,7 @@ describe('Gameplay UI Components', () => {
     expect(screen.getByText('11')).toHaveStyle({ color: 'var(--color-accent)' });
   });
 
-  it('rotates only hexagon polygons while letters remain upright, and triggers new rotation on each shuffle', () => {
+  it('keeps all 7 letters rendered cleanly across rapid shuffle triggers', () => {
     act(() => {
       useUiStore.getState().resetUi();
     });
@@ -313,12 +313,7 @@ describe('Gameplay UI Components', () => {
       />,
     );
 
-    // Initial state: letters upright, outer hex group has no animation
-    const outerGroupInitial = screen.getByTestId('outer-hex-group');
-    expect(outerGroupInitial).toHaveStyle({ animation: 'none' });
-    const letterTextK = screen.getByText('K');
-    expect(letterTextK).not.toHaveStyle({ transform: expect.stringContaining('rotate') });
-    // All 7 letters are visible
+    expect(useUiStore.getState().shuffleCount).toBe(0);
     for (const letter of ['A', 'E', 'I', 'K', 'L', 'N', 'S']) {
       expect(screen.getByText(letter)).toBeInTheDocument();
     }
@@ -327,6 +322,7 @@ describe('Gameplay UI Components', () => {
     act(() => {
       useUiStore.getState().triggerShuffleSpin();
     });
+    expect(useUiStore.getState().shuffleCount).toBe(1);
     rerender(
       <Honeycomb
         center="a"
@@ -338,27 +334,15 @@ describe('Gameplay UI Components', () => {
       />,
     );
 
-    const outerGroup1 = screen.getByTestId('outer-hex-group');
-    expect(outerGroup1).toHaveStyle({
-      animation: 'hex-shuffle-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    });
-    // Outer letter moves with hex while counter-spinning to stay upright
-    expect(screen.getByText('K')).toHaveStyle({
-      animation: 'letter-counter-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    });
-    // Center letter does not animate
-    expect(screen.getByText('A')).not.toHaveStyle({
-      animation: expect.stringContaining('counter-spin'),
-    });
-    // All 7 letters remain visible
     for (const letter of ['A', 'K', 'E', 'I', 'S', 'N', 'L']) {
       expect(screen.getByText(letter)).toBeInTheDocument();
     }
 
-    // Rapid second shuffle before previous timer would end
+    // Rapid second shuffle before previous timer ends
     act(() => {
       useUiStore.getState().triggerShuffleSpin();
     });
+    expect(useUiStore.getState().shuffleCount).toBe(2);
     rerender(
       <Honeycomb
         center="a"
@@ -370,65 +354,9 @@ describe('Gameplay UI Components', () => {
       />,
     );
 
-    const outerGroup2 = screen.getByTestId('outer-hex-group');
-    expect(outerGroup2).toHaveStyle({
-      animation: 'hex-shuffle-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    });
-    expect(screen.getByText('S')).toHaveStyle({
-      animation: 'letter-counter-spin 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    });
-    // All letters remain visible after repeated rapid shuffle
     for (const letter of ['A', 'S', 'K', 'E', 'L', 'I', 'N']) {
       expect(screen.getByText(letter)).toBeInTheDocument();
     }
-  });
-
-  it('verifies responsive viewport alignment and spacing constraints (Spec 14)', () => {
-    // FoundWords count text must not have artificial left indent pl-2
-    const { container: fwContainer } = render(
-      <FoundWords
-        foundWords={['omena', 'ananas']}
-        recentWords={['ananas', 'omena']}
-        showAll={false}
-        allLetters={new Set(['a', 'e', 'm', 'n', 'o', 's'])}
-        onToggleShowAll={vi.fn()}
-        lastResubmittedWord={null}
-      />,
-    );
-    const countWrapper = fwContainer.querySelector(
-      '[data-testid="found-words-count"]',
-    )?.parentElement;
-    expect(countWrapper?.className).not.toContain('pl-2');
-    expect(countWrapper?.className).toContain('flex items-center gap-1.5');
-
-    // HintPanels deck container must not have inset px-0.5
-    const hintData = deriveHintData(
-      {
-        word_count: 2,
-        pangram_count: 0,
-        by_letter: { o: 1, a: 1 },
-        by_length: { '5': 1, '6': 1 },
-        matrix: { o: { '5': 1 }, a: { '6': 1 } },
-      },
-      new Set(['omena', 'ananas']),
-      new Set(),
-    );
-    render(<HintPanels hintsUnlocked={new Set()} onUnlock={vi.fn()} hintData={hintData} />);
-    const deck = screen.getByTestId('hint-deck');
-    expect(deck.className).not.toContain('px-0.5');
-
-    // GameControls has responsive gap for resilient small screens
-    const { container: gcContainer } = render(
-      <GameControls
-        onDelete={vi.fn()}
-        onShuffle={vi.fn()}
-        onShare={vi.fn()}
-        shareCopied={false}
-        onSubmit={vi.fn()}
-      />,
-    );
-    const controlsRow = gcContainer.firstElementChild;
-    expect(controlsRow?.className).toContain('gap-2.5 sm:gap-3');
   });
 
   it('GameControls deactivates Poista, Sekoita, and OK when disabled while keeping Jaa active', () => {

@@ -4,6 +4,11 @@ import {
   resetInitPlayerRateLimit,
   resetTransferCreateRateLimit,
 } from '../../packages/server/src/features/player-auth/player-auth.routes.js';
+import {
+  DEFAULT_SEED_WORDS,
+  invalidatePuzzleCache,
+  setWordlist,
+} from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Player Auth & Sync Hardening (Spec 29)', () => {
@@ -13,6 +18,7 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
     resetInitPlayerRateLimit();
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
+    setWordlist([...DEFAULT_SEED_WORDS, 'kissa']);
     harness = createTestHarness();
 
     await harness.db
@@ -25,6 +31,8 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
     resetInitPlayerRateLimit();
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
+    setWordlist(DEFAULT_SEED_WORDS);
+    invalidatePuzzleCache();
     await harness.destroy();
   });
 

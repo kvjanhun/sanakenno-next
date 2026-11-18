@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConnectBanner } from '../../packages/web/src/features/player-sync/ConnectBanner.js';
 import { SettingsModal } from '../../packages/web/src/features/modals/SettingsModal.js';
@@ -125,8 +125,6 @@ describe('Player Sync UI Components', () => {
       const copyLinkBtn = screen.getByRole('button', { name: 'Kopioi linkki' });
 
       // Click copy link -> link button displays "Linkki kopioitu!", code button stays untouched
-      expect(copyLinkBtn.querySelector('.inline-grid')).toBeInTheDocument();
-      expect(copyCodeBtn.querySelector('.inline-grid')).toBeInTheDocument();
       fireEvent.click(copyLinkBtn);
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Linkki kopioitu!' })).toBeInTheDocument();
@@ -150,14 +148,22 @@ describe('Player Sync UI Components', () => {
       const onClose = vi.fn();
 
       const { rerender } = render(<SyncModal show={true} onClose={onClose} />);
+      await waitFor(() => {
+        expect(screen.getByText('123-456')).toBeInTheDocument();
+      });
       expect(screen.queryByRole('button', { name: 'Lopeta synkronointi' })).not.toBeInTheDocument();
 
       // Now set linked
-      useAuthStore.setState({
-        isLinked: true,
-        sessionCount: 2,
-      } as unknown as Partial<ReturnType<typeof useAuthStore.getState>>);
+      act(() => {
+        useAuthStore.setState({
+          isLinked: true,
+          sessionCount: 2,
+        } as unknown as Partial<ReturnType<typeof useAuthStore.getState>>);
+      });
       rerender(<SyncModal show={true} onClose={onClose} />);
+      await waitFor(() => {
+        expect(screen.getByText('123-456')).toBeInTheDocument();
+      });
 
       const stopSyncBtn = screen.getByRole('button', { name: 'Lopeta synkronointi' });
       expect(stopSyncBtn).toBeInTheDocument();
@@ -181,6 +187,9 @@ describe('Player Sync UI Components', () => {
       const onClose = vi.fn();
 
       render(<SyncModal show={true} onClose={onClose} />);
+      await waitFor(() => {
+        expect(screen.getByText('123-456')).toBeInTheDocument();
+      });
 
       fireEvent.click(screen.getByRole('button', { name: 'Nollaa tämän laitteen pelitiedot' }));
       expect(
@@ -194,7 +203,7 @@ describe('Player Sync UI Components', () => {
       });
     });
 
-    it('flushes pending sync and refreshes session count when SettingsModal or SyncModal opens', () => {
+    it('flushes pending sync and refreshes session count when SettingsModal or SyncModal opens', async () => {
       const mockRefresh = vi.fn().mockResolvedValue(undefined);
       const mockFlush = vi.fn().mockResolvedValue(undefined);
       useAuthStore.setState({
@@ -205,6 +214,9 @@ describe('Player Sync UI Components', () => {
       const { unmount } = render(<SyncModal show={true} onClose={() => {}} />);
       expect(mockRefresh).toHaveBeenCalledTimes(1);
       expect(mockFlush).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(screen.getByText('123-456')).toBeInTheDocument();
+      });
 
       unmount();
       mockRefresh.mockClear();

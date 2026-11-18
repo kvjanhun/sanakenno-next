@@ -4,6 +4,11 @@ import {
   resetEmailRateLimit,
   resetTransferCreateRateLimit,
 } from '../../packages/server/src/features/player-auth/player-auth.routes.js';
+import {
+  DEFAULT_SEED_WORDS,
+  invalidatePuzzleCache,
+  setWordlist,
+} from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 function sha256(input: string): string {
@@ -16,6 +21,7 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
   beforeEach(async () => {
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
+    setWordlist([...DEFAULT_SEED_WORDS, 'aasi', 'kissa']);
     harness = createTestHarness();
 
     await harness.db
@@ -30,6 +36,8 @@ describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
   afterEach(async () => {
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
+    setWordlist(DEFAULT_SEED_WORDS);
+    invalidatePuzzleCache();
     await harness.destroy();
   });
 

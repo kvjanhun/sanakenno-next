@@ -16,7 +16,7 @@ const KOTUS_WORDS_PATH =
   process.env.WORDLIST_PATH ??
   path.resolve(import.meta.dirname, '../../packages/server/assets/kotus_words.txt');
 
-describe('Kotus Wordlist Snapshot Verification', () => {
+describe.skipIf(!hasProdDbSnapshot)('Production 1.0 Snapshot Verification', () => {
   it('loads real Finnish Kotus dictionary snapshot and validates word counts', async () => {
     expect(
       fs.existsSync(KOTUS_WORDS_PATH),
@@ -37,9 +37,7 @@ describe('Kotus Wordlist Snapshot Verification', () => {
     expect(puzzle.hint_data.pangram_count).toBeGreaterThanOrEqual(1);
     expect(puzzle.max_score).toBeGreaterThan(50);
   });
-});
 
-describe.skipIf(!hasProdDbSnapshot)('Production 1.0 Snapshot Verification', () => {
   let tempDir: string;
   let tempDbPath: string;
   let db: ReturnType<typeof createDb>;

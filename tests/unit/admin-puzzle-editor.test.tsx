@@ -298,5 +298,100 @@ describe('Admin Puzzle Editor UI Components', () => {
         ).toBeInTheDocument();
       });
     });
+
+    it('handles center selection save and requires_force confirmation retry', async () => {
+      mockAdminGetSlots.mockResolvedValue({
+        slots: [{ slot: 5, display_number: 1 }],
+        active_slots: [5],
+        total_puzzles: 1,
+        today_slot: 5,
+      });
+
+      mockAdminGetPuzzleVariations.mockResolvedValue({
+        slot: 5,
+        display_number: 1,
+        total_puzzles: 1,
+        prev_slot: null,
+        next_slot: null,
+        letters: ['a', 'e', 'i', 'k', 'l', 'n', 's'],
+        center: 'a',
+        variations: sampleVariations,
+        is_active: true,
+      });
+
+      mockAdminPreview.mockResolvedValue({
+        words: ['kala', 'kansa'],
+        max_score: 20,
+        word_count: 2,
+        pangram_count: 1,
+        hint_data: { word_count: 2, pangram_count: 1 },
+        variations: [],
+      });
+
+      const forceError = new Error('Pelissä on alle 15 sanaa') as Error & {
+        requires_force?: boolean;
+      };
+      forceError.requires_force = true;
+
+      mockAdminSavePuzzle
+        .mockResolvedValueOnce({
+          status: 'saved',
+          slot: 5,
+          display_number: 1,
+          total_puzzles: 1,
+        })
+        .mockRejectedValueOnce(forceError)
+        .mockResolvedValueOnce({
+          status: 'saved',
+          slot: 5,
+          display_number: 1,
+          total_puzzles: 1,
+        });
+
+      render(<PuzzleEditor />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Peli 1 / 1')).toBeInTheDocument();
+      });
+
+      // Change variation center and save dirty change
+      fireEvent.click(screen.getByTitle('Valitse K keskuskirjaimeksi'));
+      expect(screen.getByText('Muutoksia')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Tallenna muutokset' }));
+
+      await waitFor(() => {
+        expect(mockAdminSavePuzzle).toHaveBeenNthCalledWith(1, 'test-csrf', {
+          slot: 5,
+          letters: 'a,e,i,k,l,n,s',
+          center: 'k',
+          force: false,
+        });
+        expect(screen.getByText('Peli tallennettu onnistuneesti!')).toBeInTheDocument();
+      });
+
+      // Submit manual puzzle that triggers requires_force, then confirm override
+      fireEvent.change(screen.getByLabelText(/Kirjaimet/i), {
+        target: { value: 'a,e,i,k,l,n,s' },
+      });
+      fireEvent.change(screen.getByLabelText(/Keskuskirjain/i), {
+        target: { value: 'e' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Tallenna peli' }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Pelissä on alle 15 sanaa');
+      });
+
+      const forceBtn = screen.getByRole('button', { name: 'Luo silti (Ohita varoitus)' });
+      fireEvent.click(forceBtn);
+
+      await waitFor(() => {
+        expect(mockAdminSavePuzzle).toHaveBeenNthCalledWith(3, 'test-csrf', {
+          letters: 'a,e,i,k,l,n,s',
+          center: 'e',
+          force: true,
+        });
+      });
+    });
   });
 });

@@ -151,6 +151,17 @@ describe('Architectural Fitness Guardrails', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps pinch-to-zoom enabled in packages/web/index.html viewport meta tag', () => {
+    const html = fs.readFileSync(path.join(ROOT, 'packages/web/index.html'), 'utf8');
+    const viewportMatch = html.match(/<meta\s+name="viewport"\s+content="([^"]+)"/i);
+    expect(viewportMatch).not.toBeNull();
+    const content = viewportMatch![1]!;
+    expect(content).not.toContain('user-scalable=no');
+    expect(content).not.toContain('maximum-scale=1.0');
+    expect(content).toContain('width=device-width');
+    expect(content).toContain('initial-scale=1.0');
+  });
+
   it('keeps @sanakenno/shared pure (no server/web imports, no Node/DOM/storage I/O)', () => {
     const sharedFiles = walkFiles(path.join(ROOT, 'packages/shared/src'), ['.ts']);
     const violations: string[] = [];

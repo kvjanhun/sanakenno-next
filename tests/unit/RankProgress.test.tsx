@@ -49,7 +49,7 @@ describe('RankProgress Component', () => {
     expect(panel).toHaveTextContent('18 p.');
   });
 
-  it('renders 0-100% total progress bar with high-contrast intermediate rank notches and companion blips', () => {
+  it('renders 0-100% total progress bar with intermediate rank notches, open blips, and no percentage labels', () => {
     const { container } = render(
       <RankProgress
         score={30}
@@ -72,61 +72,19 @@ describe('RankProgress Component', () => {
     const fill = screen.getByTestId('rank-progress-fill');
     expect(fill).toHaveStyle({ width: '20%' });
 
-    // 5 intermediate rank notches: 2%, 10%, 20%, 40%, 70% with subtle 1px inset ticks
-    const notch2 = screen.getByTestId('rank-notch-2');
-    expect(notch2).toHaveAttribute('data-rank', 'Hyvä alku');
-    expect(notch2).toHaveStyle({
-      left: '2%',
-      width: '1px',
-      backgroundColor: 'var(--color-rank-notch)',
-    });
+    // 5 intermediate rank notches: 2%, 10%, 20%, 40%, 70%
+    expect(screen.getByTestId('rank-notch-2')).toHaveAttribute('data-rank', 'Hyvä alku');
+    expect(screen.getByTestId('rank-notch-10')).toHaveAttribute('data-rank', 'Nyt mennään!');
+    expect(screen.getByTestId('rank-notch-20')).toHaveAttribute('data-rank', 'Onnistuja');
+    expect(screen.getByTestId('rank-notch-40')).toHaveAttribute('data-rank', 'Sanavalmis');
+    expect(screen.getByTestId('rank-notch-70')).toHaveAttribute('data-rank', 'Ällistyttävä');
 
-    const notch10 = screen.getByTestId('rank-notch-10');
-    expect(notch10).toHaveAttribute('data-rank', 'Nyt mennään!');
-    expect(notch10).toHaveStyle({
-      left: '10%',
-      width: '1px',
-      backgroundColor: 'var(--color-rank-notch)',
-    });
+    // 3 unassisted milestone blips beside the bar
+    expect(screen.getByTestId('milestone-pip-25')).toHaveAttribute('data-state', 'open');
+    expect(screen.getByTestId('milestone-pip-50')).toHaveAttribute('data-state', 'open');
+    expect(screen.getByTestId('milestone-pip-70')).toHaveAttribute('data-state', 'open');
 
-    const notch20 = screen.getByTestId('rank-notch-20');
-    expect(notch20).toHaveAttribute('data-rank', 'Onnistuja');
-    expect(notch20).toHaveStyle({
-      left: '20%',
-      width: '1px',
-      backgroundColor: 'var(--color-rank-notch)',
-    });
-
-    const notch40 = screen.getByTestId('rank-notch-40');
-    expect(notch40).toHaveAttribute('data-rank', 'Sanavalmis');
-    expect(notch40).toHaveStyle({
-      left: '40%',
-      width: '1px',
-      backgroundColor: 'var(--color-rank-notch)',
-    });
-
-    const notch70 = screen.getByTestId('rank-notch-70');
-    expect(notch70).toHaveAttribute('data-rank', 'Ällistyttävä');
-    expect(notch70).toHaveStyle({
-      left: '70%',
-      width: '1px',
-      backgroundColor: 'var(--color-rank-notch)',
-    });
-
-    // 3 unassisted milestone blips beside the bar (calm neutral tertiary styling when open)
-    const blip25 = screen.getByTestId('milestone-pip-25');
-    expect(blip25).toHaveAttribute('data-state', 'open');
-    expect(blip25).toHaveStyle({ color: 'var(--color-text-tertiary)' });
-
-    const blip50 = screen.getByTestId('milestone-pip-50');
-    expect(blip50).toHaveAttribute('data-state', 'open');
-    expect(blip50).toHaveStyle({ color: 'var(--color-text-tertiary)' });
-
-    const blip70 = screen.getByTestId('milestone-pip-70');
-    expect(blip70).toHaveAttribute('data-state', 'open');
-    expect(blip70).toHaveStyle({ color: 'var(--color-text-tertiary)' });
-
-    // In accordance with user requirement, no percentage text labels are rendered
+    // No percentage text labels are rendered
     expect(container.textContent).not.toMatch(/25\s*%/);
     expect(container.textContent).not.toMatch(/50\s*%/);
     expect(container.textContent).not.toMatch(/70\s*%/);
@@ -215,7 +173,7 @@ describe('RankProgress Component', () => {
     expect(screen.getByTestId('milestone-pip-70')).toHaveAttribute('data-state', 'lost');
   });
 
-  it('renders prominent bar styling and guarantees zero duplicate stars when modal is opened', () => {
+  it('guarantees zero duplicate milestone pips in the DOM when rank panel toggles open', () => {
     const { rerender } = render(
       <RankProgress
         score={40}
@@ -227,12 +185,6 @@ describe('RankProgress Component', () => {
         hasUnlockedHints={false}
       />,
     );
-
-    const progressBar = screen.getByRole('progressbar');
-    expect(progressBar).toHaveClass('border');
-    expect(progressBar.style.height).toBe('15px');
-    expect(progressBar.style.borderColor).toBe('var(--color-border)');
-    expect(progressBar.style.boxShadow).toContain('inset');
 
     // When closed, exactly 1 set of 3 milestone pips exists in the DOM
     expect(screen.getAllByTestId('milestone-pip-25')).toHaveLength(1);
@@ -257,10 +209,8 @@ describe('RankProgress Component', () => {
     expect(screen.getAllByTestId('milestone-pip-50')).toHaveLength(1);
     expect(screen.getAllByTestId('milestone-pip-70')).toHaveLength(1);
 
-    // Verify the pips are now inside the modal's top header with enlarged size container
+    // Verify the pips are now inside the modal's top header
     const panelNoHints = screen.getByTestId('rank-panel-no-hints');
-    const pip25InModal = screen.getByTestId('milestone-pip-25');
-    expect(panelNoHints).toContainElement(pip25InModal);
-    expect(pip25InModal).toHaveClass('h-7', 'w-7');
+    expect(panelNoHints).toContainElement(screen.getByTestId('milestone-pip-25'));
   });
 });

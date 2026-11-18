@@ -3,13 +3,20 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDb } from '../../packages/server/src/db/connection.js';
-import { getWordlist } from '../../packages/server/src/features/puzzle/wordlist.js';
+import {
+  DEFAULT_SEED_WORDS,
+  getWordlist,
+  invalidatePuzzleCache,
+  setWordlist,
+} from '../../packages/server/src/features/puzzle/wordlist.js';
 import { ensureBootSeed, shutdownServer } from '../../packages/server/src/index.js';
 
 describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
   const tempFiles: string[] = [];
 
   afterEach(() => {
+    setWordlist(DEFAULT_SEED_WORDS);
+    invalidatePuzzleCache();
     for (const file of tempFiles.splice(0)) {
       for (const suffix of ['', '-wal', '-shm']) {
         const target = `${file}${suffix}`;
@@ -21,6 +28,7 @@ describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
   });
 
   it('auto-seeds empty development database and skips once puzzles exist or in production', async () => {
+    setWordlist(DEFAULT_SEED_WORDS);
     const db = createDb(':memory:');
     try {
       const prodSkipped = await ensureBootSeed(db, { NODE_ENV: 'production' });
@@ -28,7 +36,7 @@ describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
 
       const devSeeded = await ensureBootSeed(db, { NODE_ENV: 'development' });
       expect(devSeeded).toBe(true);
-      expect(getWordlist().size).toBeGreaterThan(1000);
+      expect(getWordlist().size).toBe(DEFAULT_SEED_WORDS.length);
 
       const countRow = await db
         .selectFrom('puzzles')
