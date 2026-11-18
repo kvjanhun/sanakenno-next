@@ -40,14 +40,15 @@ export function gatherLocalData(): {
     if (!raw) continue;
     try {
       const saved = JSON.parse(raw) as PersistedPuzzleState;
+      const hintsUnlocked = filterVisibleHintIds(saved.hintsUnlocked ?? []);
       puzzle_states.push({
         puzzle_number: record.puzzle_number,
         found_words: saved.foundWords ?? [],
         score: saved.score ?? 0,
-        hints_unlocked: filterVisibleHintIds(saved.hintsUnlocked ?? []),
+        hints_unlocked: hintsUnlocked,
         started_at: saved.startedAt ?? 0,
         total_paused_ms: saved.totalPausedMs ?? 0,
-        score_before_hints: saved.scoreBeforeHints ?? null,
+        score_before_hints: hintsUnlocked.length > 0 ? (saved.scoreBeforeHints ?? null) : null,
       });
     } catch {
       // Ignore unparseable state.
@@ -216,7 +217,9 @@ export function pushLocalDataAheadOfServer(
         started_at: localState?.started_at ?? 0,
         total_paused_ms: localState?.total_paused_ms ?? 0,
         score_before_hints:
-          localState?.score_before_hints ?? localRecord?.best_no_hint_score ?? null,
+          localState && localState.hints_unlocked.length > 0
+            ? (localState.score_before_hints ?? localRecord?.best_no_hint_score ?? null)
+            : null,
         max_score: localRecord?.max_score ?? serverRecord?.max_score ?? 100,
         best_no_hint_score: localRecord?.best_no_hint_score,
         is_daily: localRecord?.is_daily,

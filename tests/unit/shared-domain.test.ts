@@ -303,6 +303,32 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
       expect(mergedState.total_paused_ms).toBe(500);
       expect(mergedState.score_before_hints).toBe(1);
       expect(isPuzzleStateBetterThanServer(localState, serverState)).toBe(true);
+
+      // Stale non-null score_before_hints on a hintless state must not override real hint score or persist
+      const pollutedHintless: SyncPuzzleState = {
+        puzzle_number: 6,
+        found_words: ['kana'],
+        score: 1,
+        hints_unlocked: [],
+        started_at: 1000,
+        total_paused_ms: 0,
+        score_before_hints: 1,
+      };
+      const withHints: SyncPuzzleState = {
+        puzzle_number: 6,
+        found_words: ['kana', 'kissa'],
+        score: 128,
+        hints_unlocked: ['letters'],
+        started_at: 1000,
+        total_paused_ms: 0,
+        score_before_hints: 88,
+      };
+      expect(mergePuzzleState(pollutedHintless, withHints).score_before_hints).toBe(88);
+      expect(
+        mergePuzzleState(pollutedHintless, { ...pollutedHintless, score_before_hints: null })
+          .score_before_hints,
+      ).toBeNull();
+      expect(isPuzzleStateBetterThanServer(withHints, pollutedHintless)).toBe(true);
     });
   });
 

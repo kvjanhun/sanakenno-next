@@ -98,7 +98,12 @@ export async function readPuzzleState(
   };
 }
 
-function capScoreBeforeHints(val: number | null, score: number): number | null {
+function capScoreBeforeHints(
+  val: number | null,
+  score: number,
+  hintsUnlockedCount: number,
+): number | null {
+  if (hintsUnlockedCount === 0) return null;
   return val !== null ? Math.min(val, score) : null;
 }
 
@@ -127,7 +132,11 @@ export async function mergeAndStorePuzzleState(
       ...incoming,
       found_words: validWords,
       score: recalculatedScore,
-      score_before_hints: capScoreBeforeHints(incoming.score_before_hints, recalculatedScore),
+      score_before_hints: capScoreBeforeHints(
+        incoming.score_before_hints,
+        recalculatedScore,
+        incoming.hints_unlocked.length,
+      ),
     };
   }
 
@@ -139,7 +148,11 @@ export async function mergeAndStorePuzzleState(
     merged = {
       ...mergedRaw,
       score: mergedScore,
-      score_before_hints: capScoreBeforeHints(mergedRaw.score_before_hints, mergedScore),
+      score_before_hints: capScoreBeforeHints(
+        mergedRaw.score_before_hints,
+        mergedScore,
+        mergedRaw.hints_unlocked.length,
+      ),
     };
   }
 

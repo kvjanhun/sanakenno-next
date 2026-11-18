@@ -113,9 +113,72 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
     // 'kana' (1 pt) + 'kissa' (5 pts) = 6 pts; forged words and tampered scores stripped/capped
     expect(data.puzzle_states[0]?.found_words.sort()).toEqual(['kana', 'kissa']);
     expect(data.puzzle_states[0]?.score).toBe(6);
-    expect(data.puzzle_states[0]?.score_before_hints).toBe(6);
+    expect(data.puzzle_states[0]?.score_before_hints).toBeNull();
     expect(data.stats.records[0]?.words_found).toBe(2);
     expect(data.stats.records[0]?.best_score).toBe(6);
+    expect(data.stats.records[0]?.best_no_hint_score).toBe(6);
+  });
+
+  it('preserves updated score_before_hints after an initial hintless offline sync', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as { token: string };
+    const headers = { Authorization: `Bearer ${player.token}` };
+
+    // Simulate an older client pushing 1 pt without hints but with a polluted score_before_hints: 1
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-10',
+          found_words: ['kana'],
+          score: 1,
+          max_score: 100,
+          hints_unlocked: [],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: 1,
+          best_no_hint_score: 1,
+        },
+      },
+      { headers },
+    );
+
+    // Later, player earns more points without hints (kana + kissa = 6), unlocks a hint, then finds kansallinen (total 24)
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-10',
+          found_words: ['kana', 'kissa', 'kansallinen'],
+          score: 24,
+          max_score: 100,
+          hints_unlocked: ['grid'],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: 6,
+          best_no_hint_score: 6,
+        },
+      },
+      { headers },
+    );
+
+    const pullRes = await harness.client.api.player.sync.$get({}, { headers });
+    const data = (await pullRes.json()) as {
+      puzzle_states: Array<{
+        score: number;
+        score_before_hints: number | null;
+      }>;
+      stats: {
+        records: Array<{
+          best_score: number;
+          best_no_hint_score: number;
+        }>;
+      };
+    };
+
+    expect(data.puzzle_states[0]?.score).toBe(24);
+    expect(data.puzzle_states[0]?.score_before_hints).toBe(6);
+    expect(data.stats.records[0]?.best_score).toBe(24);
     expect(data.stats.records[0]?.best_no_hint_score).toBe(6);
   });
 

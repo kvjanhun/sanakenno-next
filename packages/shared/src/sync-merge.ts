@@ -54,8 +54,16 @@ export function mergePuzzleState(local: SyncPuzzleState, server: SyncPuzzleState
   const foundWordsSet = new Set([...local.found_words, ...server.found_words]);
   const hintsSet = new Set([...local.hints_unlocked, ...server.hints_unlocked]);
 
-  const scoreBeforeHints =
-    local.score_before_hints !== null ? local.score_before_hints : server.score_before_hints;
+  let scoreBeforeHints: number | null = null;
+  if (hintsSet.size > 0) {
+    const localScore = local.hints_unlocked.length > 0 ? local.score_before_hints : null;
+    const serverScore = server.hints_unlocked.length > 0 ? server.score_before_hints : null;
+    if (localScore !== null && serverScore !== null) {
+      scoreBeforeHints = Math.max(localScore, serverScore);
+    } else {
+      scoreBeforeHints = localScore ?? serverScore;
+    }
+  }
 
   return {
     puzzle_number: local.puzzle_number,
@@ -110,5 +118,12 @@ export function isPuzzleStateBetterThanServer(
     return true;
   }
   if (local.total_paused_ms > server.total_paused_ms) return true;
-  return local.score_before_hints !== null && server.score_before_hints === null;
+  const localScoreBeforeHints = local.hints_unlocked.length > 0 ? local.score_before_hints : null;
+  const serverScoreBeforeHints =
+    server.hints_unlocked.length > 0 ? server.score_before_hints : null;
+  if (localScoreBeforeHints !== null) {
+    if (serverScoreBeforeHints === null) return true;
+    if (localScoreBeforeHints > serverScoreBeforeHints) return true;
+  }
+  return false;
 }

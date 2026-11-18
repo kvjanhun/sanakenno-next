@@ -275,6 +275,56 @@ describe('Player Sync & Reconcile (Web Store)', () => {
     });
   });
 
+  it('keeps score_before_hints null when pushing offline hintless progress ahead of server', () => {
+    const pushedPayloads: Array<{ score_before_hints: number | null; hints_unlocked: string[] }> =
+      [];
+
+    const localData = {
+      stats: {
+        version: 1 as const,
+        records: [
+          {
+            puzzle_number: 10,
+            date: '2026-11-18',
+            best_rank: 'Hyvä alku',
+            best_score: 1,
+            max_score: 150,
+            words_found: 1,
+            hints_used: 0,
+            elapsed_ms: 5000,
+            pangrams_found: 0,
+            best_no_hint_score: 1,
+          },
+        ],
+      },
+      puzzle_states: [
+        {
+          puzzle_number: 10,
+          found_words: ['kana'],
+          score: 1,
+          hints_unlocked: [],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: null,
+        },
+      ],
+    };
+
+    const res = pushLocalDataAheadOfServer(
+      localData,
+      { stats: { version: 1, records: [] }, puzzle_states: [] },
+      {
+        syncProgress: async (p) => {
+          pushedPayloads.push(p);
+        },
+      },
+    );
+
+    expect(res.pushedPuzzles).toBe(1);
+    expect(pushedPayloads[0]?.hints_unlocked).toEqual([]);
+    expect(pushedPayloads[0]?.score_before_hints).toBeNull();
+  });
+
   it('logout preserves local progress by default or with clearLocalProgress: false', async () => {
     saveToStorage(STATS_STORAGE_KEY, { records: [{ puzzle_number: 1 }] });
     saveToStorage(puzzleStateKey(1), { foundWords: ['kana'] });
