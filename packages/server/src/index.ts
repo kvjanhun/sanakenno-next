@@ -2,10 +2,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import type { Kysely } from 'kysely';
-import { checkpointAndDestroyDb, createDb, hasAnyPuzzles } from './db/connection.js';
+import { checkpointAndDestroyDb, hasAnyPuzzles, initDb, type DbEngine } from './db/connection.js';
 import type { Database } from './db/schema.js';
 import { seedDatabase } from './db/seed.js';
-import { createServerApp } from './edge-middleware.js';
+import { createMaintenanceApp, createServerApp } from './edge-middleware.js';
 
 interface ClosableServer {
   close: (callback?: (err?: Error) => void) => unknown;
@@ -42,18 +42,21 @@ export async function ensureBootSeed(
 }
 
 /**
- * Gracefully stop HTTP traffic, flush SQLite WAL frames, and close the database connection.
+ * Gracefully stop HTTP traffic, flush SQLite WAL frames (when local), and close the database connection.
  */
 export async function shutdownServer(
   server: ClosableServer | null,
-  db: Kysely<Database>,
+  db: Kysely<Database> | null,
+  engine: DbEngine = 'kysely-sqlite',
 ): Promise<void> {
   if (server) {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
   }
-  await checkpointAndDestroyDb(db);
+  if (db) {
+    await checkpointAndDestroyDb(db, engine);
+  }
 }
 
 const isMain =
@@ -62,19 +65,35 @@ const isMain =
 
 if (isMain) {
   const port = Number(process.env.PORT ?? 3001);
-  const db = createDb();
-  await ensureBootSeed(db, process.env);
 
-  const app = createServerApp(db);
-  const server = serve({
-    fetch: app.fetch,
-    port,
-  });
+  if (process.env.MAINTENANCE_MODE === 'true') {
+    const app = createMaintenanceApp();
+    const server = serve({
+      fetch: app.fetch,
+      port,
+    });
 
-  const handleSignal = () => {
-    void shutdownServer(server, db).finally(() => process.exit(0));
-  };
+    const handleSignal = () => {
+      void shutdownServer(server, null).finally(() => process.exit(0));
+    };
 
-  process.once('SIGTERM', handleSignal);
-  process.once('SIGINT', handleSignal);
+    process.once('SIGTERM', handleSignal);
+    process.once('SIGINT', handleSignal);
+  } else {
+    const { db, engine } = await initDb(process.env);
+    await ensureBootSeed(db, process.env);
+
+    const app = createServerApp(db, undefined, engine);
+    const server = serve({
+      fetch: app.fetch,
+      port,
+    });
+
+    const handleSignal = () => {
+      void shutdownServer(server, db, engine).finally(() => process.exit(0));
+    };
+
+    process.once('SIGTERM', handleSignal);
+    process.once('SIGINT', handleSignal);
+  }
 }

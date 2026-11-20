@@ -4,6 +4,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono, type MiddlewareHandler } from 'hono';
 import type { Kysely } from 'kysely';
 import { createApp } from './app.js';
+import type { DbEngine } from './db/connection.js';
 import type { Database } from './db/schema.js';
 
 export const CANONICAL_ORIGIN = 'https://sanakenno.fi';
@@ -52,7 +53,10 @@ export const edgeMiddleware: MiddlewareHandler = async (c, next) => {
 
   await next();
 
-  if (c.req.path === '/sw.js' || c.req.path === '/' || c.req.path === '/index.html') {
+  if (
+    c.res.status < 500 &&
+    (c.req.path === '/sw.js' || c.req.path === '/' || c.req.path === '/index.html')
+  ) {
     c.header('Cache-Control', 'no-cache');
   } else if (c.req.path === '/manifest.webmanifest') {
     c.header('Content-Type', 'application/manifest+json');
@@ -93,6 +97,68 @@ function resolveCommitSha(staticDir: string | null): string {
   return envCommit && envCommit.length > 0 ? envCommit : 'unknown';
 }
 
+const MAINTENANCE_API_ERROR = 'Huoltokatko käynnissä. Yritä hetken kuluttua uudelleen.';
+
+const MAINTENANCE_HTML = `<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sanakenno — Huoltokatko</title>
+    <style>
+      body { font-family: system-ui, -apple-system, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #faf8f5; color: #1f2937; padding: 1.5rem; }
+      main { max-width: 28rem; text-align: center; }
+      h1 { font-size: 1.5rem; margin: 0 0 0.75rem; }
+      p { line-height: 1.5; margin: 0; color: #4b5563; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sanakenno on huoltokatkolla</h1>
+      <p>${MAINTENANCE_API_ERROR}</p>
+    </main>
+  </body>
+</html>`;
+
+/**
+ * Create a database-free maintenance Hono application for zero-write-overlap cutovers.
+ */
+export function createMaintenanceApp(staticDir: string | null = findStaticDir()): Hono {
+  const app = new Hono();
+  app.use('*', edgeMiddleware);
+
+  app.get('/api/health', (c) => {
+    c.header('Cache-Control', 'no-store');
+    return c.json({ status: 'maintenance' }, 200);
+  });
+
+  app.get('/commit.txt', (c) => {
+    c.header('Cache-Control', 'no-store');
+    c.header('Content-Type', 'text/plain; charset=utf-8');
+    return c.text(resolveCommitSha(staticDir), 200);
+  });
+
+  app.all('/api/*', (c) => {
+    c.header('Retry-After', '120');
+    c.header('Cache-Control', 'no-store');
+    return c.json({ error: MAINTENANCE_API_ERROR }, 503);
+  });
+
+  app.all('/api', (c) => {
+    c.header('Retry-After', '120');
+    c.header('Cache-Control', 'no-store');
+    return c.json({ error: MAINTENANCE_API_ERROR }, 503);
+  });
+
+  app.all('*', (c) => {
+    c.header('Retry-After', '120');
+    c.header('Cache-Control', 'no-store');
+    return c.html(MAINTENANCE_HTML, 503);
+  });
+
+  return app;
+}
+
 /**
  * Create the complete production Hono application combining edge middleware,
  * typed `/api/*` routes, and static asset / root SPA serving.
@@ -100,9 +166,10 @@ function resolveCommitSha(staticDir: string | null): string {
 export function createServerApp(
   db: Kysely<Database>,
   staticDir: string | null = findStaticDir(),
+  engine: DbEngine = 'kysely-sqlite',
 ): Hono {
   const app = new Hono();
-  const apiApp = createApp(db);
+  const apiApp = createApp(db, engine);
 
   app.use('*', edgeMiddleware);
   app.route('/', apiApp);

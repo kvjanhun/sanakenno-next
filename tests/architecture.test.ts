@@ -67,10 +67,11 @@ describe('Architectural Fitness Guardrails', () => {
     expect(violations).toEqual([]);
   });
 
-  it('confines Kysely SQL queries and better-sqlite3 to *.queries.ts and src/db/', () => {
+  it('confines Kysely SQL queries, better-sqlite3, and @libsql/client to *.queries.ts and src/db/', () => {
     const serverFiles = walkFiles(path.join(ROOT, 'packages/server/src'), ['.ts']);
     const queryViolations: string[] = [];
     const sqliteImportViolations: string[] = [];
+    const libsqlImportViolations: string[] = [];
 
     for (const file of serverFiles) {
       const rel = path.relative(ROOT, file).replaceAll('\\', '/');
@@ -87,10 +88,15 @@ describe('Architectural Fitness Guardrails', () => {
       if (!isDbLayer && /from\s+['"]better-sqlite3['"]/.test(content)) {
         sqliteImportViolations.push(rel);
       }
+
+      if (!isDbLayer && /from\s+['"]@libsql\/client['"]/.test(content)) {
+        libsqlImportViolations.push(rel);
+      }
     }
 
     expect(queryViolations).toEqual([]);
     expect(sqliteImportViolations).toEqual([]);
+    expect(libsqlImportViolations).toEqual([]);
   });
 
   it('requires method-chained Hono routes in *.routes.ts so AppType RPC inference stays intact', () => {
@@ -171,7 +177,7 @@ describe('Architectural Fitness Guardrails', () => {
       const content = fs.readFileSync(file, 'utf8');
       const codeOnly = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
       const hasForbiddenImport =
-        /from\s+['"](@sanakenno\/(server|web)|better-sqlite3|kysely|hono|react|node:|fs|path|crypto)/.test(
+        /from\s+['"](@sanakenno\/(server|web)|@libsql\/client|better-sqlite3|kysely|hono|react|node:|fs|path|crypto)/.test(
           codeOnly,
         );
       const hasForbiddenGlobal =
@@ -227,7 +233,8 @@ describe('Architectural Fitness Guardrails', () => {
 
       for (const specFile of specFiles) {
         const content = fs.readFileSync(path.join(dir, specFile), 'utf8');
-        const statusRegex = /^Status:\s*(draft|approved|in-progress|ready-for-curation|shipped)$/m;
+        const statusRegex =
+          /^Status:\s*(draft|pending|approved|in-progress|ready-for-curation|shipped)$/m;
         const statusMatch = statusRegex.exec(content);
         expect(statusMatch, `${specFile} must have a valid Status header`).not.toBeNull();
         expect(content, `${specFile} must have a Branch header`).toMatch(

@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+if [ "$MAINTENANCE_MODE" = "true" ]; then
+  echo "[maintenance] Skipping Litestream and starting maintenance server..."
+  exec pnpm --filter @sanakenno/server start
+fi
+
 # If LITESTREAM_BUCKET is configured, manage continuous SQLite replication to GCS
 if [ -n "$LITESTREAM_BUCKET" ]; then
   echo "[litestream] Checking for existing database replica in gs://${LITESTREAM_BUCKET}/db..."

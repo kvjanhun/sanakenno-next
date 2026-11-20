@@ -10,8 +10,12 @@ import {
   type Driver,
   type SqliteDialectConfig,
 } from 'kysely';
+import { runMigrationsAsync } from './async-migrations.js';
 import { BASELINE_SQL, runMigrations } from './baseline-sql.js';
+import { LibsqlDialect } from './libsql-dialect.js';
 import type { Database } from './schema.js';
+
+export type DbEngine = 'kysely-sqlite' | 'kysely-libsql';
 
 export interface ImmediateTransactionOptions {
   maxRetries?: number;
@@ -65,6 +69,42 @@ export function createDb(
   });
 }
 
+/** Open a local SQLite file in read-only mode for verification utilities. */
+export function openReadonlySqlite(dbPath: string): SQLite.Database {
+  return new SQLite(dbPath, { readonly: true });
+}
+
+/** Enable SQLite foreign-key cascade enforcement on the active connection. */
+export async function ensureForeignKeysOn(db: Kysely<Database>): Promise<void> {
+  await sql`PRAGMA foreign_keys = ON`.execute(db);
+}
+
+/**
+ * Initialize either a managed Turso (libSQL) Kysely connection when `TURSO_DATABASE_URL`
+ * is set, or the local `better-sqlite3` database otherwise.
+ */
+export async function initDb(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<{ db: Kysely<Database>; engine: DbEngine }> {
+  const tursoUrl = env.TURSO_DATABASE_URL?.trim();
+  if (tursoUrl) {
+    const db = new Kysely<Database>({
+      dialect: new LibsqlDialect({
+        url: tursoUrl,
+        authToken: env.TURSO_AUTH_TOKEN?.trim() || undefined,
+      }),
+    });
+    await ensureForeignKeysOn(db);
+    await runMigrationsAsync(db);
+    return { db, engine: 'kysely-libsql' };
+  }
+
+  const dbPath =
+    env.DB_PATH ?? (env.DATA_DIR ? path.join(env.DATA_DIR, 'sanakenno.db') : undefined);
+  const db = createDb(dbPath);
+  return { db, engine: 'kysely-sqlite' };
+}
+
 /** Return true if at least one puzzle row exists in SQLite. */
 export async function hasAnyPuzzles(db: Kysely<Database>): Promise<boolean> {
   const row = await db
@@ -74,16 +114,26 @@ export async function hasAnyPuzzles(db: Kysely<Database>): Promise<boolean> {
   return Number(row?.count ?? 0) > 0;
 }
 
-/** Flush SQLite WAL frames to the main database file and destroy the connection pool. */
-export async function checkpointAndDestroyDb(db: Kysely<Database>): Promise<void> {
-  await sql`PRAGMA wal_checkpoint(TRUNCATE)`.execute(db).catch(() => undefined);
+/** Flush SQLite WAL frames to the main database file (when local) and destroy the connection pool. */
+export async function checkpointAndDestroyDb(
+  db: Kysely<Database>,
+  engine: DbEngine = 'kysely-sqlite',
+): Promise<void> {
+  if (engine !== 'kysely-libsql') {
+    await sql`PRAGMA wal_checkpoint(TRUNCATE)`.execute(db).catch(() => undefined);
+  }
   await db.destroy();
 }
 
 function isSqliteBusyError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const code = (error as Error & { code?: unknown }).code;
-  return code === 'SQLITE_BUSY' || error.message.includes('database is locked');
+  return (
+    code === 'SQLITE_BUSY' ||
+    code === 'SQLITE_BUSY_SNAPSHOT' ||
+    error.message.includes('SQLITE_BUSY') ||
+    error.message.includes('database is locked')
+  );
 }
 
 function delay(ms: number): Promise<void> {

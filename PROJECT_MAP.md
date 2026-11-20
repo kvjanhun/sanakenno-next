@@ -14,11 +14,12 @@ sanakenno-next/
   scripts/
     create-admin.ts          # Admin credential provisioning CLI
     deploy-sanakenno.sh      # Server deployment & verification pipeline
-    entrypoint.sh            # Container init & Litestream restore
+    entrypoint.sh            # Container init, MAINTENANCE_MODE bypass & Litestream restore
     filter-kotus-wordlist.ts # Kotus dictionary filtering & hyphenated lemma extractor
     migrate-v1-db.ts         # Standalone 1.0 -> 2.0 SQLite snapshot & backfill migration CLI
     screenshot-targets.ts    # Desktop/mobile screenshot scenario targets & CDP action builders
     screenshot.ts            # Single-CDP headless Chrome screenshot runner with auto server boot
+    verify-turso-parity.ts   # SQLite <-> Turso (libSQL) 18-table & data-invariant parity CLI
   .github/workflows/ci-web.yml# GitHub Actions CI & Cloud Run deploy workflow
   specs/                     # Sequenced specs driving autonomous implementation
     archive/                 # Shipped historical specs (superseded point-in-time slices)
@@ -26,9 +27,9 @@ sanakenno-next/
     shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, achievements, sync-merge, kotus lemma links, share-text, honeycomb-theme, auth-types) & Zod schemas
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer + Cloud Run edge middleware
       src/
-        edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), Google security headers & PWA static serving
+        edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), Google security headers, zero-DB MAINTENANCE_MODE app & PWA static serving
         lib/                 # Shared server utilities (@hono/zod-validator error hook helper)
-        db/                  # 17-table Kysely Database<Schema>, BEGIN IMMEDIATE driver, 0001-0005 migration runner (player_transfer_tickets), 1.0 backfill helper (backfill-stats.ts), deterministic seed
+        db/                  # 17-table Kysely Database<Schema>, dual SQLite (BEGIN IMMEDIATE) & repo-owned Turso/libSQL dialect (libsql-dialect.ts), sync/async 0001-0005 migration runners (async-migrations.ts), 1.0 backfill helper (backfill-stats.ts), deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
           puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
@@ -73,9 +74,9 @@ Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 
 ### 3. Production Runtime & Database Persistence
 
-- Sanakenno runs as a single-instance Google Cloud Run service (`europe-north1`, `--max-instances 1`) backed by SQLite WAL on `/data/sanakenno.db`.
-- Startup (`scripts/entrypoint.sh`) restores the SQLite replica via Litestream (`litestream.yml`, Google Cloud Storage `LITESTREAM_BUCKET`) and continuously replicates WAL segments alongside the Node process (`packages/server/src/index.ts`).
-- `SIGTERM` and `SIGINT` handlers in `packages/server/src/index.ts` close incoming HTTP traffic, run `PRAGMA wal_checkpoint(TRUNCATE)`, and destroy the Kysely pool cleanly before container termination.
+- Sanakenno runs on Google Cloud Run (`europe-north1`, `--max-instances 1`) supporting either local SQLite WAL on `/data/sanakenno.db` (default, `kysely-sqlite`) or managed Turso/libSQL when `TURSO_DATABASE_URL` is configured (`kysely-libsql`).
+- Startup (`scripts/entrypoint.sh`) bypasses Litestream and database boot when `MAINTENANCE_MODE=true` (serving `200` on `/api/health` and `503` Finnish maintenance responses elsewhere); otherwise it restores/replicates SQLite via Litestream (`litestream.yml`, `LITESTREAM_BUCKET`) alongside the Node server (`packages/server/src/index.ts`).
+- `SIGTERM` and `SIGINT` handlers in `packages/server/src/index.ts` close incoming HTTP traffic, run `PRAGMA wal_checkpoint(TRUNCATE)` on local SQLite, and destroy the Kysely pool cleanly before container termination.
 - `GET /commit.txt` serves the stamped `./dist/commit.txt` SHA or `process.env.GIT_COMMIT` for deployment parity verification.
 
 ### 4. Language Convention

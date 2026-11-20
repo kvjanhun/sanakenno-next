@@ -8,7 +8,7 @@
 
 import { createInterface } from 'node:readline';
 import argon2 from 'argon2';
-import { createDb } from '../packages/server/src/db/connection.js';
+import { checkpointAndDestroyDb, initDb } from '../packages/server/src/db/connection.js';
 import {
   createAdminUser,
   getAdminByUsername,
@@ -63,8 +63,13 @@ function prompt(question: string, hidden = false): Promise<string> {
 }
 
 async function main() {
-  const dbPath = process.env.DB_PATH || process.env.DATABASE_PATH || './sanakenno.db';
-  const db = createDb(dbPath);
+  const env: NodeJS.ProcessEnv = process.env.TURSO_DATABASE_URL
+    ? process.env
+    : {
+        ...process.env,
+        DB_PATH: process.env.DB_PATH || process.env.DATABASE_PATH || './sanakenno.db',
+      };
+  const { db, engine } = await initDb(env);
 
   try {
     console.log('--- Luo Sanakenno-ylläpitäjä ---\n');
@@ -104,7 +109,7 @@ async function main() {
     const adminId = await createAdminUser(db, username, hash);
     console.log(`\nYlläpitäjä '${username}' (id: ${adminId}) luotu onnistuneesti!`);
   } finally {
-    await db.destroy();
+    await checkpointAndDestroyDb(db, engine);
   }
 }
 

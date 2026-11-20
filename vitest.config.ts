@@ -8,7 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@sanakenno/shared': path.resolve(import.meta.dirname, 'packages/shared/src/index.ts'),
+      '@libsql/client': path.join(serverNodeModules, '@libsql/client'),
       'better-sqlite3': path.join(serverNodeModules, 'better-sqlite3'),
+      kysely: path.join(serverNodeModules, 'kysely'),
       react: path.join(webNodeModules, 'react'),
       'react-dom': path.join(webNodeModules, 'react-dom'),
       '@tanstack/react-query': path.join(webNodeModules, '@tanstack/react-query'),
