@@ -57,7 +57,7 @@ jobs:
             --source . \
             --region europe-north1 \
             --allow-unauthenticated \
-            --memory 512Mi \
+            --memory 1Gi \
             --cpu 1 \
             --max-instances 1 \
             --set-env-vars LITESTREAM_BUCKET=sanakenno-db-712588936092,BASE_URL=https://sanakenno.fi,SEED_ON_BOOT=false,GIT_COMMIT=${{ github.sha }}
