@@ -1,6 +1,0 @@
-dbs:
-  - path: /data/sanakenno.db
-    replicas:
-      - type: gs
-        bucket: '${LITESTREAM_BUCKET}'
-        path: db

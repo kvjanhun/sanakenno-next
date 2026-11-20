@@ -96,11 +96,11 @@ export const OPEN_LICENSES: readonly OpenLicenseEntry[] = [
     type: 'library',
   },
   {
-    name: 'Litestream',
-    license: 'Apache-2.0',
-    copyright: 'Ben Johnson',
-    url: 'https://litestream.io',
-    type: 'tool',
+    name: 'libSQL (@libsql/client)',
+    license: 'MIT',
+    copyright: 'Turso',
+    url: 'https://turso.tech',
+    type: 'library',
   },
   {
     name: 'Workbox',

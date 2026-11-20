@@ -1,4 +1,4 @@
-import HYPHENATED_WORDS from './hyphenated-words.json';
+import HYPHENATED_WORDS from './hyphenated-words.json' with { type: 'json' };
 
 /**
  * Kotus dictionary URL builder & canonical lemma resolver.

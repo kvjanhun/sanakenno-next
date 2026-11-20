@@ -26,6 +26,7 @@ Sanakenno incorporates open-source software libraries, build tooling, and open l
 | **Zustand** | MIT | Paul Henschel | [github.com/pmndrs/zustand](https://github.com/pmndrs/zustand) |
 | **Hono** (`hono`, `@hono/node-server`, `@hono/zod-validator`) | MIT | Yusuke Wada | [hono.dev](https://hono.dev) |
 | **Kysely** | MIT | Sami Koskimäki | [kysely.dev](https://kysely.dev) |
+| **libSQL (`@libsql/client`)** | MIT | Turso | [turso.tech](https://turso.tech) |
 | **better-sqlite3** | MIT | Joshua Wise | [github.com/WiseLibs/better-sqlite3](https://github.com/WiseLibs/better-sqlite3) |
 | **Zod** | MIT | Colin McDonnell | [zod.dev](https://zod.dev) |
 | **Argon2** (`node-argon2`) | MIT | Ranisalt | [github.com/ranisalt/node-argon2](https://github.com/ranisalt/node-argon2) |
@@ -36,7 +37,6 @@ Sanakenno incorporates open-source software libraries, build tooling, and open l
 
 | Component | License | Copyright Holder / Author | Link |
 | :--- | :--- | :--- | :--- |
-| **Litestream** | Apache-2.0 | Ben Johnson | [litestream.io](https://litestream.io) |
 | **Vite** | MIT | Evan You | [vite.dev](https://vite.dev) |
 | **Tailwind CSS** | MIT | Tailwind Labs, Inc. | [tailwindcss.com](https://tailwindcss.com) |
 | **Workbox** / `vite-plugin-pwa` | MIT | Google LLC / Antfu | [developer.chrome.com/docs/workbox](https://developer.chrome.com/docs/workbox) |

@@ -211,6 +211,16 @@ describe('Architectural Fitness Guardrails', () => {
       expect(content).not.toMatch(/\bLucide\b/i);
     }
 
+    for (const file of [
+      'PROJECT_MAP.md',
+      'README.md',
+      'OPEN_SOURCE_LICENSES.md',
+      'packages/web/src/features/modals/licenses.ts',
+    ]) {
+      const content = fs.readFileSync(path.join(ROOT, file), 'utf8');
+      expect(content).not.toMatch(/\bLitestream\b/i);
+    }
+
     const webPkg = JSON.parse(
       fs.readFileSync(path.join(ROOT, 'packages/web/package.json'), 'utf8'),
     ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };

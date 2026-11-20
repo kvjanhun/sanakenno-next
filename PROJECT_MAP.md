@@ -14,7 +14,6 @@ sanakenno-next/
   scripts/
     create-admin.ts          # Admin credential provisioning CLI
     deploy-sanakenno.sh      # Server deployment & verification pipeline
-    entrypoint.sh            # Container init, MAINTENANCE_MODE bypass & Litestream restore
     filter-kotus-wordlist.ts # Kotus dictionary filtering & hyphenated lemma extractor
     migrate-v1-db.ts         # Standalone 1.0 -> 2.0 SQLite snapshot & backfill migration CLI
     screenshot-targets.ts    # Desktop/mobile screenshot scenario targets & CDP action builders
@@ -74,8 +73,9 @@ Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 
 ### 3. Production Runtime & Database Persistence
 
-- Sanakenno runs on Google Cloud Run (`europe-north1`, `--max-instances 1`) supporting either local SQLite WAL on `/data/sanakenno.db` (default, `kysely-sqlite`) or managed Turso/libSQL when `TURSO_DATABASE_URL` is configured (`kysely-libsql`).
-- Startup (`scripts/entrypoint.sh`) bypasses Litestream and database boot when `MAINTENANCE_MODE=true` (serving `200` on `/api/health` and `503` Finnish maintenance responses elsewhere); otherwise it restores/replicates SQLite via Litestream (`litestream.yml`, `LITESTREAM_BUCKET`) alongside the Node server (`packages/server/src/index.ts`).
+- Sanakenno runs on Google Cloud Run (`europe-north1`, `512Mi` RAM, `--max-instances 3`) backed by managed **Turso (libSQL)** in `aws-eu-north-1` (`kysely-libsql`), with `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` injected via GCP Secret Manager.
+- The production Docker container runs compiled ESM JavaScript directly via `node packages/server/dist/index.js` (compiled from `@sanakenno/shared` and `@sanakenno/server`). Local development and Vitest suites use `better-sqlite3` (`kysely-sqlite`) with zero Turso account requirement.
+- Setting `MAINTENANCE_MODE=true` boots `createMaintenanceApp()` without opening any database (`200` on `/api/health`, `503` Finnish maintenance responses elsewhere).
 - `SIGTERM` and `SIGINT` handlers in `packages/server/src/index.ts` close incoming HTTP traffic, run `PRAGMA wal_checkpoint(TRUNCATE)` on local SQLite, and destroy the Kysely pool cleanly before container termination.
 - `GET /commit.txt` serves the stamped `./dist/commit.txt` SHA or `process.env.GIT_COMMIT` for deployment parity verification.
 

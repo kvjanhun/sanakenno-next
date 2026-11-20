@@ -1,6 +1,6 @@
 # Spec 36: Compiled Server Runtime, Litestream Retirement & Cloud Run Optimization
 
-Status: pending
+Status: shipped
 Branch: spec/36-compiled-server-runtime-and-litestream-retirement
 
 ## 1. Objective
@@ -54,10 +54,10 @@ Complete the post-cutover migration to **Turso (libSQL)** by retiring Litestream
 
 ### New / Updated Tests (real boundaries, not mock-only)
 
-- [ ] **Compiled Runtime Smoke (`tests/integration/compiled-server-boot.test.ts` or build verification):** After `pnpm run build`, verify asset resolution (`kotus_words.txt`, `pangram-quality.json`) works from compiled `packages/server/dist/` and `node packages/server/dist/index.js` boots cleanly in `MAINTENANCE_MODE=true` or against a temp SQLite DB and serves `GET /api/health`.
-- [ ] **Architecture (`tests/architecture.test.ts`):** Verify `PROJECT_MAP.md`, `README.md`, `OPEN_SOURCE_LICENSES.md`, and `licenses.ts` pass all single-ownership and no-changelog-prose checks, and contain no stale `Litestream` references.
+- [x] **Compiled Runtime Smoke (`tests/integration/compiled-server-boot.test.ts` or build verification):** After `pnpm run build`, verify asset resolution (`kotus_words.txt`, `pangram-quality.json`) works from compiled `packages/server/dist/` and `node packages/server/dist/index.js` boots cleanly in `MAINTENANCE_MODE=true` or against a temp SQLite DB and serves `GET /api/health`.
+- [x] **Architecture (`tests/architecture.test.ts`):** Verify `PROJECT_MAP.md`, `README.md`, `OPEN_SOURCE_LICENSES.md`, and `licenses.ts` pass all single-ownership and no-changelog-prose checks, and contain no stale `Litestream` references.
 
 ### Visual & Mechanical Gate
 
-- [ ] **Visual Inspection (`pnpm run screenshot settings`):** Inspect desktop (1280px) and mobile (390px) screenshots of `SettingsModal` to verify the updated `libSQL` license attribution renders cleanly.
-- [ ] **Mechanical Gate:** `pnpm run check:agent` passes 100% (including compiling `@sanakenno/shared`, `@sanakenno/server`, and `@sanakenno/web`).
+- [x] **Visual Inspection (`pnpm run screenshot settings`):** Inspect desktop (1280px) and mobile (390px) screenshots of `SettingsModal` to verify the updated `libSQL` license attribution renders cleanly.
+- [x] **Mechanical Gate:** `pnpm run check:agent` passes 100% (including compiling `@sanakenno/shared`, `@sanakenno/server`, and `@sanakenno/web`).

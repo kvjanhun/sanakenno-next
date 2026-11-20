@@ -16,57 +16,57 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-# Build frontend (@sanakenno/web)
-RUN pnpm --filter @sanakenno/web build
+# Compile @sanakenno/shared, @sanakenno/server, and @sanakenno/web
+RUN pnpm --filter @sanakenno/shared build && \
+    pnpm --filter @sanakenno/server build && \
+    pnpm --filter @sanakenno/web build
 
-# --- Runtime stage ---
-FROM node:22-alpine AS runtime
+# --- Production dependencies stage ---
+FROM node:22-alpine AS prod-deps
 
-# Install Litestream binary from official image
-COPY --from=litestream/litestream:0.5 /usr/local/bin/litestream /usr/local/bin/litestream
-
-RUN apk add --no-cache python3 make g++ curl tzdata ca-certificates
+RUN apk add --no-cache python3 make g++
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
-
-RUN addgroup -S sanakenno && adduser -S sanakenno -G sanakenno
 
 WORKDIR /app
 
-# Copy workspace config and package.json files for production install
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
 
-RUN pnpm install --prod --frozen-lockfile && apk del python3 make g++
+RUN pnpm install --prod --frozen-lockfile
 
-# Copy built frontend
+# --- Runtime stage (lean Node 22, zero Corepack / pnpm / tsx / Litestream) ---
+FROM node:22-alpine AS runtime
+
+RUN apk add --no-cache tzdata ca-certificates
+RUN addgroup -S sanakenno && adduser -S sanakenno -G sanakenno
+
+WORKDIR /app
+
+# Copy production node_modules and workspace manifests
+COPY --from=prod-deps /app/package.json ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=prod-deps /app/packages/shared/node_modules ./packages/shared/node_modules
+COPY --from=prod-deps /app/packages/server/package.json ./packages/server/package.json
+COPY --from=prod-deps /app/packages/server/node_modules ./packages/server/node_modules
+
+# Copy compiled shared & server JS, server assets, and built frontend
+COPY --from=build /app/packages/shared/dist ./packages/shared/dist
+COPY --from=build /app/packages/server/dist ./packages/server/dist
+COPY --from=build /app/packages/server/assets ./packages/server/assets
 COPY --from=build /app/packages/web/dist ./dist
 
-# Stamp the source commit into the frontend so deploy script and CI can verify
+# Stamp the source commit into the frontend so CI can verify deployed SHA
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 RUN echo "$GIT_COMMIT" > ./dist/commit.txt
-
-# Copy shared and server sources and assets needed at runtime
-COPY packages/shared ./packages/shared
-COPY packages/server ./packages/server
-
-# Copy Litestream configuration and startup entrypoint
-COPY litestream.yml /etc/litestream.yml
-COPY scripts/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-# Data directory for SQLite (volume mount for Litestream / host persistence)
-RUN mkdir -p /data && chown sanakenno:sanakenno /data
-VOLUME /data
 
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV STATIC_DIR=/app/dist
 ENV SEED_ON_BOOT=false
-ENV DATA_DIR=/data
-ENV DB_PATH=/data/sanakenno.db
 ENV TZ=Europe/Helsinki
 
 USER sanakenno
@@ -76,4 +76,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- "http://localhost:${PORT:-3001}/api/health" || exit 1
 
-CMD ["/app/entrypoint.sh"]
+CMD ["node", "packages/server/dist/index.js"]

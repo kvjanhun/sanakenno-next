@@ -57,17 +57,19 @@ jobs:
             --source . \
             --region europe-north1 \
             --allow-unauthenticated \
-            --memory 1Gi \
+            --memory 512Mi \
             --cpu 1 \
-            --max-instances 1 \
-            --set-env-vars LITESTREAM_BUCKET=sanakenno-db-712588936092,BASE_URL=https://sanakenno.fi,SEED_ON_BOOT=false,GIT_COMMIT=${{ github.sha }}
+            --max-instances 3 \
+            --set-env-vars BASE_URL=https://sanakenno.fi,SEED_ON_BOOT=false,GIT_COMMIT=${{ github.sha }} \
+            --update-secrets TURSO_DATABASE_URL=turso-database-url:latest,TURSO_AUTH_TOKEN=turso-auth-token:latest
 
       - name: Verify Live Deployment
         run: |
           echo "Verifying health check on live service..."
           for i in $(seq 1 30); do
-            if curl -fsS --max-time 10 "https://sanakenno-next-712588936092.europe-north1.run.app/api/health" | grep -q '"status":"ok"'; then
-              echo "Sanakenno 2.0 is healthy and live!"
+            HEALTH=$(curl -fsS --max-time 10 "https://sanakenno-next-712588936092.europe-north1.run.app/api/health" || true)
+            if echo "$HEALTH" | grep -q '"status":"ok"' && echo "$HEALTH" | grep -q '"engine":"kysely-libsql"'; then
+              echo "Sanakenno 2.0 is healthy and live on Turso!"
               exit 0
             fi
             sleep 3
