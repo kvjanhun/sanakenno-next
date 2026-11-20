@@ -14,7 +14,7 @@ import {
   getBlockedWords,
   getFullPuzzleBySlot,
   getFullPuzzleForDate,
-  getSlotScheduleRelation,
+  getSlotScheduleInfo,
 } from './puzzle.queries.js';
 import { getCanonicalLemma, puzzleWords, type FullPuzzleData } from './wordlist.js';
 
@@ -78,7 +78,11 @@ export function createPuzzleRoutes(db: Kysely<Database>) {
       }
 
       const slot = Number.parseInt(rawNumber, 10);
-      const relation = await getSlotScheduleRelation(db, slot, getHelsinkiDateString());
+      const { relation, activeSlots } = await getSlotScheduleInfo(
+        db,
+        slot,
+        getHelsinkiDateString(),
+      );
       if (relation === 'inactive') {
         return c.json({ error: 'Puzzle not found' }, 404);
       }
@@ -86,7 +90,7 @@ export function createPuzzleRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Future puzzles are not available' }, 403);
       }
 
-      const data = await getFullPuzzleBySlot(db, slot);
+      const data = await getFullPuzzleBySlot(db, slot, activeSlots);
       if (!data) {
         return c.json({ error: 'Puzzle not found' }, 404);
       }
@@ -100,7 +104,11 @@ export function createPuzzleRoutes(db: Kysely<Database>) {
       }
 
       const slot = Number.parseInt(rawNumber, 10);
-      const relation = await getSlotScheduleRelation(db, slot, getHelsinkiDateString());
+      const { relation, activeSlots } = await getSlotScheduleInfo(
+        db,
+        slot,
+        getHelsinkiDateString(),
+      );
       if (relation === 'inactive') {
         return c.json({ error: 'Puzzle not found' }, 404);
       }
@@ -108,7 +116,7 @@ export function createPuzzleRoutes(db: Kysely<Database>) {
         return c.json({ error: "Word list not available for today's or future puzzles" }, 403);
       }
 
-      const data = await getFullPuzzleBySlot(db, slot);
+      const data = await getFullPuzzleBySlot(db, slot, activeSlots);
       if (!data) {
         return c.json({ error: 'Puzzle not found' }, 404);
       }

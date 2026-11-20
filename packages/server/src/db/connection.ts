@@ -13,14 +13,15 @@ import {
 import { runMigrationsAsync } from './async-migrations.js';
 import { BASELINE_SQL, runMigrations } from './baseline-sql.js';
 import { LibsqlDialect } from './libsql-dialect.js';
+import {
+  isSqliteBusyError,
+  runImmediateTransactionWithRetry,
+  type ImmediateTransactionOptions,
+} from './retry.js';
 import type { Database } from './schema.js';
 
 export type DbEngine = 'kysely-sqlite' | 'kysely-libsql';
-
-export interface ImmediateTransactionOptions {
-  maxRetries?: number;
-  retryDelayMs?: number;
-}
+export { isSqliteBusyError, runImmediateTransactionWithRetry, type ImmediateTransactionOptions };
 
 /**
  * Custom Kysely SQLite driver that begins transactions with `BEGIN IMMEDIATE`
@@ -94,7 +95,6 @@ export async function initDb(
         authToken: env.TURSO_AUTH_TOKEN?.trim() || undefined,
       }),
     });
-    await ensureForeignKeysOn(db);
     await runMigrationsAsync(db);
     return { db, engine: 'kysely-libsql' };
   }
@@ -123,43 +123,4 @@ export async function checkpointAndDestroyDb(
     await sql`PRAGMA wal_checkpoint(TRUNCATE)`.execute(db).catch(() => undefined);
   }
   await db.destroy();
-}
-
-function isSqliteBusyError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const code = (error as Error & { code?: unknown }).code;
-  return (
-    code === 'SQLITE_BUSY' ||
-    code === 'SQLITE_BUSY_SNAPSHOT' ||
-    error.message.includes('SQLITE_BUSY') ||
-    error.message.includes('database is locked')
-  );
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Run a Kysely `BEGIN IMMEDIATE` transaction with transient SQLITE_BUSY retry backoff.
- */
-export async function runImmediateTransactionWithRetry<T>(
-  db: Kysely<Database>,
-  work: (trx: Kysely<Database>) => Promise<T>,
-  options: ImmediateTransactionOptions = {},
-): Promise<T> {
-  const maxRetries = options.maxRetries ?? 3;
-  const retryDelayMs = options.retryDelayMs ?? 25;
-
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await db.transaction().execute((trx) => work(trx));
-    } catch (error) {
-      if (!isSqliteBusyError(error) || attempt >= maxRetries) {
-        throw error;
-      }
-      const jitterMs = Math.floor(Math.random() * retryDelayMs);
-      await delay(retryDelayMs * (attempt + 1) + jitterMs);
-    }
-  }
 }

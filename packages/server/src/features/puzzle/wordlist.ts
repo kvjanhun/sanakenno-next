@@ -71,8 +71,17 @@ let _allWords = new Set<string>();
 let _lemmaMap = new Map<string, string>();
 let _wordlistLoaded = false;
 
-const _puzzleCache = new Map<number, FullPuzzleData>();
+interface CachedPuzzleEntry {
+  data: FullPuzzleData;
+  cachedAt: number;
+}
+
+const _puzzleCache = new Map<number, CachedPuzzleEntry>();
 let _cacheGeneration = 0;
+
+/** Default in-memory TTL for cached puzzle payloads so cross-instance blocked_words edits propagate. */
+export const DEFAULT_PUZZLE_CACHE_TTL_MS = 60_000;
+let _puzzleCacheTtlMs = DEFAULT_PUZZLE_CACHE_TTL_MS;
 
 /**
  * Normalize a raw candidate word by trimming, lowercasing, and stripping hyphens.
@@ -347,23 +356,48 @@ export function computeVariations(
 export const MAX_PUZZLE_CACHE_SIZE = 10;
 
 /**
- * Read a cached full puzzle by slot if present in the current generation.
+ * Override the in-memory puzzle cache TTL in milliseconds (primarily for deterministic tests).
+ */
+export function setPuzzleCacheTtlMs(ttlMs: number): void {
+  _puzzleCacheTtlMs = ttlMs;
+}
+
+/**
+ * Return the active in-memory puzzle cache TTL in milliseconds.
+ */
+export function getPuzzleCacheTtlMs(): number {
+  return _puzzleCacheTtlMs;
+}
+
+/**
+ * Read a cached full puzzle by slot if present and unexpired in the current generation.
  * Refreshes LRU recency when found.
  */
 export function getCachedPuzzle(slot: number): FullPuzzleData | undefined {
-  const data = _puzzleCache.get(slot);
-  if (data !== undefined) {
-    _puzzleCache.delete(slot);
-    _puzzleCache.set(slot, data);
+  const entry = _puzzleCache.get(slot);
+  if (entry === undefined) {
+    return undefined;
   }
-  return data;
+  if (Date.now() - entry.cachedAt >= _puzzleCacheTtlMs) {
+    _puzzleCache.delete(slot);
+    return undefined;
+  }
+  _puzzleCache.delete(slot);
+  _puzzleCache.set(slot, entry);
+  return entry.data;
 }
 
 /**
  * Store a computed full puzzle in the slot cache, evicting the least recently used
  * when exceeding MAX_PUZZLE_CACHE_SIZE.
  */
-export function setCachedPuzzle(slot: number, data: FullPuzzleData): void {
+export function setCachedPuzzle(
+  slot: number,
+  data: FullPuzzleData,
+  preserveCachedAt = false,
+): void {
+  const existing = _puzzleCache.get(slot);
+  const cachedAt = preserveCachedAt && existing ? existing.cachedAt : Date.now();
   if (_puzzleCache.has(slot)) {
     _puzzleCache.delete(slot);
   } else if (_puzzleCache.size >= MAX_PUZZLE_CACHE_SIZE) {
@@ -372,7 +406,7 @@ export function setCachedPuzzle(slot: number, data: FullPuzzleData): void {
       _puzzleCache.delete(oldestKey);
     }
   }
-  _puzzleCache.set(slot, data);
+  _puzzleCache.set(slot, { data, cachedAt });
 }
 
 /**

@@ -1,12 +1,8 @@
 import {
   bestNoHintScoreForRecord,
   isPangram,
-  mergePuzzleState,
-  mergeStatsRecord,
   rankForScore,
-  recalcScore,
   type PlayerPreferences,
-  type PlayerStats,
   type StatsRecord,
   type SyncPayload,
   type SyncProgressPayload,
@@ -15,6 +11,17 @@ import {
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import { getFullPuzzleBySlot } from '../puzzle/puzzle.queries.js';
+import type { FullPuzzleData } from '../puzzle/wordlist.js';
+import {
+  bulkUpsertLocalData,
+  preloadBulkPuzzleMeta,
+  puzzleDataToMeta,
+  sanitizeAndMergePuzzleState,
+  sanitizeAndMergeStatsRecord,
+  type BulkPuzzleMeta,
+} from './player-sync-bulk.queries.js';
+
+export { bulkUpsertLocalData, preloadBulkPuzzleMeta, type BulkPuzzleMeta };
 
 /**
  * Read and parse stored JSON preferences for a player, or null if absent/invalid.
@@ -98,15 +105,6 @@ export async function readPuzzleState(
   };
 }
 
-function capScoreBeforeHints(
-  val: number | null,
-  score: number,
-  hintsUnlockedCount: number,
-): number | null {
-  if (hintsUnlockedCount === 0) return null;
-  return val !== null ? Math.min(val, score) : null;
-}
-
 /**
  * Merge and store a single puzzle state for a player.
  */
@@ -114,47 +112,14 @@ export async function mergeAndStorePuzzleState(
   db: Kysely<Database>,
   playerId: number,
   incoming: SyncPuzzleState,
+  preloadedPuzzle?: FullPuzzleData | null,
 ): Promise<SyncPuzzleState> {
-  const puzzle = await getFullPuzzleBySlot(db, incoming.puzzle_number);
-  const allLetters = puzzle ? new Set<string>([puzzle.center, ...puzzle.letters]) : null;
-  let sanitizedIncoming = incoming;
-  if (puzzle && allLetters) {
-    const validWordSet = new Set(puzzle.words);
-    const validWords = Array.from(
-      new Set(
-        incoming.found_words
-          .map((word) => word.trim().toLowerCase().replaceAll('-', ''))
-          .filter((word) => validWordSet.has(word)),
-      ),
-    );
-    const recalculatedScore = recalcScore(validWords, allLetters);
-    sanitizedIncoming = {
-      ...incoming,
-      found_words: validWords,
-      score: recalculatedScore,
-      score_before_hints: capScoreBeforeHints(
-        incoming.score_before_hints,
-        recalculatedScore,
-        incoming.hints_unlocked.length,
-      ),
-    };
-  }
-
-  const existing = await readPuzzleState(db, playerId, sanitizedIncoming.puzzle_number);
-  const mergedRaw = existing ? mergePuzzleState(existing, sanitizedIncoming) : sanitizedIncoming;
-  let merged = mergedRaw;
-  if (allLetters) {
-    const mergedScore = recalcScore(mergedRaw.found_words, allLetters);
-    merged = {
-      ...mergedRaw,
-      score: mergedScore,
-      score_before_hints: capScoreBeforeHints(
-        mergedRaw.score_before_hints,
-        mergedScore,
-        mergedRaw.hints_unlocked.length,
-      ),
-    };
-  }
+  const puzzle =
+    preloadedPuzzle !== undefined
+      ? preloadedPuzzle
+      : await getFullPuzzleBySlot(db, incoming.puzzle_number);
+  const existing = await readPuzzleState(db, playerId, incoming.puzzle_number);
+  const merged = sanitizeAndMergePuzzleState(existing, incoming, puzzleDataToMeta(puzzle));
 
   if (!existing) {
     await db
@@ -246,41 +211,14 @@ export async function mergeAndStoreStatsRecord(
   db: Kysely<Database>,
   playerId: number,
   incoming: StatsRecord,
+  preloadedPuzzle?: FullPuzzleData | null,
 ): Promise<StatsRecord> {
-  const puzzle = await getFullPuzzleBySlot(db, incoming.puzzle_number);
-  const maxScore = puzzle ? puzzle.max_score : incoming.max_score;
-  const cappedScore = Math.min(incoming.best_score, maxScore);
-  const sanitizedIncoming: StatsRecord = {
-    ...incoming,
-    max_score: maxScore,
-    best_score: cappedScore,
-    best_rank: rankForScore(cappedScore, maxScore),
-    words_found: puzzle
-      ? Math.min(incoming.words_found, puzzle.words.length)
-      : incoming.words_found,
-    pangrams_found: puzzle
-      ? Math.min(incoming.pangrams_found ?? 0, puzzle.hint_data.pangram_count)
-      : (incoming.pangrams_found ?? 0),
-    best_no_hint_score:
-      incoming.best_no_hint_score !== undefined
-        ? Math.min(incoming.best_no_hint_score, cappedScore)
-        : undefined,
-  };
-
-  const existing = await readStatsRecord(db, playerId, sanitizedIncoming.puzzle_number);
-  const mergedBase = existing ? mergeStatsRecord(existing, sanitizedIncoming) : sanitizedIncoming;
-  const mergedMaxScore = puzzle
-    ? puzzle.max_score
-    : existing
-      ? Math.max(existing.max_score, sanitizedIncoming.max_score)
-      : sanitizedIncoming.max_score;
-  const mergedScore = Math.min(mergedBase.best_score, mergedMaxScore);
-  const merged: StatsRecord = {
-    ...mergedBase,
-    max_score: mergedMaxScore,
-    best_score: mergedScore,
-    best_rank: rankForScore(mergedScore, mergedMaxScore),
-  };
+  const puzzle =
+    preloadedPuzzle !== undefined
+      ? preloadedPuzzle
+      : await getFullPuzzleBySlot(db, incoming.puzzle_number);
+  const existing = await readStatsRecord(db, playerId, incoming.puzzle_number);
+  const merged = sanitizeAndMergeStatsRecord(existing, incoming, puzzleDataToMeta(puzzle));
 
   const longestWordOrNull =
     merged.longest_word && merged.longest_word.length > 0 ? merged.longest_word : null;
@@ -321,12 +259,9 @@ export async function mergeAndStoreStatsRecord(
         longest_word: longestWordOrNull,
         pangrams_found: merged.pangrams_found ?? 0,
         best_no_hint_score: bestNoHint,
-        long_words_count: Math.max(
-          Number(existing.long_words_count ?? 0),
-          merged.long_words_count ?? 0,
-        ),
-        is_daily: existing.is_daily || merged.is_daily ? 1 : 0,
-        played_at_date: merged.played_at_date ?? existing.played_at_date ?? null,
+        long_words_count: merged.long_words_count ?? 0,
+        is_daily: merged.is_daily ? 1 : 0,
+        played_at_date: merged.played_at_date ?? null,
         updated_at: sql<string>`datetime('now')`,
       })
       .where('player_id', '=', playerId)
@@ -349,8 +284,12 @@ export async function deriveStatsFromProgress(
   db: Kysely<Database>,
   payload: SyncProgressPayload,
   mergedState: SyncPuzzleState,
+  preloadedPuzzle?: FullPuzzleData | null,
 ): Promise<StatsRecord> {
-  const puzzle = await getFullPuzzleBySlot(db, payload.puzzle_number);
+  const puzzle =
+    preloadedPuzzle !== undefined
+      ? preloadedPuzzle
+      : await getFullPuzzleBySlot(db, payload.puzzle_number);
   const allLetters = puzzle
     ? new Set<string>([puzzle.center, ...puzzle.letters])
     : new Set<string>();
@@ -394,48 +333,48 @@ export async function deriveStatsFromProgress(
 }
 
 /**
- * Fetch the full SyncPayload (stats, puzzle_states, preferences) for a player.
+ * Fetch the full SyncPayload (stats, puzzle_states, preferences) for a player concurrently.
  */
 export async function fetchPlayerData(
   db: Kysely<Database>,
   playerId: number,
 ): Promise<SyncPayload> {
-  const statsRows = await db
-    .selectFrom('player_stats')
-    .select([
-      'puzzle_number',
-      'date',
-      'best_rank',
-      'best_score',
-      'max_score',
-      'words_found',
-      'hints_used',
-      'elapsed_ms',
-      'longest_word',
-      'pangrams_found',
-      'best_no_hint_score',
-      'long_words_count',
-      'is_daily',
-      'played_at_date',
-    ])
-    .where('player_id', '=', playerId)
-    .execute();
-
-  const stateRows = await db
-    .selectFrom('player_puzzle_states')
-    .select([
-      'puzzle_number',
-      'found_words',
-      'score',
-      'hints_unlocked',
-      'started_at',
-      'total_paused_ms',
-      'score_before_hints',
-    ])
-    .where('player_id', '=', playerId)
-    .execute();
-
-  const preferences = await readPlayerPreferences(db, playerId);
+  const [statsRows, stateRows, preferences] = await Promise.all([
+    db
+      .selectFrom('player_stats')
+      .select([
+        'puzzle_number',
+        'date',
+        'best_rank',
+        'best_score',
+        'max_score',
+        'words_found',
+        'hints_used',
+        'elapsed_ms',
+        'longest_word',
+        'pangrams_found',
+        'best_no_hint_score',
+        'long_words_count',
+        'is_daily',
+        'played_at_date',
+      ])
+      .where('player_id', '=', playerId)
+      .execute(),
+    db
+      .selectFrom('player_puzzle_states')
+      .select([
+        'puzzle_number',
+        'found_words',
+        'score',
+        'hints_unlocked',
+        'started_at',
+        'total_paused_ms',
+        'score_before_hints',
+      ])
+      .where('player_id', '=', playerId)
+      .execute(),
+    readPlayerPreferences(db, playerId),
+  ]);
 
   return {
     stats: {
@@ -468,25 +407,4 @@ export async function fetchPlayerData(
     })),
     preferences,
   };
-}
-
-/**
- * Bulk upsert client stats and puzzle states when pairing a device via `/auth/transfer/use`.
- */
-export async function bulkUpsertLocalData(
-  db: Kysely<Database>,
-  playerId: number,
-  stats: PlayerStats | undefined,
-  puzzleStates: SyncPuzzleState[] | undefined,
-): Promise<void> {
-  if (stats?.records?.length) {
-    for (const record of stats.records) {
-      await mergeAndStoreStatsRecord(db, playerId, record);
-    }
-  }
-  if (puzzleStates?.length) {
-    for (const state of puzzleStates) {
-      await mergeAndStorePuzzleState(db, playerId, state);
-    }
-  }
 }

@@ -312,17 +312,23 @@ export async function getTransferTicket(
 }
 
 /**
- * Mark a transfer ticket as consumed.
+ * Atomically mark an unused, unexpired transfer ticket as consumed.
+ * Returns true if this call claimed the ticket, false if it was already used or expired.
  */
 export async function markTransferTicketUsed(
   db: Kysely<Database>,
   ticketId: string,
-): Promise<void> {
-  await db
+  nowIso: string = new Date().toISOString(),
+): Promise<boolean> {
+  const res = await db
     .updateTable('player_transfer_tickets')
     .set({
       used_at: sql<string>`datetime('now')`,
     })
     .where('id', '=', ticketId)
-    .execute();
+    .where('used_at', 'is', null)
+    .where('expires_at', '>', nowIso)
+    .executeTakeFirst();
+
+  return Number(res.numUpdatedRows) > 0;
 }

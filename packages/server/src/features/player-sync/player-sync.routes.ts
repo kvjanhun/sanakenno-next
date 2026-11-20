@@ -6,6 +6,7 @@ import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
 import { zodErrorHook } from '../../lib/zod-validator.js';
 import { requirePlayerAuth, type PlayerVariables } from '../player-auth/player-auth.middleware.js';
+import { getFullPuzzleBySlot } from '../puzzle/puzzle.queries.js';
 import {
   deriveStatsFromProgress,
   fetchPlayerData,
@@ -33,11 +34,12 @@ export function createPlayerSyncRoutes(db: Kysely<Database>) {
       async (c) => {
         const player = c.get('player');
         const payload = c.req.valid('json');
+        const puzzle = await getFullPuzzleBySlot(db, payload.puzzle_number);
 
         await runImmediateTransactionWithRetry(db, async (trx) => {
-          const mergedState = await mergeAndStorePuzzleState(trx, player.playerId, payload);
-          const derivedStats = await deriveStatsFromProgress(trx, payload, mergedState);
-          await mergeAndStoreStatsRecord(trx, player.playerId, derivedStats);
+          const mergedState = await mergeAndStorePuzzleState(trx, player.playerId, payload, puzzle);
+          const derivedStats = await deriveStatsFromProgress(trx, payload, mergedState, puzzle);
+          await mergeAndStoreStatsRecord(trx, player.playerId, derivedStats, puzzle);
         });
 
         return c.json({ status: 'synced' as const }, 200);

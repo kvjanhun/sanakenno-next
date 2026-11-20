@@ -1,5 +1,6 @@
 import type { RankName } from '@sanakenno/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from '../../packages/server/src/app.js';
 import {
   DEFAULT_SEED_WORDS,
   invalidatePuzzleCache,
@@ -175,6 +176,30 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
       expect(res.status).toBe(400);
       const data = (await res.json()) as { error: string };
       expect(data.error).toBe('Sana ei kuulu peliin');
+    });
+
+    it('rejects inactive slot with exact Finnish 400 error without redundant active-slot pre-check', async () => {
+      let queries = 0;
+      const countedDb = harness.db.withPlugin({
+        transformQuery(args) {
+          queries += 1;
+          return args.node;
+        },
+        transformResult: (args) => Promise.resolve(args.result),
+      });
+      const countedApp = createApp(countedDb);
+
+      const inactiveRes = await countedApp.request('/api/word-find', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word: 'kenno', puzzle_number: 2 }),
+      });
+      expect(inactiveRes.status).toBe(400);
+      expect(await inactiveRes.json()).toEqual({
+        error: 'Valittua peliä ei löydy tai se ei ole aktiivinen',
+      });
+      // Only getFullPuzzleBySlot's 2 parallel reads (row + activeSlots); no separate isActivePuzzleSlot pre-check
+      expect(queries).toBe(2);
     });
 
     it('rejects invalid puzzle_number or word', async () => {

@@ -9,7 +9,11 @@ import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
 import { zodErrorHook } from '../../lib/zod-validator.js';
-import { bulkUpsertLocalData, fetchPlayerData } from '../player-sync/player-sync.queries.js';
+import {
+  bulkUpsertLocalData,
+  fetchPlayerData,
+  preloadBulkPuzzleMeta,
+} from '../player-sync/player-sync.queries.js';
 import {
   checkEmailRateLimit,
   initPlayerRateLimit,
@@ -45,6 +49,13 @@ export {
 };
 
 const PLAYER_KEY_HEX_RE = /^[0-9a-f]{64}$/i;
+
+class TransferTicketClaimError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TransferTicketClaimError';
+  }
+}
 
 const transferEmailErrorHook = zodErrorHook<{ Variables: PlayerVariables }>((err) => {
   const field = err.issues[0]?.path[0];
@@ -163,19 +174,43 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
           existingSessionToken = authHeader.slice(7).trim();
         }
 
-        const { token, sessionCount } = await runImmediateTransactionWithRetry(db, async (trx) => {
-          if (ticket) {
-            await markTransferTicketUsed(trx, ticket.id);
+        const preloadedPuzzles = await preloadBulkPuzzleMeta(db, stats, puzzleStates);
+
+        let token: string;
+        let sessionCount: number;
+        try {
+          const result = await runImmediateTransactionWithRetry(db, async (trx) => {
+            if (ticket) {
+              const nowMs = Date.now();
+              if (Date.parse(ticket.expires_at) <= nowMs) {
+                throw new TransferTicketClaimError('Tunniste on vanhentunut');
+              }
+              const claimed = await markTransferTicketUsed(
+                trx,
+                ticket.id,
+                new Date(nowMs).toISOString(),
+              );
+              if (!claimed) {
+                throw new TransferTicketClaimError('Tunniste on jo käytetty');
+              }
+            }
+            await bulkUpsertLocalData(trx, playerId, stats, puzzleStates, preloadedPuzzles);
+            await cleanupExpiredPlayerSessions(trx);
+            if (existingSessionToken) {
+              await deletePlayerSession(trx, existingSessionToken);
+            }
+            const newToken = await createPlayerSession(trx, playerId);
+            const count = await countActivePlayerSessions(trx, playerId);
+            return { token: newToken, sessionCount: count };
+          });
+          token = result.token;
+          sessionCount = result.sessionCount;
+        } catch (err) {
+          if (err instanceof TransferTicketClaimError) {
+            return c.json({ error: err.message }, 400);
           }
-          await bulkUpsertLocalData(trx, playerId, stats, puzzleStates);
-          await cleanupExpiredPlayerSessions(trx);
-          if (existingSessionToken) {
-            await deletePlayerSession(trx, existingSessionToken);
-          }
-          const newToken = await createPlayerSession(trx, playerId);
-          const count = await countActivePlayerSessions(trx, playerId);
-          return { token: newToken, sessionCount: count };
-        });
+          throw err;
+        }
 
         const playerData = await fetchPlayerData(db, playerId);
         return c.json(

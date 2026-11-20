@@ -51,6 +51,36 @@ describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
     }
   });
 
+  it('never auto-seeds an empty kysely-libsql database in development unless SEED_ON_BOOT=true', async () => {
+    setWordlist(DEFAULT_SEED_WORDS);
+    const db = createDb(':memory:');
+    try {
+      const libsqlSkipped = await ensureBootSeed(db, { NODE_ENV: 'development' }, 'kysely-libsql');
+      expect(libsqlSkipped).toBe(false);
+
+      const emptyCount = await db
+        .selectFrom('puzzles')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .executeTakeFirstOrThrow();
+      expect(Number(emptyCount.count)).toBe(0);
+
+      const explicitSeeded = await ensureBootSeed(
+        db,
+        { NODE_ENV: 'development', SEED_ON_BOOT: 'true' },
+        'kysely-libsql',
+      );
+      expect(explicitSeeded).toBe(true);
+
+      const seededCount = await db
+        .selectFrom('puzzles')
+        .select((eb) => eb.fn.countAll<number>().as('count'))
+        .executeTakeFirstOrThrow();
+      expect(Number(seededCount.count)).toBeGreaterThan(0);
+    } finally {
+      await db.destroy();
+    }
+  });
+
   it('closes HTTP server, checkpoints SQLite WAL, and destroys database connection cleanly', async () => {
     const dbFile = path.join(
       os.tmpdir(),

@@ -19,18 +19,23 @@ function resolveBootDbPath(env: NodeJS.ProcessEnv): string {
 
 /**
  * Seed initial puzzles when explicitly requested (`SEED_ON_BOOT=true`) or when running
- * in non-production dev mode against an empty default development database.
+ * in non-production dev mode against an empty default local SQLite database.
  */
 export async function ensureBootSeed(
   db: Kysely<Database>,
   env: NodeJS.ProcessEnv = process.env,
+  engine: DbEngine = 'kysely-sqlite',
 ): Promise<boolean> {
   if (env.SEED_ON_BOOT === 'true') {
     await seedDatabase(db);
     return true;
   }
 
-  if (env.NODE_ENV !== 'production' && resolveBootDbPath(env) === './sanakenno.dev.db') {
+  if (
+    engine === 'kysely-sqlite' &&
+    env.NODE_ENV !== 'production' &&
+    resolveBootDbPath(env) === './sanakenno.dev.db'
+  ) {
     const populated = await hasAnyPuzzles(db);
     if (!populated) {
       await seedDatabase(db);
@@ -81,7 +86,7 @@ if (isMain) {
     process.once('SIGINT', handleSignal);
   } else {
     const { db, engine } = await initDb(process.env);
-    await ensureBootSeed(db, process.env);
+    await ensureBootSeed(db, process.env, engine);
 
     const app = createServerApp(db, undefined, engine);
     const server = serve({

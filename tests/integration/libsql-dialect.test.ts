@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createClient } from '@libsql/client';
+import { createClient, type TransactionMode } from '@libsql/client';
 import { Kysely } from 'kysely';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../packages/server/src/app.js';
@@ -13,8 +13,9 @@ import {
   checkpointAndDestroyDb,
   ensureForeignKeysOn,
   initDb,
+  runImmediateTransactionWithRetry,
 } from '../../packages/server/src/db/connection.js';
-import { LibsqlDialect } from '../../packages/server/src/db/libsql-dialect.js';
+import { LibsqlConnection, LibsqlDialect } from '../../packages/server/src/db/libsql-dialect.js';
 import type { Database } from '../../packages/server/src/db/schema.js';
 import { seedDatabase } from '../../packages/server/src/db/seed.js';
 
@@ -265,6 +266,116 @@ describe('LibsqlDialect & Async Migrations Integration', () => {
       expect(syncBody.stats.records[0]?.puzzle_number).toBe(1);
       expect(syncBody.puzzle_states).toHaveLength(1);
       expect(syncBody.puzzle_states[0]?.puzzle_number).toBe(1);
+    } finally {
+      await checkpointAndDestroyDb(db, engine);
+    }
+  });
+
+  it('omits no-op PRAGMA inside write transactions and always calls tx.close() on commit, rollback, and abnormal release', async () => {
+    const client = createClient({ url: ':memory:' });
+    const executedTxSql: string[] = [];
+    const closeSpies: Array<ReturnType<typeof vi.spyOn>> = [];
+
+    const origTransaction = client.transaction.bind(client);
+    vi.spyOn(client, 'transaction').mockImplementation(async (mode?: TransactionMode) => {
+      const tx = await origTransaction(mode);
+      const origExecute = tx.execute.bind(tx);
+      vi.spyOn(tx, 'execute').mockImplementation((stmt) => {
+        const sqlText = typeof stmt === 'string' ? stmt : stmt.sql;
+        executedTxSql.push(sqlText);
+        return origExecute(stmt);
+      });
+      closeSpies.push(vi.spyOn(tx, 'close'));
+      return tx;
+    });
+
+    const dialect = new LibsqlDialect({ client });
+    const db = new Kysely<Database>({ dialect });
+
+    try {
+      await runMigrationsAsync(db);
+      executedTxSql.length = 0;
+      closeSpies.length = 0;
+
+      // 1. Committed transaction
+      await db.transaction().execute(async (trx) => {
+        await trx.insertInto('config').values({ key: 'k1', value: 'v1' }).execute();
+      });
+
+      // 2. Rolled-back transaction
+      await expect(
+        db.transaction().execute(async (trx) => {
+          await trx.insertInto('config').values({ key: 'k2', value: 'v2' }).execute();
+          throw new Error('rollback-check');
+        }),
+      ).rejects.toThrow('rollback-check');
+
+      expect(executedTxSql.some((s) => /PRAGMA\s+foreign_keys/i.test(s))).toBe(false);
+      expect(closeSpies).toHaveLength(2);
+      expect(closeSpies[0]).toHaveBeenCalledTimes(1);
+      expect(closeSpies[1]).toHaveBeenCalledTimes(1);
+
+      // 3. Abnormal connection release with an open lingering transaction
+      const driver = dialect.createDriver();
+      const conn = (await driver.acquireConnection()) as LibsqlConnection;
+      await driver.beginTransaction(conn, {});
+      await driver.releaseConnection(conn);
+      expect(closeSpies).toHaveLength(3);
+      expect(closeSpies[2]).toHaveBeenCalledTimes(1);
+    } finally {
+      await checkpointAndDestroyDb(db, 'kysely-libsql');
+    }
+  });
+
+  it('retries pre-commit transient libSQL error codes but never retries HRANA_CLOSED_ERROR', async () => {
+    const { url } = createTempFileUrl('retry.db');
+    const { db, engine } = await initDb({ TURSO_DATABASE_URL: url });
+
+    try {
+      for (const code of ['SQLITE_BUSY_TIMEOUT', 'SQLITE_LOCKED', 'HRANA_STREAM_EXPIRED']) {
+        let attempts = 0;
+        const result = await runImmediateTransactionWithRetry(
+          db,
+          async (trx) => {
+            attempts += 1;
+            if (attempts === 1) {
+              const err = new Error(`simulated ${code}`) as Error & { code: string };
+              err.code = code;
+              throw err;
+            }
+            await trx
+              .insertInto('config')
+              .values({ key: `retry_${code}`, value: 'ok' })
+              .execute();
+            return 'committed';
+          },
+          { maxRetries: 3, retryDelayMs: 1 },
+        );
+
+        expect(result).toBe('committed');
+        expect(attempts).toBe(2);
+        const row = await db
+          .selectFrom('config')
+          .select('value')
+          .where('key', '=', `retry_${code}`)
+          .executeTakeFirst();
+        expect(row?.value).toBe('ok');
+      }
+
+      let closedAttempts = 0;
+      await expect(
+        runImmediateTransactionWithRetry(
+          db,
+          async () => {
+            closedAttempts += 1;
+            const err = new Error('Hrana connection closed') as Error & { code: string };
+            err.code = 'HRANA_CLOSED_ERROR';
+            throw err;
+          },
+          { maxRetries: 3, retryDelayMs: 1 },
+        ),
+      ).rejects.toThrow('Hrana connection closed');
+      expect(closedAttempts).toBe(1);
     } finally {
       await checkpointAndDestroyDb(db, engine);
     }

@@ -1,3 +1,5 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import argon2 from 'argon2';
 import type { Kysely } from 'kysely';
 import {
@@ -8,7 +10,7 @@ import {
   loadWordlist,
   setWordlist,
 } from '../features/puzzle/wordlist.js';
-import { createDb } from './connection.js';
+import { checkpointAndDestroyDb, initDb } from './connection.js';
 import type { Database } from './schema.js';
 
 /**
@@ -97,9 +99,14 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
     .execute();
 }
 
-const isMain = import.meta.url === `file://${process.argv[1]}`;
+const isMain =
+  typeof process.argv[1] === 'string' &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
-  const db = createDb();
-  await seedDatabase(db);
-  await db.destroy();
+  const { db, engine } = await initDb(process.env);
+  try {
+    await seedDatabase(db);
+  } finally {
+    await checkpointAndDestroyDb(db, engine);
+  }
 }

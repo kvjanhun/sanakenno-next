@@ -2,6 +2,7 @@ import { getHelsinkiDateString } from '@sanakenno/shared';
 import { sql, type Kysely } from 'kysely';
 import { computePuzzle } from '../features/puzzle/wordlist.js';
 import { BASELINE_SQL, CURATED_BLOCKED_WORDS } from './baseline-sql.js';
+import { runImmediateTransactionWithRetry } from './retry.js';
 import type { Database } from './schema.js';
 
 interface AsyncMigration {
@@ -275,18 +276,22 @@ export async function runMigrationsAsync(db: Kysely<Database>): Promise<boolean>
   for (const migration of ASYNC_MIGRATIONS) {
     if (applied.has(migration.version)) continue;
 
-    await db.transaction().execute(async (trx) => {
+    const didApply = await runImmediateTransactionWithRetry(db, async (trx) => {
       const check = await trx
         .selectFrom('schema_migrations')
         .select('version')
         .where('version', '=', migration.version)
         .executeTakeFirst();
-      if (check) return;
+      if (check) return false;
 
       await migration.up(trx);
       await trx.insertInto('schema_migrations').values({ version: migration.version }).execute();
-      appliedAny = true;
+      return true;
     });
+
+    if (didApply) {
+      appliedAny = true;
+    }
   }
 
   return appliedAny;

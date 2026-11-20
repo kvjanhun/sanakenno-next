@@ -28,12 +28,12 @@ sanakenno-next/
       src/
         edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), Google security headers, zero-DB MAINTENANCE_MODE app & PWA static serving
         lib/                 # Shared server utilities (@hono/zod-validator error hook helper)
-        db/                  # 17-table Kysely Database<Schema>, dual SQLite (BEGIN IMMEDIATE) & repo-owned Turso/libSQL dialect (libsql-dialect.ts), sync/async 0001-0005 migration runners (async-migrations.ts), 1.0 backfill helper (backfill-stats.ts), deterministic seed
+        db/                  # 18-table Kysely Database<Schema>, dual SQLite (BEGIN IMMEDIATE) & repo-owned Turso/libSQL dialect (libsql-dialect.ts), pre-commit transient retry policy (retry.ts), sync/async 0001-0005 migration runners (async-migrations.ts), 1.0 backfill helper (backfill-stats.ts), deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
-          puzzle/            # Finnish wordlist engine, bounded 10-entry LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
-          player-auth/       # Passwordless player Bearer auth, session TTL, 15-min transfer tickets & 6-digit PIN pairing (POST /api/player/auth/transfer/ticket, /create, /use), Resend EU support, sliding-window rate limiters, active device count (GET /api/player/me)
-          player-sync/       # Monotonic cross-device progress & preference sync (GET /api/player/sync, POST /api/player/sync/progress, POST /api/player/sync/preferences)
+          puzzle/            # Finnish wordlist engine, bounded 10-entry TTL/content-validated LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
+          player-auth/       # Passwordless player Bearer auth, session TTL, atomic single-use 15-min transfer tickets & 6-digit PIN pairing (POST /api/player/auth/transfer/ticket, /create, /use), Resend EU support, sliding-window rate limiters, active device count (GET /api/player/me)
+          player-sync/       # Monotonic cross-device progress, bulk transfer upsert (player-sync-bulk.queries.ts) & preference sync (GET /api/player/sync, POST /api/player/sync/progress, POST /api/player/sync/preferences)
           telemetry/         # Hardened public gameplay telemetry with sliding-window rate limiters & wordlist validation (POST /api/achievement, /api/failed-guess, /api/word-find)
           admin-auth/        # Argon2id admin cookie session auth & CSRF guardrails (POST /api/auth/*)
           admin-puzzles/     # Puzzle CRUD, swap, center override, preview, blocked words & 14-day schedule (POST/GET/DELETE /api/admin/*)

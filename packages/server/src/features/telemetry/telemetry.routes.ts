@@ -189,13 +189,11 @@ export function createWordFindRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Invalid word' }, 400);
       }
 
-      const active = await isActivePuzzleSlot(db, puzzle_number);
-      if (!active) {
+      const puzzleData = await getFullPuzzleBySlot(db, puzzle_number);
+      if (!puzzleData) {
         return c.json({ error: 'Valittua peliä ei löydy tai se ei ole aktiivinen' }, 400);
       }
-
-      const puzzleData = await getFullPuzzleBySlot(db, puzzle_number);
-      if (!puzzleData || !puzzleData.words.includes(normalized)) {
+      if (!puzzleData.words.includes(normalized)) {
         return c.json({ error: 'Sana ei kuulu peliin' }, 400);
       }
 

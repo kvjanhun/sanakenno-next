@@ -1,5 +1,6 @@
 import { getHelsinkiDateString } from '@sanakenno/shared';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from '../../packages/server/src/app.js';
 import {
   getActiveSlots,
   getDaysRemainingInCycle,
@@ -152,8 +153,33 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
 
       // Advance to rollover day 2026-01-04 -> index 0 (slot 1) -> full cycle of 3 days remaining
       vi.setSystemTime(new Date('2026-01-04T10:00:00Z'));
-      const healthRollover = await (await harness.client.api.health.$get()).json();
-      expect(healthRollover.days_remaining).toBe(3);
+      let healthQueries = 0;
+      const countedDb = harness.db.withPlugin({
+        transformQuery(args) {
+          healthQueries += 1;
+          return args.node;
+        },
+        transformResult: (args) => Promise.resolve(args.result),
+      });
+      const countedApp = createApp(countedDb);
+      const healthRolloverRes = await countedApp.request('/api/health');
+      expect(healthRolloverRes.status).toBe(200);
+      const healthRollover = (await healthRolloverRes.json()) as {
+        status: string;
+        engine: string;
+        total_puzzles: number;
+        days_remaining: number;
+        timezone: string;
+      };
+      expect(healthRollover).toEqual({
+        status: 'ok',
+        engine: 'kysely-sqlite',
+        total_puzzles: 3,
+        days_remaining: 3,
+        timezone: 'Europe/Helsinki',
+      });
+      // Only 2 parallel queries: active slots + epoch date (no separate countActivePuzzles or duplicate getActiveSlots)
+      expect(healthQueries).toBe(2);
     });
   });
 

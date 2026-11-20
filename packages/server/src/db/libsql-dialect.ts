@@ -58,7 +58,6 @@ export class LibsqlConnection implements DatabaseConnection {
 
   async beginTransaction(): Promise<void> {
     this.#tx = await this.#client.transaction('write');
-    await this.#tx.execute('PRAGMA foreign_keys = ON');
   }
 
   async commitTransaction(): Promise<void> {
@@ -67,7 +66,11 @@ export class LibsqlConnection implements DatabaseConnection {
     }
     const tx = this.#tx;
     this.#tx = null;
-    await tx.commit();
+    try {
+      await tx.commit();
+    } finally {
+      tx.close();
+    }
   }
 
   async rollbackTransaction(): Promise<void> {
@@ -76,7 +79,20 @@ export class LibsqlConnection implements DatabaseConnection {
     }
     const tx = this.#tx;
     this.#tx = null;
-    await tx.rollback();
+    try {
+      await tx.rollback();
+    } finally {
+      tx.close();
+    }
+  }
+
+  closeActiveTransaction(): void {
+    if (!this.#tx) {
+      return;
+    }
+    const tx = this.#tx;
+    this.#tx = null;
+    tx.close();
   }
 
   async executeQuery<R>(compiledQuery: CompiledQuery): Promise<QueryResult<R>> {
@@ -141,8 +157,10 @@ export class LibsqlDriver implements Driver {
     await (connection as LibsqlConnection).rollbackTransaction();
   }
 
-  async releaseConnection(): Promise<void> {
-    // Connections are lightweight wrappers over the shared libSQL Client.
+  async releaseConnection(connection: DatabaseConnection): Promise<void> {
+    if (connection instanceof LibsqlConnection) {
+      connection.closeActiveTransaction();
+    }
   }
 
   async destroy(): Promise<void> {

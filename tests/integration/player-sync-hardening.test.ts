@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from '../../packages/server/src/app.js';
 import {
   resetEmailRateLimit,
   resetInitPlayerRateLimit,
@@ -258,5 +259,50 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
       });
       expect(res.status).toBe(404);
     }
+  });
+
+  it('resolves puzzle once outside the write transaction on POST /api/player/sync/progress', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as { token: string };
+
+    const executedTables: string[] = [];
+    const countedDb = harness.db.withPlugin({
+      transformQuery(args) {
+        const json = JSON.stringify(args.node);
+        if (json.includes('"puzzles"')) executedTables.push('puzzles');
+        if (json.includes('"blocked_words"')) executedTables.push('blocked_words');
+        return args.node;
+      },
+      transformResult: (args) => Promise.resolve(args.result),
+    });
+    const countedApp = createApp(countedDb);
+
+    // Warm puzzle cache on the same db instance first (simulating normal play)
+    await countedApp.request('/api/puzzle');
+    executedTables.length = 0;
+
+    const res = await countedApp.request('/api/player/sync/progress', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${player.token}`,
+      },
+      body: JSON.stringify({
+        puzzle_number: 1,
+        date: '2026-04-10',
+        found_words: ['kana'],
+        score: 1,
+        max_score: 50,
+        hints_unlocked: [],
+        started_at: 1000,
+        total_paused_ms: 0,
+        score_before_hints: null,
+        best_no_hint_score: 1,
+      }),
+    });
+    expect(res.status).toBe(200);
+    // Warm cache: 2 parallel queries inside getFullPuzzleBySlot (row + activeSlots), 0 blocked_words scans, and never repeated 3x inside tx
+    expect(executedTables.filter((t) => t === 'puzzles')).toHaveLength(2);
+    expect(executedTables.filter((t) => t === 'blocked_words')).toHaveLength(0);
   });
 });

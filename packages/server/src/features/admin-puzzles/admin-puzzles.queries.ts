@@ -124,14 +124,19 @@ export async function softDeletePuzzle(db: Kysely<Database>, slot: number) {
 }
 
 export async function swapPuzzles(db: Kysely<Database>, slotA: number, slotB: number) {
-  const pA = await getPuzzleBySlot(db, slotA);
-  const pB = await getPuzzleBySlot(db, slotB);
+  const rows = await db
+    .selectFrom('puzzles')
+    .select(['slot', 'letters', 'center', 'is_active', 'max_score'])
+    .where('slot', 'in', [slotA, slotB])
+    .execute();
+
+  const pA = rows.find((r) => Number(r.slot) === slotA);
+  const pB = rows.find((r) => Number(r.slot) === slotB);
   if (!pA || !pB) {
     throw new Error('Molemmat pelit vaaditaan vaihtoon');
   }
 
   const now = new Date().toISOString();
-  // Temporarily assign slotA to negative slot to avoid conflict
   await db
     .updateTable('puzzles')
     .set({
