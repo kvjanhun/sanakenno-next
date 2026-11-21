@@ -6,17 +6,6 @@ import {
   type AnnouncementInput,
 } from './announcements.js';
 
-/** localStorage key for the player's "hide hint deck" preference. Defaults to true (collapsed). */
-export const HINTS_HIDDEN_KEY = 'sanakenno_hints_hidden';
-
-function writeHintsHidden(hidden: boolean): void {
-  try {
-    window.localStorage.setItem(HINTS_HIDDEN_KEY, hidden ? '1' : '0');
-  } catch {
-    // Storage unavailable (private mode / quota): keep the in-memory preference only.
-  }
-}
-
 /** Message severity used for immediate word-submission feedback. */
 export type MessageType = 'ok' | 'error' | 'special';
 
@@ -127,7 +116,6 @@ export const useUiStore = create<UiState>()((set, get) => ({
   hintsHidden: true,
 
   setHintsHidden: (hintsHidden) => {
-    writeHintsHidden(hintsHidden);
     set({ hintsHidden });
   },
 

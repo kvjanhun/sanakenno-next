@@ -39,11 +39,7 @@ export function HintPanels({
 
   // Independent unlocks (legacy IDs map onto the same levels).
   const has = (...ids: string[]) => ids.some((id) => hintsUnlocked.has(id));
-  const matrixLevel: 0 | 1 | 2 = has('tier3', 'matrix_full', 'distribution')
-    ? 2
-    : has('tier1', 'matrix_totals', 'matrix', 'summary')
-      ? 1
-      : 0;
+  const matrixLevel: 0 | 1 | 2 = has('tier3', 'distribution') ? 2 : has('tier1', 'summary') ? 1 : 0;
 
   const hasPangrams = has('tier2', 'pangrams');
   const hasPairs = has('pairs');
@@ -155,22 +151,6 @@ export function HintPanels({
             {tabButton('matrix', 'Matriisi', matrixLevel, 'tier-tab-1', 2)}
             {tabButton('hints', 'Vihjeet', unlockedCluesCount, 'tier-tab-2', 3)}
           </div>
-
-          {/* Hidden aliases kept for legacy test selectors */}
-          <button
-            type="button"
-            data-testid="tier-tab-3"
-            className="hidden"
-            onClick={() => setActiveTab('matrix')}
-            aria-hidden="true"
-          />
-          <button
-            type="button"
-            data-testid="tier-tab-4"
-            className="hidden"
-            onClick={() => setActiveTab('hints')}
-            aria-hidden="true"
-          />
 
           <button
             type="button"

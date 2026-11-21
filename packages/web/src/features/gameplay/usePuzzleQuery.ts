@@ -28,9 +28,7 @@ export function usePuzzleQuery(date: string | null = null) {
         }
         return data;
       } catch (err) {
-        const cached =
-          loadCachedPuzzleResponse(targetDate) ??
-          (date === null ? loadCachedPuzzleResponse('today') : null);
+        const cached = loadCachedPuzzleResponse(targetDate);
         if (cached) {
           return cached;
         }

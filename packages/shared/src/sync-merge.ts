@@ -4,7 +4,12 @@
  * Merge strategy: take the best of both sides. No data is ever discarded.
  */
 
-import { bestNoHintScoreForRecord, rankIndex, type StatsRecord } from './stats.js';
+import {
+  bestNoHintScoreForRecord,
+  mergeStatsRecordFields,
+  rankIndex,
+  type StatsRecord,
+} from './stats.js';
 import type { SyncPuzzleState } from './auth-types.js';
 
 function hasAdditionalItems(local: string[], server: string[]): boolean {
@@ -21,30 +26,7 @@ function earlierStartedAt(a: number, b: number): number {
  * Merge two stats records for the same puzzle_number.
  */
 export function mergeStatsRecord(existing: StatsRecord, incoming: StatsRecord): StatsRecord {
-  const useIncomingRank = rankIndex(incoming.best_rank) > rankIndex(existing.best_rank);
-
-  const existingLW = existing.longest_word ?? '';
-  const incomingLW = incoming.longest_word ?? '';
-
-  return {
-    puzzle_number: existing.puzzle_number,
-    date: existing.date,
-    best_rank: useIncomingRank ? incoming.best_rank : existing.best_rank,
-    best_score: Math.max(existing.best_score, incoming.best_score),
-    max_score: existing.max_score,
-    words_found: Math.max(existing.words_found, incoming.words_found),
-    hints_used: Math.max(existing.hints_used, incoming.hints_used),
-    elapsed_ms: Math.max(existing.elapsed_ms, incoming.elapsed_ms),
-    longest_word: existingLW.length >= incomingLW.length ? existingLW : incomingLW,
-    pangrams_found: Math.max(existing.pangrams_found ?? 0, incoming.pangrams_found ?? 0),
-    best_no_hint_score: Math.max(
-      bestNoHintScoreForRecord(existing),
-      bestNoHintScoreForRecord(incoming),
-    ),
-    is_daily: Boolean(existing.is_daily || incoming.is_daily),
-    played_at_date: incoming.played_at_date ?? existing.played_at_date,
-    long_words_count: Math.max(existing.long_words_count ?? 0, incoming.long_words_count ?? 0),
-  };
+  return mergeStatsRecordFields(existing, incoming);
 }
 
 /**

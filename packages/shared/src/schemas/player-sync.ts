@@ -29,7 +29,7 @@ export const PlayerMeResponseSchema = z.object({
 export type PlayerMeResponse = z.infer<typeof PlayerMeResponseSchema>;
 
 export const TransferCreatePayloadSchema = z.object({
-  email: z.string().trim().min(1),
+  email: z.string().trim().min(1).email(),
   player_key: z.string().trim().min(1).optional(),
 });
 

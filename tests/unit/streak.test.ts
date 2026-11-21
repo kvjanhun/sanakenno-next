@@ -158,5 +158,71 @@ describe('Streak Calculation & Daily Integrity', () => {
     );
     expect(updated.records[0]?.is_daily).toBe(true);
     expect(updated.records[0]?.best_score).toBe(80);
+
+    // Legacy record (is_daily: undefined) updated via archive view preserves is_daily: true
+    const legacyStats: PlayerStats = {
+      version: 1,
+      records: [
+        createRecord({
+          puzzle_number: 11,
+          date: '2026-03-01',
+          is_daily: undefined,
+          played_at_date: undefined,
+        }),
+      ],
+    };
+    const updatedLegacy = updateStatsRecord(
+      legacyStats,
+      createRecord({ puzzle_number: 11, date: '2026-03-01', is_daily: false, best_score: 90 }),
+    );
+    expect(updatedLegacy.records[0]?.is_daily).toBe(true);
+
+    // Explicit archive record (is_daily: false) merged with partial incoming (is_daily: undefined, played_at_date: undefined) stays is_daily: false
+    const archiveStats: PlayerStats = {
+      version: 1,
+      records: [
+        createRecord({
+          puzzle_number: 12,
+          date: '2026-03-01',
+          is_daily: false,
+          played_at_date: '2026-03-05',
+        }),
+      ],
+    };
+    const updatedArchive = updateStatsRecord(
+      archiveStats,
+      createRecord({
+        puzzle_number: 12,
+        date: '2026-03-01',
+        is_daily: undefined,
+        played_at_date: undefined,
+        hints_used: 1,
+      }),
+    );
+    expect(updatedArchive.records[0]?.is_daily).toBe(false);
+  });
+
+  it('ignores 0-word records when computing daily streaks', () => {
+    const today = '2026-11-05';
+    const solvedYesterday = createRecord({
+      puzzle_number: 101,
+      date: '2026-11-04',
+      words_found: 4,
+      is_daily: true,
+    });
+    const zeroWordToday = createRecord({
+      puzzle_number: 102,
+      date: today,
+      words_found: 0,
+      best_score: 0,
+      hints_used: 1,
+      is_daily: true,
+    });
+
+    expect(computeStreak([zeroWordToday], today)).toEqual({ current: 0, best: 0 });
+    expect(computeStreak([solvedYesterday, zeroWordToday], today)).toEqual({
+      current: 1,
+      best: 1,
+    });
   });
 });

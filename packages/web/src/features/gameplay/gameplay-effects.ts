@@ -3,13 +3,15 @@ import {
   evaluateAchievements,
   getHelsinkiDateString,
   noHintMilestoneStates,
+  rankForScore,
   type PuzzleResponse,
   type RankName,
+  type SyncProgressPayload,
 } from '@sanakenno/shared';
 import { postAchievement, postWordFind } from '../../api/client.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { formatAnnouncementCount } from './announcements.js';
-import { recordLocalStatsUpdate } from './storage.js';
+import { isPuzzleRevealed, recordLocalStatsUpdate } from './storage.js';
 import { useUiStore } from './useUiStore.js';
 
 export interface AcceptedWordContext {
@@ -29,6 +31,109 @@ export interface AcceptedWordContext {
   totalPausedMs: number;
   scoreBeforeHints: number | null;
   foundWords: Set<string>;
+}
+
+export interface HintUnlockedContext {
+  puzzle: PuzzleResponse;
+  foundWords: Set<string>;
+  score: number;
+  visibleHintsUnlocked: string[];
+  scoreBeforeHints: number | null;
+  startedAt: number;
+  totalPausedMs: number;
+  validLetters: Set<string>;
+  wasFirstHint: boolean;
+}
+
+export function buildSyncPayload(params: {
+  puzzle: PuzzleResponse;
+  viewingPuzzleDate: string | null;
+  foundWords: Iterable<string>;
+  score: number;
+  visibleHintsUnlocked: string[];
+  startedAt: number;
+  totalPausedMs: number;
+  scoreBeforeHints: number | null;
+  bestNoHintScore: number;
+}): { payload: SyncProgressPayload; dateStr: string; isDaily: boolean } {
+  const todayHelsinki = getHelsinkiDateString();
+  const dateStr = params.viewingPuzzleDate ?? params.puzzle.date ?? todayHelsinki;
+  const isDaily =
+    params.viewingPuzzleDate === null &&
+    (params.puzzle.date ? params.puzzle.date === todayHelsinki : true);
+
+  return {
+    dateStr,
+    isDaily,
+    payload: {
+      puzzle_number: params.puzzle.puzzle_number,
+      date: dateStr,
+      found_words: [...params.foundWords],
+      score: params.score,
+      hints_unlocked: params.visibleHintsUnlocked,
+      started_at: params.startedAt,
+      total_paused_ms: params.totalPausedMs,
+      score_before_hints: params.scoreBeforeHints,
+      max_score: params.puzzle.max_score,
+      best_no_hint_score: params.bestNoHintScore,
+      is_daily: isDaily,
+      played_at_date: todayHelsinki,
+    },
+  };
+}
+
+export function handleHintUnlockedEffects(ctx: HintUnlockedContext): void {
+  const {
+    puzzle,
+    foundWords,
+    score,
+    visibleHintsUnlocked,
+    scoreBeforeHints,
+    startedAt,
+    totalPausedMs,
+    validLetters,
+    wasFirstHint,
+  } = ctx;
+
+  if (isPuzzleRevealed(puzzle.puzzle_number)) {
+    return;
+  }
+
+  const ui = useUiStore.getState();
+  const bestNoHintScore = visibleHintsUnlocked.length === 0 ? score : (scoreBeforeHints ?? 0);
+  const { payload, dateStr, isDaily } = buildSyncPayload({
+    puzzle,
+    viewingPuzzleDate: ui.viewingPuzzleDate,
+    foundWords,
+    score,
+    visibleHintsUnlocked,
+    startedAt,
+    totalPausedMs,
+    scoreBeforeHints,
+    bestNoHintScore,
+  });
+
+  if (foundWords.size > 0) {
+    recordLocalStatsUpdate({
+      puzzleNumber: puzzle.puzzle_number,
+      dateStr,
+      rank: rankForScore(score, puzzle.max_score),
+      score,
+      maxScore: puzzle.max_score,
+      foundWords,
+      validLetters,
+      hintsUsed: visibleHintsUnlocked.length,
+      elapsedMs: Math.max(0, Date.now() - startedAt - totalPausedMs),
+      bestNoHintScore,
+      isDaily,
+    });
+  }
+
+  useAuthStore.getState().syncProgressDebounced(payload);
+
+  if (wasFirstHint) {
+    void useAuthStore.getState().flushPendingSync();
+  }
 }
 
 export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
@@ -52,18 +157,23 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
   } = ctx;
 
   const ui = useUiStore.getState();
+  const revealed = isPuzzleRevealed(puzzle.puzzle_number);
 
-  postWordFind({ word: normalized, puzzle_number: puzzle.puzzle_number });
+  if (!revealed) {
+    postWordFind({ word: normalized, puzzle_number: puzzle.puzzle_number });
+  }
 
   if (newRank !== previousRank) {
-    postAchievement({
-      puzzle_number: puzzle.puzzle_number,
-      rank: newRank as RankName,
-      score: newScore,
-      max_score: puzzle.max_score,
-      words_found: newFoundWords.size,
-      elapsed_ms: Math.max(0, Date.now() - startedAt - totalPausedMs),
-    });
+    if (!revealed) {
+      postAchievement({
+        puzzle_number: puzzle.puzzle_number,
+        rank: newRank as RankName,
+        score: newScore,
+        max_score: puzzle.max_score,
+        words_found: newFoundWords.size,
+        elapsed_ms: Math.max(0, Date.now() - startedAt - totalPausedMs),
+      });
+    }
 
     if (newRank === 'Täysi kenno') {
       ui.setCelebration('taysikenno');
@@ -132,13 +242,25 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     }
   }
 
-  const viewingDate = ui.viewingPuzzleDate;
-  const isDaily =
-    viewingDate === null && (puzzle.date ? puzzle.date === getHelsinkiDateString() : true);
+  if (revealed) {
+    return;
+  }
+
+  const { payload, dateStr, isDaily } = buildSyncPayload({
+    puzzle,
+    viewingPuzzleDate: ui.viewingPuzzleDate,
+    foundWords: newFoundWords,
+    score: newScore,
+    visibleHintsUnlocked,
+    startedAt,
+    totalPausedMs,
+    scoreBeforeHints,
+    bestNoHintScore,
+  });
 
   const statsResult = recordLocalStatsUpdate({
     puzzleNumber: puzzle.puzzle_number,
-    dateStr: viewingDate ?? getHelsinkiDateString(),
+    dateStr,
     rank: newRank,
     score: newScore,
     maxScore: puzzle.max_score,
@@ -174,24 +296,7 @@ export function handleAcceptedWordEffects(ctx: AcceptedWordContext): void {
     }
   }
 
-  // Debounced cloud sync
-  const todayHelsinki = getHelsinkiDateString();
-  const syncPayload = {
-    puzzle_number: puzzle.puzzle_number,
-    date: ui.viewingPuzzleDate ?? todayHelsinki,
-    found_words: [...newFoundWords],
-    score: newScore,
-    hints_unlocked: visibleHintsUnlocked,
-    started_at: startedAt,
-    total_paused_ms: totalPausedMs,
-    score_before_hints: scoreBeforeHints,
-    max_score: puzzle.max_score,
-    best_no_hint_score: bestNoHintScore,
-    is_daily: isDaily,
-    played_at_date: todayHelsinki,
-  };
-
-  useAuthStore.getState().syncProgressDebounced(syncPayload);
+  useAuthStore.getState().syncProgressDebounced(payload);
 
   // Immediate flush on major milestones
   if (newRank === 'Ällistyttävä' || newRank === 'Täysi kenno') {

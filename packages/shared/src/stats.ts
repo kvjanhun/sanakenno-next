@@ -87,6 +87,48 @@ export function isDailyRecord(record: StatsRecord): boolean {
 }
 
 /**
+ * Resolve `is_daily` asymmetrically when merging an existing record with an incoming update.
+ * Preserves legacy `is_daily: undefined` daily records while ensuring partial sync updates
+ * (`{ is_daily: undefined, played_at_date: undefined }`) never promote an explicit archive
+ * record (`existing.is_daily === false`) to `true`.
+ */
+export function mergeIsDaily(existing: StatsRecord, incoming: StatsRecord): boolean {
+  if (existing.is_daily === true || incoming.is_daily === true) return true;
+  if (existing.is_daily === undefined && isDailyRecord(existing)) return true;
+  if (incoming.is_daily === undefined && incoming.played_at_date !== undefined) {
+    return incoming.played_at_date === incoming.date;
+  }
+  return false;
+}
+
+/**
+ * Shared monotonic field-by-field merge for two stats records of the same puzzle_number.
+ */
+export function mergeStatsRecordFields(existing: StatsRecord, incoming: StatsRecord): StatsRecord {
+  const shouldUpgrade = rankIndex(incoming.best_rank) > rankIndex(existing.best_rank);
+
+  return {
+    puzzle_number: existing.puzzle_number,
+    date: existing.date,
+    best_rank: shouldUpgrade ? incoming.best_rank : existing.best_rank,
+    best_score: Math.max(existing.best_score, incoming.best_score),
+    max_score: Math.max(existing.max_score, incoming.max_score),
+    words_found: Math.max(existing.words_found, incoming.words_found),
+    hints_used: Math.max(existing.hints_used, incoming.hints_used),
+    elapsed_ms: Math.max(existing.elapsed_ms, incoming.elapsed_ms),
+    longest_word: longerWord(existing.longest_word, incoming.longest_word),
+    pangrams_found: Math.max(existing.pangrams_found ?? 0, incoming.pangrams_found ?? 0),
+    best_no_hint_score: Math.max(
+      bestNoHintScoreForRecord(existing),
+      bestNoHintScoreForRecord(incoming),
+    ),
+    is_daily: mergeIsDaily(existing, incoming),
+    played_at_date: incoming.played_at_date ?? existing.played_at_date,
+    long_words_count: Math.max(existing.long_words_count ?? 0, incoming.long_words_count ?? 0),
+  };
+}
+
+/**
  * Upsert a stats record. Only upgrades best_rank and best_score.
  * Returns a new PlayerStats (immutable).
  */
@@ -106,32 +148,17 @@ export function updateStatsRecord(stats: PlayerStats, record: StatsRecord): Play
     };
   }
 
-  const shouldUpgrade = rankIndex(record.best_rank) > rankIndex(existing.best_rank);
-
   return {
     ...stats,
     records: stats.records.map((r) =>
-      r.puzzle_number === record.puzzle_number
-        ? {
-            ...r,
-            best_rank: shouldUpgrade ? record.best_rank : r.best_rank,
-            best_score: Math.max(r.best_score, record.best_score),
-            words_found: Math.max(r.words_found, record.words_found),
-            hints_used: Math.max(r.hints_used, record.hints_used),
-            elapsed_ms: Math.max(r.elapsed_ms, record.elapsed_ms),
-            longest_word: longerWord(r.longest_word, record.longest_word),
-            pangrams_found: Math.max(r.pangrams_found ?? 0, record.pangrams_found ?? 0),
-            best_no_hint_score: Math.max(
-              bestNoHintScoreForRecord(r),
-              bestNoHintScoreForRecord(record),
-            ),
-            is_daily: Boolean(r.is_daily || record.is_daily),
-            played_at_date: record.played_at_date ?? r.played_at_date,
-            long_words_count: Math.max(r.long_words_count ?? 0, record.long_words_count ?? 0),
-          }
-        : r,
+      r.puzzle_number === record.puzzle_number ? mergeStatsRecordFields(r, record) : r,
     ),
   };
+}
+
+function parseIsoDateUtc(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Date.UTC(y ?? 0, (m ?? 1) - 1, d ?? 1);
 }
 
 /**
@@ -142,7 +169,7 @@ export function computeStreak(
   records: StatsRecord[],
   today?: string,
 ): { current: number; best: number } {
-  const dailyRecords = records.filter(isDailyRecord);
+  const dailyRecords = records.filter((r) => isDailyRecord(r) && r.words_found > 0);
   if (dailyRecords.length === 0) return { current: 0, best: 0 };
 
   const dates = [...new Set(dailyRecords.map((r) => r.date))].sort().reverse();
@@ -150,9 +177,9 @@ export function computeStreak(
   if (!latestDateStr) return { current: 0, best: 0 };
 
   const todayStr = today ?? getHelsinkiDateString();
-  const todayDate = new Date(todayStr + 'T12:00:00');
-  const latestDate = new Date(latestDateStr + 'T12:00:00');
-  const daysDiff = Math.round((todayDate.getTime() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
+  const daysDiff = Math.round(
+    (parseIsoDateUtc(todayStr) - parseIsoDateUtc(latestDateStr)) / 86_400_000,
+  );
 
   let current = 0;
   if (daysDiff >= 0 && daysDiff <= 1) {
@@ -161,9 +188,7 @@ export function computeStreak(
       const prevStr = dates[i - 1];
       const currStr = dates[i];
       if (!prevStr || !currStr) break;
-      const prev = new Date(prevStr + 'T12:00:00');
-      const curr = new Date(currStr + 'T12:00:00');
-      const diff = Math.round((prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24));
+      const diff = Math.round((parseIsoDateUtc(prevStr) - parseIsoDateUtc(currStr)) / 86_400_000);
       if (diff === 1) {
         current++;
       } else {
@@ -179,9 +204,7 @@ export function computeStreak(
     const prevStr = sorted[i - 1];
     const currStr = sorted[i];
     if (!prevStr || !currStr) continue;
-    const prev = new Date(prevStr + 'T12:00:00');
-    const curr = new Date(currStr + 'T12:00:00');
-    const diff = Math.round((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+    const diff = Math.round((parseIsoDateUtc(currStr) - parseIsoDateUtc(prevStr)) / 86_400_000);
     if (diff === 1) {
       run++;
       best = Math.max(best, run);

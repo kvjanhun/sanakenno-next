@@ -231,4 +231,67 @@ describe('Debounced Progress Sync', () => {
     await useAuthStore.getState().flushPendingSync();
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
+
+  it('does not lose a newer payload enqueued while flushPendingSync is in-flight and coalesces concurrent flushes', async () => {
+    saveToStorage(AUTH_TOKEN_STORAGE_KEY, 'test-bearer-token');
+
+    const payload1: SyncProgressPayload = {
+      puzzle_number: 7,
+      date: '2026-04-15',
+      found_words: ['kana'],
+      score: 1,
+      max_score: 50,
+      hints_unlocked: ['tier1'],
+      started_at: 1000,
+      total_paused_ms: 0,
+      score_before_hints: 1,
+      best_no_hint_score: 1,
+    };
+    const payload2: SyncProgressPayload = {
+      ...payload1,
+      found_words: ['kana', 'sana'],
+      score: 2,
+      hints_unlocked: ['tier1', 'tier2'],
+    };
+
+    let resolveFirstCall!: () => void;
+    const firstCallPromise = new Promise<void>((resolve) => {
+      resolveFirstCall = resolve;
+    });
+
+    const postSpy = vi
+      .spyOn(clientModule, 'postSyncProgress')
+      .mockImplementationOnce(() => firstCallPromise)
+      .mockResolvedValueOnce();
+
+    useAuthStore.getState().syncProgressDebounced(payload1);
+
+    // Start two concurrent flushes; they must share the same in-flight promise
+    const flushA = useAuthStore.getState().flushPendingSync();
+    const flushB = useAuthStore.getState().flushPendingSync();
+    expect(postSpy).toHaveBeenCalledTimes(1);
+    expect(postSpy).toHaveBeenNthCalledWith(1, 'test-bearer-token', payload1);
+
+    // Enqueue a newer payload for the SAME slot while the first network call is in-flight
+    useAuthStore.getState().syncProgressDebounced(payload2);
+
+    resolveFirstCall();
+    await Promise.all([flushA, flushB]);
+
+    // The follow-up pass must have sent payload2 rather than deleting it
+    expect(postSpy).toHaveBeenCalledTimes(2);
+    expect(postSpy).toHaveBeenNthCalledWith(2, 'test-bearer-token', payload2);
+
+    // Also verify concurrent flushes on failure only attempt once per flush batch
+    postSpy.mockReset();
+    postSpy.mockRejectedValue(new Error('Network down'));
+    useAuthStore.getState().syncProgressDebounced(payload1);
+    await Promise.all([
+      useAuthStore.getState().flushPendingSync(),
+      useAuthStore.getState().flushPendingSync(),
+    ]);
+    expect(postSpy).toHaveBeenCalledTimes(1);
+    postSpy.mockResolvedValue();
+    await useAuthStore.getState().flushPendingSync();
+  });
 });

@@ -1,5 +1,7 @@
 import {
   bestNoHintScoreForRecord,
+  isDailyRecord,
+  mergeIsDaily,
   mergePuzzleState,
   mergeStatsRecord,
   rankForScore,
@@ -16,6 +18,20 @@ import { computePuzzle, type FullPuzzleData } from '../puzzle/wordlist.js';
 const STATS_UPSERT_CHUNK_SIZE = 40;
 const STATE_UPSERT_CHUNK_SIZE = 50;
 const SLOT_IN_QUERY_CHUNK_SIZE = 500;
+
+/**
+ * Safely parse a JSON string column into a string array, falling back to `[]` on corrupt data.
+ */
+export function parseStringArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === 'string');
+  } catch {
+    return [];
+  }
+}
 
 export interface BulkPuzzleMeta {
   allLetters: Set<string>;
@@ -132,7 +148,9 @@ export function sanitizeAndMergeStatsRecord(
       Number(existing?.long_words_count ?? 0),
       mergedBase.long_words_count ?? 0,
     ),
-    is_daily: Boolean(existing?.is_daily || mergedBase.is_daily),
+    is_daily: existing
+      ? mergeIsDaily(existing, sanitizedIncoming)
+      : isDailyRecord(sanitizedIncoming),
     played_at_date: mergedBase.played_at_date ?? existing?.played_at_date,
   };
 }
@@ -349,9 +367,9 @@ export async function bulkUpsertLocalData(
       const puzzleNumber = Number(row.puzzle_number);
       stateMap.set(puzzleNumber, {
         puzzle_number: puzzleNumber,
-        found_words: JSON.parse(row.found_words) as string[],
+        found_words: parseStringArray(row.found_words),
         score: Number(row.score),
-        hints_unlocked: JSON.parse(row.hints_unlocked) as string[],
+        hints_unlocked: parseStringArray(row.hints_unlocked),
         started_at: Number(row.started_at),
         total_paused_ms: Number(row.total_paused_ms),
         score_before_hints: row.score_before_hints !== null ? Number(row.score_before_hints) : null,

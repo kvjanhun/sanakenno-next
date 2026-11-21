@@ -56,6 +56,8 @@ export interface AuthState {
 
 const pendingSyncQueue = new Map<number, SyncProgressPayload>();
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let queueVersion = 0;
+let inFlightFlush: Promise<void> | null = null;
 const DEBOUNCE_DELAY_MS = 1500;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -336,6 +338,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   syncProgressDebounced: (payload: SyncProgressPayload) => {
+    queueVersion += 1;
     pendingSyncQueue.set(payload.puzzle_number, payload);
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -348,19 +351,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       clearTimeout(debounceTimer);
       debounceTimer = null;
     }
-    if (pendingSyncQueue.size === 0) return;
-    const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
-    if (!token) return;
-
-    const entries = Array.from(pendingSyncQueue.entries());
-    for (const [slot, payload] of entries) {
-      try {
-        await postSyncProgress(token, payload);
-        pendingSyncQueue.delete(slot);
-      } catch {
-        // Keep in queue for next flush attempt
-      }
+    if (inFlightFlush) {
+      await inFlightFlush;
+      return;
     }
+
+    const runFlush = async () => {
+      while (pendingSyncQueue.size > 0) {
+        const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
+        if (!token) return;
+
+        const startVersion = queueVersion;
+        const entries = Array.from(pendingSyncQueue.entries());
+        let hadFailure = false;
+
+        for (const [slot, payload] of entries) {
+          try {
+            await postSyncProgress(token, payload);
+            if (pendingSyncQueue.get(slot) === payload) {
+              pendingSyncQueue.delete(slot);
+            }
+          } catch {
+            // Keep in queue for next flush attempt
+            hadFailure = true;
+          }
+        }
+
+        if (hadFailure || queueVersion === startVersion) {
+          break;
+        }
+      }
+    };
+
+    inFlightFlush = runFlush().finally(() => {
+      inFlightFlush = null;
+    });
+    await inFlightFlush;
   },
 
   requestTransferTicket: async () => {

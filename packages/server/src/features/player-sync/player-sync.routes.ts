@@ -12,6 +12,7 @@ import {
   fetchPlayerData,
   mergeAndStorePuzzleState,
   mergeAndStoreStatsRecord,
+  readStatsRecord,
   upsertPlayerPreferences,
 } from './player-sync.queries.js';
 
@@ -38,8 +39,20 @@ export function createPlayerSyncRoutes(db: Kysely<Database>) {
 
         await runImmediateTransactionWithRetry(db, async (trx) => {
           const mergedState = await mergeAndStorePuzzleState(trx, player.playerId, payload, puzzle);
-          const derivedStats = await deriveStatsFromProgress(trx, payload, mergedState, puzzle);
-          await mergeAndStoreStatsRecord(trx, player.playerId, derivedStats, puzzle);
+          const existingStats =
+            mergedState.found_words.length === 0
+              ? await readStatsRecord(trx, player.playerId, payload.puzzle_number)
+              : undefined;
+          if (mergedState.found_words.length > 0 || existingStats !== undefined) {
+            const derivedStats = await deriveStatsFromProgress(trx, payload, mergedState, puzzle);
+            await mergeAndStoreStatsRecord(
+              trx,
+              player.playerId,
+              derivedStats,
+              puzzle,
+              existingStats,
+            );
+          }
         });
 
         return c.json({ status: 'synced' as const }, 200);

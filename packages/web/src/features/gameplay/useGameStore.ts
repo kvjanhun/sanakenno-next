@@ -11,10 +11,11 @@ import {
 } from '@sanakenno/shared';
 import { postFailedGuess } from '../../api/client.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
-import { handleAcceptedWordEffects } from './gameplay-effects.js';
+import { handleAcceptedWordEffects, handleHintUnlockedEffects } from './gameplay-effects.js';
 import { hashWord } from './hash.js';
 import { filterVisibleHintIds, isVisibleHintId } from './hints.js';
 import {
+  isPuzzleRevealed,
   puzzleStateKey,
   readSavedPuzzleState,
   recordLocalStatsUpdate,
@@ -165,23 +166,36 @@ export const useGameStore = create<GameState>()((set, get) => ({
     if (foundWords.has(normalized)) return rejectWord('Löysit jo tämän!', normalized);
 
     const wordHash = await hashWord(normalized);
-    if (!state.wordHashSet().has(wordHash)) {
-      postFailedGuess({
-        word: normalized,
-        date: useUiStore.getState().viewingPuzzleDate ?? getHelsinkiDateString(),
-      });
+    const fresh = get();
+    if (
+      !fresh.puzzle ||
+      fresh.puzzle.puzzle_number !== puzzle.puzzle_number ||
+      fresh.foundWords.has(normalized)
+    ) {
+      return;
+    }
+
+    if (!fresh.wordHashSet().has(wordHash)) {
+      if (!isPuzzleRevealed(fresh.puzzle.puzzle_number)) {
+        postFailedGuess({
+          word: normalized,
+          date:
+            useUiStore.getState().viewingPuzzleDate ?? fresh.puzzle.date ?? getHelsinkiDateString(),
+        });
+      }
       return rejectWord('Ei sanakirjassa');
     }
 
-    const pts = scoreWord(normalized, validLetters);
-    const pangram = isPangram(normalized, validLetters);
-    const newFoundWords = new Set(foundWords).add(normalized);
-    const newScore = state.score + pts;
-    const previousRank = rankForScore(state.score, puzzle.max_score);
-    const newRank = rankForScore(newScore, puzzle.max_score);
-    const visibleHintsUnlocked = filterVisibleHintIds(state.hintsUnlocked);
+    const freshValidLetters = fresh.allLetters();
+    const pts = scoreWord(normalized, freshValidLetters);
+    const pangram = isPangram(normalized, freshValidLetters);
+    const newFoundWords = new Set(fresh.foundWords).add(normalized);
+    const newScore = fresh.score + pts;
+    const previousRank = rankForScore(fresh.score, fresh.puzzle.max_score);
+    const newRank = rankForScore(newScore, fresh.puzzle.max_score);
+    const visibleHintsUnlocked = filterVisibleHintIds(fresh.hintsUnlocked);
     const bestNoHintScore =
-      visibleHintsUnlocked.length === 0 ? newScore : (state.scoreBeforeHints ?? 0);
+      visibleHintsUnlocked.length === 0 ? newScore : (fresh.scoreBeforeHints ?? 0);
 
     useUiStore.getState().clearWordRejection();
     set({ foundWords: newFoundWords, score: newScore, currentWord: '' });
@@ -192,31 +206,46 @@ export const useGameStore = create<GameState>()((set, get) => ({
       pts,
       pangram,
       newFoundWords,
-      previousScore: state.score,
+      previousScore: fresh.score,
       newScore,
       previousRank,
       newRank,
       visibleHintsUnlocked,
       bestNoHintScore,
-      validLetters,
-      puzzle,
-      startedAt: state.startedAt,
-      totalPausedMs: state.totalPausedMs,
-      scoreBeforeHints: state.scoreBeforeHints,
-      foundWords,
+      validLetters: freshValidLetters,
+      puzzle: fresh.puzzle,
+      startedAt: fresh.startedAt,
+      totalPausedMs: fresh.totalPausedMs,
+      scoreBeforeHints: fresh.scoreBeforeHints,
+      foundWords: fresh.foundWords,
     });
   },
 
   unlockHint: (id: string) => {
-    if (!isVisibleHintId(id)) return;
+    const state = get();
+    if (!state.puzzle || !isVisibleHintId(id) || state.hintsUnlocked.has(id)) return;
+    const wasFirstHint = filterVisibleHintIds(state.hintsUnlocked).length === 0;
+    const nextHints = new Set(state.hintsUnlocked).add(id);
+    const nextScoreBeforeHints = wasFirstHint ? state.score : state.scoreBeforeHints;
+
     useUiStore.getState().setHintsHidden(false);
-    set((s) => {
-      if (s.hintsUnlocked.has(id)) return s;
-      const isFirst = s.hintsUnlocked.size === 0;
-      const next = new Set(s.hintsUnlocked).add(id);
-      return { hintsUnlocked: next, ...(isFirst ? { scoreBeforeHints: s.score } : {}) };
+    set({
+      hintsUnlocked: nextHints,
+      ...(wasFirstHint ? { scoreBeforeHints: state.score } : {}),
     });
     get().saveState();
+
+    handleHintUnlockedEffects({
+      puzzle: state.puzzle,
+      foundWords: state.foundWords,
+      score: state.score,
+      visibleHintsUnlocked: filterVisibleHintIds(nextHints),
+      scoreBeforeHints: nextScoreBeforeHints,
+      startedAt: state.startedAt,
+      totalPausedMs: state.totalPausedMs,
+      validLetters: state.allLetters(),
+      wasFirstHint,
+    });
   },
 
   tickTimer: (startedAt: number, totalPausedMs: number) => {

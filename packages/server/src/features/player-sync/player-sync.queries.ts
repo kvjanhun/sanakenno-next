@@ -14,6 +14,7 @@ import { getFullPuzzleBySlot } from '../puzzle/puzzle.queries.js';
 import type { FullPuzzleData } from '../puzzle/wordlist.js';
 import {
   bulkUpsertLocalData,
+  parseStringArray,
   preloadBulkPuzzleMeta,
   puzzleDataToMeta,
   sanitizeAndMergePuzzleState,
@@ -26,7 +27,7 @@ export { bulkUpsertLocalData, preloadBulkPuzzleMeta, type BulkPuzzleMeta };
 /**
  * Read and parse stored JSON preferences for a player, or null if absent/invalid.
  */
-export async function readPlayerPreferences(
+async function readPlayerPreferences(
   db: Kysely<Database>,
   playerId: number,
 ): Promise<PlayerPreferences | null> {
@@ -72,7 +73,7 @@ export async function upsertPlayerPreferences(
 /**
  * Fetch a single puzzle state for a player and puzzle slot.
  */
-export async function readPuzzleState(
+async function readPuzzleState(
   db: Kysely<Database>,
   playerId: number,
   puzzleNumber: number,
@@ -95,9 +96,9 @@ export async function readPuzzleState(
 
   return {
     puzzle_number: puzzleNumber,
-    found_words: JSON.parse(existing.found_words) as string[],
+    found_words: parseStringArray(existing.found_words),
     score: Number(existing.score),
-    hints_unlocked: JSON.parse(existing.hints_unlocked) as string[],
+    hints_unlocked: parseStringArray(existing.hints_unlocked),
     started_at: Number(existing.started_at),
     total_paused_ms: Number(existing.total_paused_ms),
     score_before_hints:
@@ -212,12 +213,16 @@ export async function mergeAndStoreStatsRecord(
   playerId: number,
   incoming: StatsRecord,
   preloadedPuzzle?: FullPuzzleData | null,
+  preloadedExisting?: StatsRecord,
 ): Promise<StatsRecord> {
   const puzzle =
     preloadedPuzzle !== undefined
       ? preloadedPuzzle
       : await getFullPuzzleBySlot(db, incoming.puzzle_number);
-  const existing = await readStatsRecord(db, playerId, incoming.puzzle_number);
+  const existing =
+    preloadedExisting !== undefined
+      ? preloadedExisting
+      : await readStatsRecord(db, playerId, incoming.puzzle_number);
   const merged = sanitizeAndMergeStatsRecord(existing, incoming, puzzleDataToMeta(puzzle));
 
   const longestWordOrNull =
@@ -398,9 +403,9 @@ export async function fetchPlayerData(
     },
     puzzle_states: stateRows.map((r) => ({
       puzzle_number: Number(r.puzzle_number),
-      found_words: JSON.parse(r.found_words) as string[],
+      found_words: parseStringArray(r.found_words),
       score: Number(r.score),
-      hints_unlocked: JSON.parse(r.hints_unlocked) as string[],
+      hints_unlocked: parseStringArray(r.hints_unlocked),
       started_at: Number(r.started_at),
       total_paused_ms: Number(r.total_paused_ms),
       score_before_hints: r.score_before_hints !== null ? Number(r.score_before_hints) : null,

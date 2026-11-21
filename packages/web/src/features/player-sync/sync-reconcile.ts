@@ -1,4 +1,5 @@
 import {
+  AUTH_TOKEN_STORAGE_KEY,
   emptyStats,
   getHelsinkiDateString,
   isPuzzleStateBetterThanServer,
@@ -15,17 +16,17 @@ import {
 import { filterVisibleHintIds } from '../gameplay/hints.js';
 import {
   getRawStorage,
+  isPuzzleRevealed,
   loadFromStorage,
   puzzleStateKey,
   saveToStorage,
   type PersistedPuzzleState,
 } from '../gameplay/storage.js';
-import { usePaletteStore } from '../theme/usePaletteStore.js';
+import { PREFERENCES_UPDATED_AT_KEY, usePaletteStore } from '../theme/usePaletteStore.js';
 import { useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
 
-export const AUTH_TOKEN_STORAGE_KEY = 'sanakenno_auth_token';
+export { AUTH_TOKEN_STORAGE_KEY, PREFERENCES_UPDATED_AT_KEY };
 export const PLAYER_KEY_STORAGE_KEY = 'sanakenno_player_key';
-export const PREFERENCES_UPDATED_AT_KEY = 'sanakenno_preferences_updated_at';
 export const LINKED_STATE_STORAGE_KEY = 'sanakenno_device_linked';
 
 export function gatherLocalData(): {
@@ -34,16 +35,41 @@ export function gatherLocalData(): {
 } {
   const stats = loadFromStorage<PlayerStats>(STATS_STORAGE_KEY) ?? emptyStats();
   const puzzle_states: SyncPuzzleState[] = [];
+  const statsSlotSet = new Set(stats.records.map((r) => r.puzzle_number));
+  const candidateSlots = new Set<number>(statsSlotSet);
 
-  for (const record of stats.records) {
-    const raw = getRawStorage(puzzleStateKey(record.puzzle_number));
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        const match = key ? /^sanakenno_state_(\d+)$/.exec(key) : null;
+        if (match?.[1]) {
+          candidateSlots.add(Number(match[1]));
+        }
+      }
+    } catch {
+      // Ignore storage enumeration issues
+    }
+  }
+
+  for (const puzzleNumber of candidateSlots) {
+    if (isPuzzleRevealed(puzzleNumber)) continue;
+    const raw = getRawStorage(puzzleStateKey(puzzleNumber));
     if (!raw) continue;
     try {
       const saved = JSON.parse(raw) as PersistedPuzzleState;
+      const foundWords = Array.isArray(saved.foundWords) ? saved.foundWords : [];
       const hintsUnlocked = filterVisibleHintIds(saved.hintsUnlocked ?? []);
+      if (
+        !statsSlotSet.has(puzzleNumber) &&
+        foundWords.length === 0 &&
+        hintsUnlocked.length === 0
+      ) {
+        continue;
+      }
       puzzle_states.push({
-        puzzle_number: record.puzzle_number,
-        found_words: saved.foundWords ?? [],
+        puzzle_number: puzzleNumber,
+        found_words: foundWords,
         score: saved.score ?? 0,
         hints_unlocked: hintsUnlocked,
         started_at: saved.startedAt ?? 0,
@@ -111,7 +137,7 @@ export function pullAndMergeData(payload: SyncPayload, onPushPreferences: () => 
       }
     }
     if (changed) {
-      saveToStorage(STATS_STORAGE_KEY, { records: mergedRecords });
+      saveToStorage(STATS_STORAGE_KEY, { records: mergedRecords, version: 1 });
     }
   }
 
