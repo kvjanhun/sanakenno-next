@@ -50,6 +50,7 @@ export const PuzzleStateSchema = z.object({
   started_at: z.number().int().nonnegative().optional().default(0),
   total_paused_ms: z.number().int().nonnegative().optional().default(0),
   score_before_hints: z.number().int().nonnegative().nullable().optional().default(null),
+  revealed: z.boolean().optional().default(false),
 });
 
 export const PlayerPreferencesSchema = z.object({

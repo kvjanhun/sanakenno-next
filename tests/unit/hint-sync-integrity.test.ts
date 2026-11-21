@@ -262,9 +262,11 @@ describe('Spec 38: Hint Activation Sync, Stats & Gameplay State Integrity', () =
       scoreBeforeHints: null,
     });
 
-    // gatherLocalData excludes revealed slot 40 and timer-only slot 41, includes slot 42
+    // gatherLocalData includes revealed slot 40 (with revealed: true) and valid unrevealed slot 42, excludes timer-only slot 41
     const gathered = gatherLocalData();
-    expect(gathered.puzzle_states.map((s) => s.puzzle_number)).toEqual([42]);
+    expect(gathered.puzzle_states.map((s) => s.puzzle_number)).toEqual([40, 42]);
+    expect(gathered.puzzle_states.find((s) => s.puzzle_number === 40)?.revealed).toBe(true);
+    expect(gathered.puzzle_states.find((s) => s.puzzle_number === 42)?.revealed).toBeUndefined();
 
     // backfillNoHintStats does not fabricate missing records for slot 40 or 42
     const backfilled = backfillNoHintStats(emptyStats());

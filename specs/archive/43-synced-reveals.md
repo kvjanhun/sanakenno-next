@@ -1,6 +1,6 @@
 # Spec 43: Cross-Device Revealed Puzzle Sync
 
-Status: approved
+Status: shipped
 Branch: spec/43-synced-reveals
 
 ## 1. Objective
@@ -56,16 +56,16 @@ Sync revealed-answer puzzle flags (`revealed_<slot>`) monotonically across paire
 
 ### New / Updated Tests (real boundaries, not mock-only)
 
-- [ ] **Shared (`tests/unit/shared-domain.test.ts`):**
+- [x] **Shared (`tests/unit/shared-domain.test.ts`):**
   - `mergePuzzleState` and `isPuzzleStateBetterThanServer` merge `revealed` monotonically (`false || true === true`).
-- [ ] **Integration (`tests/integration/player-sync-hardening.test.ts`):**
+- [x] **Integration (`tests/integration/player-sync-revealed.test.ts`):**
   - Migration `0006-add-player-puzzle-state-revealed` adds `revealed` cleanly on existing DBs.
   - `POST /api/player/sync/progress` with `revealed: true` and `found_words: []` persists `player_puzzle_states.revealed = 1` across `GET /api/player/sync` without creating a 0-word `player_stats` record, and subsequent progress pushes for a revealed puzzle do not mutate `player_stats`.
   - Device transfer (`/api/player/auth/transfer/use`) preserves `revealed: true` via `bulkUpsertLocalData`.
-- [ ] **Web Sync (`tests/unit/player-sync-store.test.ts`):**
+- [x] **Web Sync (`tests/unit/sync-reconcile.test.ts`, `tests/unit/Modals.test.tsx`, `tests/unit/hint-sync-integrity.test.ts`):**
   - `gatherLocalData`, `pullAndMergeData`, and `pushLocalDataAheadOfServer` round-trip `revealed_<slot>` even for unplayed puzzles, and `PuzzleWordsModal` triggers `syncRevealedPuzzle`.
 
 ### Visual & Mechanical Gate
 
-- [ ] **Visual Inspection (`pnpm run screenshot`):** Confirm baseline views remain clean (no UI layout changes in this slice).
-- [ ] **Mechanical Gate:** `pnpm run check:agent` passes 100%.
+- [x] **Visual Inspection (`pnpm run screenshot`):** Confirm baseline views remain clean (no UI layout changes in this slice).
+- [x] **Mechanical Gate:** `pnpm run check:agent` passes 100%.

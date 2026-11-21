@@ -16,6 +16,7 @@ export interface SyncPuzzleState {
   started_at: number;
   total_paused_ms: number;
   score_before_hints: number | null;
+  revealed?: boolean;
 }
 
 /** Combined gameplay progress snapshot pushed by web after an accepted word. */

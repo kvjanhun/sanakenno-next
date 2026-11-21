@@ -55,6 +55,7 @@ export function mergePuzzleState(local: SyncPuzzleState, server: SyncPuzzleState
     started_at: earlierStartedAt(local.started_at, server.started_at),
     total_paused_ms: Math.max(local.total_paused_ms, server.total_paused_ms),
     score_before_hints: scoreBeforeHints,
+    revealed: Boolean(local.revealed || server.revealed),
   };
 }
 
@@ -107,5 +108,6 @@ export function isPuzzleStateBetterThanServer(
     if (serverScoreBeforeHints === null) return true;
     if (localScoreBeforeHints > serverScoreBeforeHints) return true;
   }
+  if (Boolean(local.revealed) && !server.revealed) return true;
   return false;
 }

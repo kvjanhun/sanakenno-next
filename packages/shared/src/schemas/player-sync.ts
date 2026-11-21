@@ -68,6 +68,7 @@ export const SyncProgressPayloadSchema = z.object({
   started_at: z.number().int().nonnegative(),
   total_paused_ms: z.number().int().nonnegative(),
   score_before_hints: z.number().int().nonnegative().nullable(),
+  revealed: z.boolean().optional().default(false),
   max_score: z.number().int().nonnegative(),
   best_no_hint_score: z.number().int().nonnegative().optional(),
   is_daily: z.boolean().optional(),

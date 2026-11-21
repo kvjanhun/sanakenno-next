@@ -19,7 +19,9 @@ import {
   isPuzzleRevealed,
   loadFromStorage,
   puzzleStateKey,
+  revealedKey,
   saveToStorage,
+  setRawStorage,
   type PersistedPuzzleState,
 } from '../gameplay/storage.js';
 import { PREFERENCES_UPDATED_AT_KEY, usePaletteStore } from '../theme/usePaletteStore.js';
@@ -42,9 +44,14 @@ export function gatherLocalData(): {
     try {
       for (let i = 0; i < window.localStorage.length; i++) {
         const key = window.localStorage.key(i);
-        const match = key ? /^sanakenno_state_(\d+)$/.exec(key) : null;
-        if (match?.[1]) {
-          candidateSlots.add(Number(match[1]));
+        const stateMatch = key ? /^sanakenno_state_(\d+)$/.exec(key) : null;
+        if (stateMatch?.[1]) {
+          candidateSlots.add(Number(stateMatch[1]));
+          continue;
+        }
+        const revealedMatch = key ? /^revealed_(\d+)$/.exec(key) : null;
+        if (revealedMatch?.[1] && window.localStorage.getItem(key!) === 'true') {
+          candidateSlots.add(Number(revealedMatch[1]));
         }
       }
     } catch {
@@ -53,14 +60,29 @@ export function gatherLocalData(): {
   }
 
   for (const puzzleNumber of candidateSlots) {
-    if (isPuzzleRevealed(puzzleNumber)) continue;
+    const revealed = isPuzzleRevealed(puzzleNumber);
     const raw = getRawStorage(puzzleStateKey(puzzleNumber));
-    if (!raw) continue;
+    if (!raw) {
+      if (revealed) {
+        puzzle_states.push({
+          puzzle_number: puzzleNumber,
+          found_words: [],
+          score: 0,
+          hints_unlocked: [],
+          started_at: 0,
+          total_paused_ms: 0,
+          score_before_hints: null,
+          revealed: true,
+        });
+      }
+      continue;
+    }
     try {
       const saved = JSON.parse(raw) as PersistedPuzzleState;
       const foundWords = Array.isArray(saved.foundWords) ? saved.foundWords : [];
       const hintsUnlocked = filterVisibleHintIds(saved.hintsUnlocked ?? []);
       if (
+        !revealed &&
         !statsSlotSet.has(puzzleNumber) &&
         foundWords.length === 0 &&
         hintsUnlocked.length === 0
@@ -75,9 +97,21 @@ export function gatherLocalData(): {
         started_at: saved.startedAt ?? 0,
         total_paused_ms: saved.totalPausedMs ?? 0,
         score_before_hints: hintsUnlocked.length > 0 ? (saved.scoreBeforeHints ?? null) : null,
+        ...(revealed ? { revealed: true } : {}),
       });
     } catch {
-      // Ignore unparseable state.
+      if (revealed) {
+        puzzle_states.push({
+          puzzle_number: puzzleNumber,
+          found_words: [],
+          score: 0,
+          hints_unlocked: [],
+          started_at: 0,
+          total_paused_ms: 0,
+          score_before_hints: null,
+          revealed: true,
+        });
+      }
     }
   }
 
@@ -152,6 +186,10 @@ export function pullAndMergeData(payload: SyncPayload, onPushPreferences: () => 
   if (payload.puzzle_states) {
     const now = Date.now();
     for (const serverState of payload.puzzle_states) {
+      if (serverState.revealed && !isPuzzleRevealed(serverState.puzzle_number)) {
+        setRawStorage(revealedKey(serverState.puzzle_number), 'true');
+        changed = true;
+      }
       const key = puzzleStateKey(serverState.puzzle_number);
       const raw = getRawStorage(key);
       const remoteElapsedMs = statsByPuzzle.get(serverState.puzzle_number);
@@ -266,6 +304,7 @@ export function pushLocalDataAheadOfServer(
           localState && localState.hints_unlocked.length > 0
             ? (localState.score_before_hints ?? localRecord?.best_no_hint_score ?? null)
             : null,
+        revealed: Boolean(localState?.revealed),
         max_score: localRecord?.max_score ?? serverRecord?.max_score ?? 100,
         best_no_hint_score: localRecord?.best_no_hint_score,
         is_daily: localRecord?.is_daily,

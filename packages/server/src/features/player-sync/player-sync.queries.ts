@@ -87,6 +87,7 @@ async function readPuzzleState(
       'started_at',
       'total_paused_ms',
       'score_before_hints',
+      'revealed',
     ])
     .where('player_id', '=', playerId)
     .where('puzzle_number', '=', puzzleNumber)
@@ -103,6 +104,7 @@ async function readPuzzleState(
     total_paused_ms: Number(existing.total_paused_ms),
     score_before_hints:
       existing.score_before_hints !== null ? Number(existing.score_before_hints) : null,
+    revealed: Boolean(existing.revealed),
   };
 }
 
@@ -134,6 +136,7 @@ export async function mergeAndStorePuzzleState(
         started_at: merged.started_at,
         total_paused_ms: merged.total_paused_ms,
         score_before_hints: merged.score_before_hints ?? null,
+        revealed: merged.revealed ? 1 : 0,
       })
       .execute();
   } else {
@@ -146,6 +149,7 @@ export async function mergeAndStorePuzzleState(
         started_at: merged.started_at,
         total_paused_ms: merged.total_paused_ms,
         score_before_hints: merged.score_before_hints ?? null,
+        revealed: merged.revealed ? 1 : 0,
         updated_at: sql<string>`datetime('now')`,
       })
       .where('player_id', '=', playerId)
@@ -375,6 +379,7 @@ export async function fetchPlayerData(
         'started_at',
         'total_paused_ms',
         'score_before_hints',
+        'revealed',
       ])
       .where('player_id', '=', playerId)
       .execute(),
@@ -409,6 +414,7 @@ export async function fetchPlayerData(
       started_at: Number(r.started_at),
       total_paused_ms: Number(r.total_paused_ms),
       score_before_hints: r.score_before_hints !== null ? Number(r.score_before_hints) : null,
+      revealed: Boolean(r.revealed),
     })),
     preferences,
   };

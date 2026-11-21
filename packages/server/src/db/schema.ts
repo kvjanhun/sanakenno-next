@@ -156,6 +156,7 @@ export interface PlayerPuzzleStatesTable {
   started_at: Generated<number>;
   total_paused_ms: Generated<number>;
   score_before_hints: number | null;
+  revealed: Generated<number>;
   updated_at: Generated<string>;
 }
 

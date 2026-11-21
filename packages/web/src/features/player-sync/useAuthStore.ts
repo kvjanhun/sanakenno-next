@@ -1,4 +1,9 @@
-import { type SyncProgressPayload, type TransferTicketResponse } from '@sanakenno/shared';
+import {
+  getHelsinkiDateString,
+  type PlayerStats,
+  type SyncProgressPayload,
+  type TransferTicketResponse,
+} from '@sanakenno/shared';
 import { create } from 'zustand';
 import {
   fetchPlayerMe,
@@ -12,9 +17,11 @@ import {
   postSyncPreferences,
   postSyncProgress,
 } from '../../api/client.js';
+import { filterVisibleHintIds } from '../gameplay/hints.js';
 import {
   getRawStorage,
   loadFromStorage,
+  readSavedPuzzleState,
   removeFromStorage,
   saveToStorage,
   STATS_STORAGE_KEY,
@@ -49,6 +56,7 @@ export interface AuthState {
   logout: (options?: { clearLocalProgress?: boolean }) => Promise<void>;
   syncProgress: (payload: SyncProgressPayload) => Promise<void>;
   syncProgressDebounced: (payload: SyncProgressPayload) => void;
+  syncRevealedPuzzle: (puzzleNumber: number) => Promise<void>;
   flushPendingSync: () => Promise<void>;
   requestTransferTicket: () => Promise<TransferTicketResponse>;
   syncPreferences: () => Promise<void>;
@@ -344,6 +352,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     debounceTimer = setTimeout(() => {
       void get().flushPendingSync();
     }, DEBOUNCE_DELAY_MS);
+  },
+
+  syncRevealedPuzzle: async (puzzleNumber: number) => {
+    const token = loadFromStorage<string>(AUTH_TOKEN_STORAGE_KEY);
+    if (!token) return;
+    const saved = readSavedPuzzleState(puzzleNumber);
+    const stats = loadFromStorage<PlayerStats>(STATS_STORAGE_KEY);
+    const record = stats?.records.find((r) => r.puzzle_number === puzzleNumber);
+    const hintsUnlocked = filterVisibleHintIds(saved?.hintsUnlocked ?? []);
+    try {
+      await get().syncProgress({
+        puzzle_number: puzzleNumber,
+        date: record?.date ?? getHelsinkiDateString(),
+        found_words: saved?.foundWords ?? [],
+        score: saved?.score ?? 0,
+        hints_unlocked: hintsUnlocked,
+        started_at: saved?.startedAt ?? 0,
+        total_paused_ms: saved?.totalPausedMs ?? 0,
+        score_before_hints: hintsUnlocked.length > 0 ? (saved?.scoreBeforeHints ?? null) : null,
+        revealed: true,
+        max_score: record?.max_score ?? 0,
+      });
+    } catch {
+      // Offline or transient failure: local revealed_<slot> will sync on next initialize pull/push
+    }
   },
 
   flushPendingSync: async () => {

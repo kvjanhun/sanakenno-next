@@ -91,7 +91,9 @@ export function sanitizeAndMergePuzzleState(
     };
   }
 
-  const mergedRaw = existing ? mergePuzzleState(existing, sanitizedIncoming) : sanitizedIncoming;
+  const mergedRaw = existing
+    ? mergePuzzleState(existing, sanitizedIncoming)
+    : { ...sanitizedIncoming, revealed: Boolean(sanitizedIncoming.revealed) };
   if (!meta) return mergedRaw;
 
   const mergedScore = recalcScore(mergedRaw.found_words, meta.allLetters);
@@ -103,6 +105,7 @@ export function sanitizeAndMergePuzzleState(
       mergedScore,
       mergedRaw.hints_unlocked.length,
     ),
+    revealed: Boolean(mergedRaw.revealed),
   };
 }
 
@@ -358,6 +361,7 @@ export async function bulkUpsertLocalData(
         'started_at',
         'total_paused_ms',
         'score_before_hints',
+        'revealed',
       ])
       .where('player_id', '=', playerId)
       .execute();
@@ -373,6 +377,7 @@ export async function bulkUpsertLocalData(
         started_at: Number(row.started_at),
         total_paused_ms: Number(row.total_paused_ms),
         score_before_hints: row.score_before_hints !== null ? Number(row.score_before_hints) : null,
+        revealed: Boolean(row.revealed),
       });
     }
 
@@ -398,6 +403,7 @@ export async function bulkUpsertLocalData(
         started_at: merged.started_at,
         total_paused_ms: merged.total_paused_ms,
         score_before_hints: merged.score_before_hints ?? null,
+        revealed: merged.revealed ? 1 : 0,
       };
     });
 
@@ -413,6 +419,7 @@ export async function bulkUpsertLocalData(
             started_at: eb.ref('excluded.started_at'),
             total_paused_ms: eb.ref('excluded.total_paused_ms'),
             score_before_hints: eb.ref('excluded.score_before_hints'),
+            revealed: eb.ref('excluded.revealed'),
             updated_at: sql<string>`datetime('now')`,
           })),
         )

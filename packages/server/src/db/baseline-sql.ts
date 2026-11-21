@@ -161,6 +161,7 @@ export const BASELINE_STATEMENTS: readonly string[] = [
     started_at         INTEGER NOT NULL DEFAULT 0,
     total_paused_ms    INTEGER NOT NULL DEFAULT 0,
     score_before_hints INTEGER,
+    revealed           INTEGER NOT NULL DEFAULT 0,
     updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(player_id, puzzle_number)
 )`,

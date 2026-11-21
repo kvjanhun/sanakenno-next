@@ -260,6 +260,14 @@ export const ASYNC_MIGRATIONS: readonly AsyncMigration[] = [
       );
     },
   },
+  {
+    version: '0006-add-player-puzzle-state-revealed',
+    description:
+      'Add revealed flag to player_puzzle_states for monotonic cross-device answer-reveal sync',
+    async up(db) {
+      await ensureColumnAsync(db, 'player_puzzle_states', 'revealed', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
 ];
 
 /**

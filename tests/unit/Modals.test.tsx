@@ -61,7 +61,10 @@ describe('SettingsModal, ModalShell native <dialog>, and live OS theme reactivit
     expect(screen.getByText('Tallennettu tälle laitteelle (ei yhteyttä)')).toBeInTheDocument();
   });
 
-  it('PuzzleWordsModal only sets revealed_<slot> when word data actually loads, never on fetch error', async () => {
+  it('PuzzleWordsModal only sets revealed_<slot> and triggers syncRevealedPuzzle when word data actually loads, never on fetch error', async () => {
+    const syncRevealedSpy = vi
+      .spyOn(useAuthStore.getState(), 'syncRevealedPuzzle')
+      .mockResolvedValue();
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockRejectedValueOnce(new Error('Offline'))
@@ -90,6 +93,7 @@ describe('SettingsModal, ModalShell native <dialog>, and live OS theme reactivit
       expect(screen.getByText('Sanalistaa ei voitu ladata.')).toBeInTheDocument();
     });
     expect(isPuzzleRevealed(42)).toBe(false);
+    expect(syncRevealedSpy).not.toHaveBeenCalled();
     unmount();
 
     const okClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -103,6 +107,8 @@ describe('SettingsModal, ModalShell native <dialog>, and live OS theme reactivit
       expect(screen.getByText('kana')).toBeInTheDocument();
     });
     expect(isPuzzleRevealed(42)).toBe(true);
+    expect(syncRevealedSpy).toHaveBeenCalledWith(42);
+    syncRevealedSpy.mockRestore();
     fetchSpy.mockRestore();
   });
 

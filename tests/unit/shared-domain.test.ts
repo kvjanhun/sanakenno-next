@@ -358,6 +358,13 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
           .score_before_hints,
       ).toBeNull();
       expect(isPuzzleStateBetterThanServer(withHints, pollutedHintless)).toBe(true);
+
+      const unrevealed = { ...withHints, revealed: false };
+      const revealed = { ...withHints, revealed: true };
+      expect(mergePuzzleState(unrevealed, revealed).revealed).toBe(true);
+      expect(mergePuzzleState(revealed, unrevealed).revealed).toBe(true);
+      expect(isPuzzleStateBetterThanServer(revealed, unrevealed)).toBe(true);
+      expect(isPuzzleStateBetterThanServer(unrevealed, revealed)).toBe(false);
     });
   });
 

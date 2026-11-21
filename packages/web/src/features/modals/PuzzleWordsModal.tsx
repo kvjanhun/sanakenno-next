@@ -6,6 +6,7 @@ import {
   revealedKey,
   setRawStorage,
 } from '../gameplay/storage.js';
+import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { ModalShell } from './ModalShell.js';
 import { usePuzzleWordsQuery } from './usePuzzleWordsQuery.js';
 
@@ -43,6 +44,7 @@ export function PuzzleWordsModal({
   useEffect(() => {
     if (show && puzzleNumber !== null && Boolean(data)) {
       setRawStorage(revealedKey(puzzleNumber), 'true');
+      void useAuthStore.getState().syncRevealedPuzzle(puzzleNumber);
     }
   }, [puzzleNumber, show, data]);
 

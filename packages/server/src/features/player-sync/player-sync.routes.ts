@@ -39,6 +39,9 @@ export function createPlayerSyncRoutes(db: Kysely<Database>) {
 
         await runImmediateTransactionWithRetry(db, async (trx) => {
           const mergedState = await mergeAndStorePuzzleState(trx, player.playerId, payload, puzzle);
+          if (mergedState.revealed) {
+            return;
+          }
           const existingStats =
             mergedState.found_words.length === 0
               ? await readStatsRecord(trx, player.playerId, payload.puzzle_number)
