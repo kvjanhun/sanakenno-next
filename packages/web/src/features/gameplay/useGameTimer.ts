@@ -52,6 +52,7 @@ export function useGameTimer(
     const pause = (): void => {
       if (startedAt.current !== null && hiddenAt.current === null) {
         hiddenAt.current = Date.now();
+        onSyncRef.current?.(startedAt.current, totalPausedMs.current);
       }
     };
 

@@ -264,6 +264,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
       startedAt,
       totalPausedMs,
       scoreBeforeHints,
+      lastActiveAt: Date.now(),
     };
     saveToStorage(puzzleStateKey(puzzle.puzzle_number), data);
   },
@@ -298,14 +299,37 @@ export const useGameStore = create<GameState>()((set, get) => ({
         : saved.score;
 
     const visibleHints = filterVisibleHintIds(saved.hintsUnlocked ?? []);
+    const now = Date.now();
+    const startedAt = saved.startedAt || now;
+    const closedIdleGap =
+      typeof saved.lastActiveAt === 'number' &&
+      Number.isFinite(saved.lastActiveAt) &&
+      saved.lastActiveAt > 0 &&
+      now > saved.lastActiveAt
+        ? now - saved.lastActiveAt
+        : 0;
+    const totalPausedMs = (saved.totalPausedMs ?? 0) + closedIdleGap;
+
     set({
       foundWords: new Set(validWords),
       score,
       hintsUnlocked: new Set(visibleHints),
       scoreBeforeHints: saved.scoreBeforeHints ?? null,
-      startedAt: saved.startedAt || Date.now(),
-      totalPausedMs: saved.totalPausedMs ?? 0,
+      startedAt,
+      totalPausedMs,
     });
+
+    if (closedIdleGap > 0 || saved.lastActiveAt === undefined) {
+      saveToStorage<PersistedPuzzleState>(puzzleStateKey(puzzle.puzzle_number), {
+        foundWords: validWords,
+        score,
+        hintsUnlocked: visibleHints,
+        startedAt,
+        totalPausedMs,
+        scoreBeforeHints: saved.scoreBeforeHints ?? null,
+        lastActiveAt: now,
+      });
+    }
 
     const hasHintsOpened = visibleHints.length > 0;
     useUiStore.getState().setHintsHidden(!hasHintsOpened);
@@ -326,10 +350,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
         foundWords: new Set(validWords),
         validLetters: allLetters,
         hintsUsed: visibleHints.length,
-        elapsedMs: Math.max(
-          0,
-          Date.now() - (saved.startedAt || Date.now()) - (saved.totalPausedMs ?? 0),
-        ),
+        elapsedMs: Math.max(0, now - startedAt - totalPausedMs),
         bestNoHintScore,
         isDaily,
       });

@@ -157,4 +157,19 @@ describe('StatsModal Achievements & Streak UI', () => {
     const stored = JSON.parse(window.localStorage.getItem(STATS_STORAGE_KEY)!) as PlayerStats;
     expect(stored.records[0]?.long_words_count).toBe(3);
   });
+
+  it('displays canonical hyphenated lemma for Pisin sana in summary tab', () => {
+    saveToStorage(STATS_STORAGE_KEY, {
+      version: 1,
+      records: [
+        createMockRecord({
+          puzzle_number: 55,
+          longest_word: 'aamuuninen',
+        }),
+      ],
+    });
+
+    render(<StatsModal show={true} onClose={() => {}} />);
+    expect(screen.getByText('aamu-uninen')).toBeInTheDocument();
+  });
 });

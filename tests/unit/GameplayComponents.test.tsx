@@ -31,8 +31,8 @@ describe('Gameplay UI Components', () => {
       />,
     );
 
-    const img = screen.getByRole('img', { name: /Kirjainkenno/i });
-    expect(img).toBeInTheDocument();
+    const group = screen.getByRole('group', { name: /Kirjainkenno/i });
+    expect(group).toBeInTheDocument();
 
     const centerCell = screen.getByTestId('hex-cell-a');
     expect(centerCell).toHaveAttribute('data-hex-center', 'true');

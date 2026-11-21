@@ -124,7 +124,7 @@ describe('Integrated Gameplay Flow (in-process)', () => {
 
     // Initial render: honeycomb, score 0, rank "Etsi sanoja!"
     await waitFor(() => {
-      expect(screen.getByRole('img', { name: /Kirjainkenno/i })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: /Kirjainkenno/i })).toBeInTheDocument();
     });
     expect(screen.getByTestId('score-display')).toHaveTextContent('0 pistettä');
     expect(screen.getByTestId('rank-button')).toHaveTextContent('Etsi sanoja!');
@@ -314,7 +314,7 @@ describe('Integrated Gameplay Flow (in-process)', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('img', { name: /Kirjainkenno/i })).toBeInTheDocument();
+      expect(screen.getByRole('group', { name: /Kirjainkenno/i })).toBeInTheDocument();
     });
 
     // Open SyncModal (showAuth: true)
@@ -333,5 +333,34 @@ describe('Integrated Gameplay Flow (in-process)', () => {
     });
     fireEvent.keyDown(window, { key: 'a' });
     expect(useGameStore.getState().currentWord).toBe('');
+  });
+
+  it('suppresses board keyboard input while ConnectBanner is open and activates focused hex cells without triggering submit/shuffle', async () => {
+    window.history.replaceState({}, '', '/?connect=test-connect-token');
+    render(
+      <QueryClientProvider client={queryClient}>
+        <GameplayView />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('group', { name: /Kirjainkenno/i })).toBeInTheDocument();
+    });
+
+    // ConnectBanner is open -> keyboard letter input is ignored
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(useGameStore.getState().currentWord).toBe('');
+
+    // Dismiss ConnectBanner
+    const dismissBtn = screen.getByRole('button', { name: /peruuta/i });
+    fireEvent.click(dismissBtn);
+
+    // Focus a hex cell and press Enter/Space -> adds letter without submitting or shuffling
+    const beforeOuter = [...useGameStore.getState().outerLetters];
+    const cellK = screen.getByRole('button', { name: 'Kirjain K' });
+    fireEvent.keyDown(cellK, { key: 'Enter' });
+    fireEvent.keyDown(cellK, { key: ' ' });
+    expect(useGameStore.getState().currentWord).toBe('kk');
+    expect(useGameStore.getState().outerLetters).toEqual(beforeOuter);
   });
 });

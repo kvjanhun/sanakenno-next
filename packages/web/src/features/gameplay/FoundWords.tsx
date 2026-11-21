@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { buildKotusUrl, isPangram, toColumns } from '@sanakenno/shared';
+import { buildKotusUrl, getCanonicalLemma, isPangram, toColumns } from '@sanakenno/shared';
 import { ChevronDownIcon } from './icons.js';
 
 export interface FoundWordsProps {
@@ -80,67 +80,73 @@ export function FoundWords({
         <div className="flex gap-6 flex-wrap">
           {columns.map((col, ci) => (
             <ul key={ci} className="list-none p-0 m-0">
-              {col.map((word) => (
-                <li
-                  key={word}
-                  className="font-[var(--font-mono)] text-sm transition-colors duration-300"
-                  style={{
-                    color:
-                      word === lastResubmittedWord
-                        ? 'var(--color-accent)'
-                        : 'var(--color-text-primary)',
-                    fontWeight: isPangram(word, allLetters) ? 700 : 400,
-                  }}
-                >
-                  <a
-                    href={buildKotusUrl(word)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`Avaa sanan "${word}" määritelmä Kotuksessa`}
-                    aria-label={`Avaa sanan "${word}" määritelmä Kotuksessa`}
+              {col.map((word) => {
+                const displayWord = getCanonicalLemma(word);
+                return (
+                  <li
+                    key={word}
+                    className="font-[var(--font-mono)] text-sm transition-colors duration-300"
                     style={{
-                      color: 'inherit',
-                      textDecoration: 'none',
+                      color:
+                        word === lastResubmittedWord
+                          ? 'var(--color-accent)'
+                          : 'var(--color-text-primary)',
+                      fontWeight: isPangram(word, allLetters) ? 700 : 400,
                     }}
                   >
-                    {word}
-                  </a>
-                </li>
-              ))}
+                    <a
+                      href={buildKotusUrl(word)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Avaa sanan "${displayWord}" määritelmä Kotuksessa`}
+                      aria-label={`Avaa sanan "${displayWord}" määritelmä Kotuksessa`}
+                      style={{
+                        color: 'inherit',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      {displayWord}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           ))}
         </div>
       ) : (
         <div ref={scrollContainerRef} className="w-full overflow-x-auto scrollbar-none">
           <div className="flex gap-1.5" style={{ flexWrap: 'nowrap', width: 'max-content' }}>
-            {collapsed.map((word) => (
-              <a
-                key={word}
-                className="font-[var(--font-mono)] text-sm px-2 py-0.5 rounded-full transition-colors duration-300 animate-pill-slide-in"
-                href={buildKotusUrl(word)}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`Avaa sanan "${word}" määritelmä Kotuksessa`}
-                aria-label={`Avaa sanan "${word}" määritelmä Kotuksessa`}
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  flexShrink: 0,
-                  backgroundColor:
-                    word === lastResubmittedWord
-                      ? 'var(--color-accent)'
-                      : 'var(--color-bg-secondary)',
-                  color:
-                    word === lastResubmittedWord
-                      ? 'var(--color-on-accent)'
-                      : 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)',
-                  fontWeight: isPangram(word, allLetters) ? 700 : 400,
-                  textDecoration: 'none',
-                }}
-              >
-                {word}
-              </a>
-            ))}
+            {collapsed.map((word) => {
+              const displayWord = getCanonicalLemma(word);
+              return (
+                <a
+                  key={word}
+                  className="font-[var(--font-mono)] text-sm px-2 py-0.5 rounded-full transition-colors duration-300 animate-pill-slide-in"
+                  href={buildKotusUrl(word)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`Avaa sanan "${displayWord}" määritelmä Kotuksessa`}
+                  aria-label={`Avaa sanan "${displayWord}" määritelmä Kotuksessa`}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    flexShrink: 0,
+                    backgroundColor:
+                      word === lastResubmittedWord
+                        ? 'var(--color-accent)'
+                        : 'var(--color-bg-secondary)',
+                    color:
+                      word === lastResubmittedWord
+                        ? 'var(--color-on-accent)'
+                        : 'var(--color-text-primary)',
+                    border: '1px solid var(--color-border)',
+                    fontWeight: isPangram(word, allLetters) ? 700 : 400,
+                    textDecoration: 'none',
+                  }}
+                >
+                  {displayWord}
+                </a>
+              );
+            })}
           </div>
         </div>
       )}

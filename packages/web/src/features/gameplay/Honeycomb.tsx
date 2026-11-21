@@ -87,6 +87,7 @@ export function Honeycomb({
 
   const svgRef = useRef<SVGSVGElement>(null);
   const handledByPointerRef = useRef(false);
+  const keyFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preventTouch = useCallback((e: TouchEvent) => e.preventDefault(), []);
 
   useEffect(() => {
@@ -97,8 +98,31 @@ export function Honeycomb({
     return () => {
       el.removeEventListener('touchstart', preventTouch);
       el.removeEventListener('touchmove', preventTouch);
+      if (keyFlashTimerRef.current !== null) {
+        clearTimeout(keyFlashTimerRef.current);
+      }
     };
   }, [preventTouch]);
+
+  const handleHexKeyDown = useCallback(
+    (index: number, letter: string) => (e: React.KeyboardEvent<SVGGElement>) => {
+      if (disabled) return;
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        e.stopPropagation();
+        onHexDown(index);
+        onLetterPress(letter);
+        if (keyFlashTimerRef.current !== null) {
+          clearTimeout(keyFlashTimerRef.current);
+        }
+        keyFlashTimerRef.current = setTimeout(() => {
+          onHexUp();
+          keyFlashTimerRef.current = null;
+        }, 90);
+      }
+    },
+    [disabled, onHexDown, onHexUp, onLetterPress],
+  );
 
   return (
     <svg
@@ -106,7 +130,7 @@ export function Honeycomb({
       viewBox="18 18 264 264"
       width="264"
       height="264"
-      role="img"
+      role="group"
       aria-label={ariaLabel}
       style={{ touchAction: 'none' }}
     >
@@ -143,10 +167,15 @@ export function Honeycomb({
               key={i}
               data-testid={`hex-cell-${hex.letter}`}
               data-hex-center="false"
-              aria-hidden="true"
+              role="button"
+              tabIndex={disabled ? -1 : 0}
+              aria-label={`Kirjain ${hex.letter.toUpperCase()}`}
+              aria-disabled={disabled || undefined}
+              className="hex-cell"
               style={{
                 cursor: disabled ? 'default' : 'pointer',
               }}
+              onKeyDown={handleHexKeyDown(i, hex.letter)}
               onPointerDown={
                 disabled
                   ? undefined
@@ -174,6 +203,7 @@ export function Honeycomb({
               onPointerLeave={disabled ? undefined : onHexUp}
             >
               <polygon
+                aria-hidden="true"
                 points={hexPoints(hex.x, hex.y, 46)}
                 style={{
                   fill: 'url(#hex-outer-grad)',
@@ -187,6 +217,7 @@ export function Honeycomb({
                 }}
               />
               <text
+                aria-hidden="true"
                 x={hex.x}
                 y={hex.y}
                 textAnchor="middle"
@@ -219,10 +250,15 @@ export function Honeycomb({
             key={i}
             data-testid={`hex-cell-${hex.letter}`}
             data-hex-center="true"
-            aria-hidden="true"
+            role="button"
+            tabIndex={disabled ? -1 : 0}
+            aria-label={`Keskuskirjain ${hex.letter.toUpperCase()}`}
+            aria-disabled={disabled || undefined}
+            className="hex-cell"
             style={{
               cursor: disabled ? 'default' : 'pointer',
             }}
+            onKeyDown={handleHexKeyDown(i, hex.letter)}
             onPointerDown={
               disabled
                 ? undefined
@@ -250,6 +286,7 @@ export function Honeycomb({
             onPointerLeave={disabled ? undefined : onHexUp}
           >
             <polygon
+              aria-hidden="true"
               points={hexPoints(hex.x, hex.y, 46)}
               style={{
                 fill: 'var(--color-accent)',
@@ -263,6 +300,7 @@ export function Honeycomb({
               }}
             />
             <path
+              aria-hidden="true"
               d={hexPath(hex.x, hex.y, 46)}
               style={{
                 fill: 'url(#hex-center-overlay)',
@@ -270,6 +308,7 @@ export function Honeycomb({
               }}
             />
             <text
+              aria-hidden="true"
               x={hex.x}
               y={hex.y}
               textAnchor="middle"

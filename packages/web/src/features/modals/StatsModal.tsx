@@ -6,6 +6,7 @@ import {
   computeRankDistribution,
   computeStreak,
   emptyStats,
+  getCanonicalLemma,
   RANKS,
   STATS_STORAGE_KEY,
   type PlayerStats,
@@ -317,7 +318,7 @@ export function StatsModal({
                   className="font-semibold text-right truncate max-w-[200px]"
                   style={{ color: 'var(--color-text-primary)' }}
                 >
-                  {lifetime.longestWord || '—'}
+                  {lifetime.longestWord ? getCanonicalLemma(lifetime.longestWord) : '—'}
                 </span>
               </div>
             </div>

@@ -438,4 +438,31 @@ describe('Gameplay hybrid stores (useGameStore + useUiStore + storage)', () => {
     expect(useGameStore.getState().foundWords.size).toBe(0);
     expect(useGameStore.getState().score).toBe(0);
   });
+
+  it('folds closed-tab idle gap since lastActiveAt into totalPausedMs on loadState', async () => {
+    const now = Date.now();
+    const fourHoursMs = 4 * 60 * 60 * 1000;
+    const activePlayMs = 90_000;
+    const startedAt = now - fourHoursMs - activePlayMs;
+    const lastActiveAt = now - fourHoursMs;
+
+    saveToStorage(puzzleStateKey(61), {
+      foundWords: ['kana'],
+      score: 1,
+      hintsUnlocked: [],
+      startedAt,
+      totalPausedMs: 0,
+      scoreBeforeHints: null,
+      lastActiveAt,
+    });
+
+    const puzzle = await buildSamplePuzzle(61);
+    await useGameStore.getState().loadPuzzle(puzzle);
+
+    const state = useGameStore.getState();
+    const effectiveElapsedMs = Date.now() - state.startedAt - state.totalPausedMs;
+    expect(state.totalPausedMs).toBeGreaterThanOrEqual(fourHoursMs - 1000);
+    expect(effectiveElapsedMs).toBeLessThan(activePlayMs + 5000);
+    expect(effectiveElapsedMs).toBeGreaterThanOrEqual(activePlayMs - 1000);
+  });
 });

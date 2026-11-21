@@ -15,6 +15,13 @@ const COLOR_MAP: Record<string, string> = {
   tertiary: 'var(--color-text-tertiary)',
 };
 
+function fontSizeForWordLength(length: number): string {
+  if (length <= 10) return '30px';
+  if (length <= 13) return '25px';
+  if (length <= 16) return '21px';
+  return '18px';
+}
+
 export function WordInput({
   currentWord,
   center,
@@ -38,12 +45,14 @@ export function WordInput({
   }
 
   const chars = currentWord ? colorizeWord(currentWord, center, allLetters) : null;
+  const fontSize = fontSizeForWordLength(currentWord.length);
 
   return (
     <div
-      className={`flex items-center justify-center text-center text-[30px] font-semibold leading-none${shake ? ' word-shake' : ''}`}
+      className={`flex items-center justify-center text-center font-semibold leading-none${shake ? ' word-shake' : ''}`}
       style={{
         fontFamily: 'var(--font-game)',
+        fontSize,
         fontKerning: 'normal',
         letterSpacing: '0',
         minHeight: '38px',

@@ -32,6 +32,8 @@ export interface PersistedPuzzleState {
   totalPausedMs: number;
   /** Score at the moment the first hint was unlocked; null if no hints used. */
   scoreBeforeHints: number | null;
+  /** Last timestamp (ms) when this session was actively playing, used to exclude closed-tab idle gaps. */
+  lastActiveAt?: number;
 }
 
 /** Legacy persisted shape including puzzleNumber inside the payload. */

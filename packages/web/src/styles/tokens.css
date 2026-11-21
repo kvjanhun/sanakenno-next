@@ -465,3 +465,8 @@ html {
 .animate-announcement-in {
   animation: announcement-slide-down 0.2s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+.hex-cell:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

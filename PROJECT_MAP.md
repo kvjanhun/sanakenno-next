@@ -85,7 +85,7 @@ Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 ### 5. Hyphen Normalization & Kotus Lemma Invariant
 
 - Both hyphenated and un-hyphenated forms (`aamu-uninen` and `aamuuninen`) resolve to the identical normalized SHA-256 hash in gameplay.
-- Kotus dictionary links and revealed word lists in `PuzzleWordsModal` always use canonical hyphenated lemmas.
+- Kotus dictionary links, `FoundWords`, `StatsModal` (`Pisin sana`), and revealed word lists in `PuzzleWordsModal` always use canonical hyphenated lemmas.
 
 ### 6. Daily Streak Integrity & Milestone Separation
 

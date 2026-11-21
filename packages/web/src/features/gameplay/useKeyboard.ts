@@ -15,8 +15,10 @@ export interface UseKeyboardOptions {
   enabled: boolean;
 }
 
-/** Finnish letter pattern: a-z plus ä, ö, and hyphen. */
-const LETTER_PATTERN = /^[a-zäö-]$/;
+/** Finnish letter pattern: a-z plus å, ä, ö, and hyphen. */
+const LETTER_PATTERN = /^[a-zåäö-]$/;
+
+const INTERACTIVE_SELECTOR = 'button, [role="button"], a[href], select';
 
 /**
  * Attach a global keydown listener for Finnish puzzle input.
@@ -41,11 +43,14 @@ export function useKeyboard(options: UseKeyboardOptions): void {
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
 
       const key = e.key.toLowerCase();
+      const isInteractiveTarget = Boolean(target?.closest?.(INTERACTIVE_SELECTOR));
 
       if (key === 'enter') {
+        if (isInteractiveTarget) return;
         e.preventDefault();
         opts.onEnter();
       } else if (key === ' ' || key === 'spacebar') {
+        if (isInteractiveTarget) return;
         e.preventDefault();
         opts.onShuffle?.();
       } else if (key === 'backspace') {

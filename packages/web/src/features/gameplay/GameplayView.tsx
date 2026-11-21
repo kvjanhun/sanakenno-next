@@ -128,6 +128,7 @@ export function GameplayView(): React.JSX.Element {
       !showStats &&
       !showSettings &&
       !showAuth &&
+      connectToken === null &&
       celebration === null &&
       revealPuzzle === null &&
       !!puzzle,

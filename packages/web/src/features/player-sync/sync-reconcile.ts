@@ -141,19 +141,36 @@ export function pullAndMergeData(payload: SyncPayload, onPushPreferences: () => 
     }
   }
 
+  const statsByPuzzle = new Map<number, number>();
+  for (const r of payload.stats?.records ?? []) {
+    if (typeof r.elapsed_ms === 'number' && Number.isFinite(r.elapsed_ms) && r.elapsed_ms >= 0) {
+      statsByPuzzle.set(r.puzzle_number, r.elapsed_ms);
+    }
+  }
+
   // Merge puzzle states
   if (payload.puzzle_states) {
+    const now = Date.now();
     for (const serverState of payload.puzzle_states) {
       const key = puzzleStateKey(serverState.puzzle_number);
       const raw = getRawStorage(key);
+      const remoteElapsedMs = statsByPuzzle.get(serverState.puzzle_number);
       if (!raw) {
+        const rebasedPausedMs =
+          remoteElapsedMs !== undefined && serverState.started_at > 0
+            ? Math.max(
+                serverState.total_paused_ms,
+                Math.max(0, now - serverState.started_at - remoteElapsedMs),
+              )
+            : serverState.total_paused_ms;
         const newState: PersistedPuzzleState = {
           foundWords: serverState.found_words,
           score: serverState.score,
           hintsUnlocked: serverState.hints_unlocked,
           startedAt: serverState.started_at,
-          totalPausedMs: serverState.total_paused_ms,
+          totalPausedMs: rebasedPausedMs,
           scoreBeforeHints: serverState.score_before_hints,
+          ...(remoteElapsedMs !== undefined ? { lastActiveAt: now } : {}),
         };
         saveToStorage(key, newState);
         changed = true;
@@ -177,6 +194,9 @@ export function pullAndMergeData(payload: SyncPayload, onPushPreferences: () => 
             startedAt: merged.started_at,
             totalPausedMs: merged.total_paused_ms,
             scoreBeforeHints: merged.score_before_hints,
+            ...(localParsed.lastActiveAt !== undefined
+              ? { lastActiveAt: localParsed.lastActiveAt }
+              : {}),
           };
           if (JSON.stringify(mergedPersisted) !== JSON.stringify(localParsed)) {
             saveToStorage(key, mergedPersisted);
