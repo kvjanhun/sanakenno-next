@@ -8,7 +8,7 @@ import { ConnectBanner } from '../player-sync/ConnectBanner.js';
 import { SyncModal } from '../player-sync/SyncModal.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { usePaletteStore } from '../theme/usePaletteStore.js';
-import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
+import { useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
 import { AnnouncementBanner } from './AnnouncementBanner.js';
 import { Celebration } from './Celebration.js';
 import { FoundWords } from './FoundWords.js';
@@ -32,8 +32,7 @@ export function GameplayView(): React.JSX.Element {
   const { isLoading, isError, refetch } = usePuzzleQuery(viewingPuzzleDate);
 
   const themeId = usePaletteStore((s) => s.themeId);
-  const preference = useThemePreferenceStore((s) => s.preference);
-  const scheme = resolveScheme(preference);
+  const scheme = useThemePreferenceStore((s) => s.resolvedScheme);
 
   const [revealPuzzle, setRevealPuzzle] = useState<{
     puzzleNumber: number;
@@ -94,7 +93,6 @@ export function GameplayView(): React.JSX.Element {
   }, [viewingPuzzleDate]);
 
   const [connectToken, setConnectToken] = useState<string | null>(null);
-  const isLinked = useAuthStore((s) => s.isLinked);
   const sessionCount = useAuthStore((s) => s.sessionCount);
 
   useEffect(() => {
@@ -110,18 +108,11 @@ export function GameplayView(): React.JSX.Element {
   }, []);
 
   const handleEscape = useCallback(() => {
-    if (revealPuzzle !== null) {
-      setRevealPuzzle(null);
-      return;
-    }
     const ui = useUiStore.getState();
-    if (ui.showArchive) ui.setShowArchive(false);
-    else if (ui.showStats) ui.setShowStats(false);
-    else if (ui.showRules) ui.setShowRules(false);
-    else if (ui.showSettings) ui.setShowSettings(false);
-    else if (ui.showAuth) ui.setShowAuth(false);
-    else if (ui.showRanks) ui.setShowRanks(false);
-  }, [revealPuzzle]);
+    if (ui.showRanks) {
+      ui.setShowRanks(false);
+    }
+  }, []);
 
   useKeyboard({
     onLetter: (letter) => useGameStore.getState().addLetter(letter),
@@ -136,6 +127,8 @@ export function GameplayView(): React.JSX.Element {
       !showArchive &&
       !showStats &&
       !showSettings &&
+      !showAuth &&
+      celebration === null &&
       revealPuzzle === null &&
       !!puzzle,
   });
@@ -278,7 +271,6 @@ export function GameplayView(): React.JSX.Element {
             useUiStore.getState().setShowSettings(false);
             useUiStore.getState().setShowAuth(true);
           }}
-          isLinked={isLinked}
           sessionCount={sessionCount}
         />
       )}

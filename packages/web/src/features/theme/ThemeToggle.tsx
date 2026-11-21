@@ -15,12 +15,12 @@ export function ThemeToggle({
   preference: propPreference,
   setPreference: propSetPreference,
 }: ThemeToggleProps = {}): React.JSX.Element {
-  const storePreference = useThemePreferenceStore((s) => s.preference);
+  const storeResolvedScheme = useThemePreferenceStore((s) => s.resolvedScheme);
   const storeSetPreference = useThemePreferenceStore((s) => s.setPreference);
 
-  const preference = propPreference !== undefined ? propPreference : storePreference;
   const setPreference = propSetPreference !== undefined ? propSetPreference : storeSetPreference;
-  const resolved = resolveScheme(preference);
+  const resolved =
+    propPreference !== undefined ? resolveScheme(propPreference) : storeResolvedScheme;
 
   const toggle = useCallback(() => {
     setPreference(resolved === 'light' ? 'dark' : 'light');

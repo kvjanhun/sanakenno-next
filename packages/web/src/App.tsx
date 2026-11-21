@@ -32,11 +32,11 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {isAdmin ? (
-        <main className="min-h-dvh flex flex-col">
+        <div className="min-h-dvh flex flex-col">
           <Suspense fallback={<div className="p-8 text-center text-sm">Ladataan ylläpitoa...</div>}>
             <AdminLayout />
           </Suspense>
-        </main>
+        </div>
       ) : (
         <GameplayView />
       )}

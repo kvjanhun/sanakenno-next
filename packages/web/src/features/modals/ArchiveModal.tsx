@@ -30,6 +30,8 @@ export function ArchiveModal({
   const [confirmEntry, setConfirmEntry] = useState<ArchiveEntry | null>(null);
   const preserveSelectionRef = useRef(false);
   const initializedForOpenRef = useRef(false);
+  const confirmDialogRef = useRef<HTMLDialogElement | null>(null);
+  const confirmPointerDownTargetRef = useRef<EventTarget | null>(null);
 
   const todayEntry = useMemo(() => entries.find((e) => e.is_today) ?? null, [entries]);
 
@@ -74,6 +76,25 @@ export function ArchiveModal({
       if (y && m) setYearMonth({ year: y, monthIndex: m - 1 });
     }
   }, [show, entries, currentPuzzleNumber, todayEntry]);
+
+  useEffect(() => {
+    if (!confirmEntry) return;
+    const dialog = confirmDialogRef.current;
+    if (!dialog) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+    dialog.focus({ preventScroll: true });
+    return () => {
+      if (dialog.open) {
+        dialog.close();
+      }
+      if (opener && document.contains(opener)) {
+        opener.focus({ preventScroll: true });
+      }
+    };
+  }, [confirmEntry]);
 
   const selectedEntry = useMemo(() => {
     if (!selectedDate) return null;
@@ -229,70 +250,85 @@ export function ArchiveModal({
         )}
       </ModalShell>
 
-      {/* Pop-up selection dialog for unrevealed puzzle answer reveal */}
+      {/* Top-layer native confirmation dialog for unrevealed puzzle answer reveal */}
       {confirmEntry && (
-        <div
-          className="fixed inset-0 z-60 flex items-center justify-center p-4"
-          style={{ backgroundColor: 'rgb(0 0 0 / 0.5)' }}
-          onClick={() => setConfirmEntry(null)}
+        <dialog
+          ref={confirmDialogRef}
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="confirm-reveal-title"
+          aria-describedby="confirm-reveal-desc"
+          tabIndex={-1}
+          className="m-auto w-[calc(100%-2rem)] max-w-xs rounded-xl p-4 flex flex-col gap-3 shadow-xl outline-none backdrop:bg-black/50"
+          style={{
+            backgroundColor: 'var(--color-bg-primary)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-primary)',
+          }}
+          onCancel={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setConfirmEntry(null);
+          }}
+          onPointerDown={(e) => {
+            confirmPointerDownTargetRef.current = e.target;
+          }}
+          onMouseDown={(e) => {
+            confirmPointerDownTargetRef.current = e.target;
+          }}
+          onClick={(e) => {
+            const startedInside =
+              confirmPointerDownTargetRef.current !== null &&
+              confirmPointerDownTargetRef.current !== e.currentTarget;
+            confirmPointerDownTargetRef.current = null;
+            if (e.target === e.currentTarget && !startedInside) {
+              setConfirmEntry(null);
+            }
+          }}
         >
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="confirm-reveal-title"
-            aria-describedby="confirm-reveal-desc"
-            className="w-full max-w-xs rounded-xl p-4 flex flex-col gap-3 shadow-xl"
-            style={{
-              backgroundColor: 'var(--color-bg-primary)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-primary)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex flex-col gap-1 text-center">
-              <h3
-                id="confirm-reveal-title"
-                className="text-sm font-semibold"
-                style={{ color: 'var(--color-text-primary)' }}
-              >
-                Paljastetaanko vastaukset?
-              </h3>
-              <p
-                id="confirm-reveal-desc"
-                className="text-xs leading-relaxed"
-                style={{ color: 'var(--color-text-secondary)' }}
-              >
-                Vastauksien paljastamisen jälkeen tästä kennosta ei enää kerry tilastoja.
-              </p>
-            </div>
-
-            <div className="flex gap-2 mt-1">
-              <button
-                type="button"
-                onClick={() => setConfirmEntry(null)}
-                className="flex-1 h-8 rounded-lg font-medium text-xs cursor-pointer border flex items-center justify-center transition-colors"
-                style={{
-                  backgroundColor: 'transparent',
-                  borderColor: 'var(--color-border)',
-                  color: 'var(--color-text-primary)',
-                }}
-              >
-                Takaisin
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmReveal}
-                className="flex-1 h-8 rounded-lg font-semibold text-xs cursor-pointer border-none flex items-center justify-center transition-opacity hover:opacity-90"
-                style={{
-                  backgroundColor: 'var(--color-accent)',
-                  color: 'var(--color-on-accent)',
-                }}
-              >
-                Paljasta vastaukset
-              </button>
-            </div>
+          <div className="flex flex-col gap-1 text-center">
+            <h3
+              id="confirm-reveal-title"
+              className="text-sm font-semibold m-0"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              Paljastetaanko vastaukset?
+            </h3>
+            <p
+              id="confirm-reveal-desc"
+              className="text-xs leading-relaxed m-0"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
+              Vastauksien paljastamisen jälkeen tästä kennosta ei enää kerry tilastoja.
+            </p>
           </div>
-        </div>
+
+          <div className="flex gap-2 mt-1">
+            <button
+              type="button"
+              onClick={() => setConfirmEntry(null)}
+              className="flex-1 h-8 rounded-lg font-medium text-xs cursor-pointer border flex items-center justify-center transition-colors"
+              style={{
+                backgroundColor: 'transparent',
+                borderColor: 'var(--color-border)',
+                color: 'var(--color-text-primary)',
+              }}
+            >
+              Takaisin
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmReveal}
+              className="flex-1 h-8 rounded-lg font-semibold text-xs cursor-pointer border-none flex items-center justify-center transition-opacity hover:opacity-90"
+              style={{
+                backgroundColor: 'var(--color-accent)',
+                color: 'var(--color-on-accent)',
+              }}
+            >
+              Paljasta vastaukset
+            </button>
+          </div>
+        </dialog>
       )}
     </>
   );

@@ -4,14 +4,14 @@ import { isPuzzleRevealed, loadFromStorage, readSavedPuzzleState } from '../game
 export interface ArchivePlayStatus {
   played: boolean;
   rank: string | null;
-  score: number;
-  maxScore: number;
-  percentage: number;
   wordsFound: number;
-  hintsUsed: boolean;
-  isTopRank: boolean;
   isFullBoard: boolean;
   isRevealed: boolean;
+}
+
+/** Load persisted player stats once so calendar grids can reuse them across all days. */
+export function loadArchivePlayerStats(): PlayerStats | null {
+  return loadFromStorage<PlayerStats>(STATS_STORAGE_KEY);
 }
 
 /** Format a YYYY-MM-DD date string as Finnish short date (e.g. "ma 31.3."). */
@@ -31,51 +31,39 @@ export function formatFinnishMonth(year: number, monthIndex: number): string {
   return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
 }
 
-export function getArchivePlayStatus(puzzleNumber: number, maxScore: number): ArchivePlayStatus {
+export function getArchivePlayStatus(
+  puzzleNumber: number,
+  maxScore: number,
+  preloadedStats?: PlayerStats | null,
+): ArchivePlayStatus {
   const isRevealed = isPuzzleRevealed(puzzleNumber);
   const state = readSavedPuzzleState(puzzleNumber);
 
   if (state && Array.isArray(state.foundWords) && state.foundWords.length > 0) {
     const score = state.score;
     const rank = rankForScore(score, maxScore);
-    const percentage = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 0;
-    const hintsUsed = (state.hintsUnlocked?.length ?? 0) > 0;
-    const isTopRank = percentage >= 70;
     const isFullBoard = maxScore > 0 && score >= maxScore;
 
     return {
       played: true,
       rank,
-      score,
-      maxScore,
-      percentage,
       wordsFound: state.foundWords.length,
-      hintsUsed,
-      isTopRank,
       isFullBoard,
       isRevealed,
     };
   }
 
-  const stats = loadFromStorage<PlayerStats>(STATS_STORAGE_KEY);
+  const stats = preloadedStats !== undefined ? preloadedStats : loadArchivePlayerStats();
   const record = stats?.records.find((r) => r.puzzle_number === puzzleNumber);
   if (record && record.words_found > 0) {
     const score = record.best_score;
     const rank = record.best_rank || rankForScore(score, maxScore);
-    const percentage = maxScore > 0 ? Math.min(100, Math.round((score / maxScore) * 100)) : 0;
-    const hintsUsed = record.hints_used > 0;
-    const isTopRank = percentage >= 70;
     const isFullBoard = maxScore > 0 && score >= maxScore;
 
     return {
       played: true,
       rank,
-      score,
-      maxScore,
-      percentage,
       wordsFound: record.words_found,
-      hintsUsed,
-      isTopRank,
       isFullBoard,
       isRevealed,
     };
@@ -84,12 +72,7 @@ export function getArchivePlayStatus(puzzleNumber: number, maxScore: number): Ar
   return {
     played: false,
     rank: null,
-    score: 0,
-    maxScore,
-    percentage: 0,
     wordsFound: 0,
-    hintsUsed: false,
-    isTopRank: false,
     isFullBoard: false,
     isRevealed,
   };

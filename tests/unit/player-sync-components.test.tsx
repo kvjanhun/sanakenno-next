@@ -232,11 +232,13 @@ describe('Player Sync UI Components', () => {
     it('renders privacy disclosure section in SettingsModal and expands GDPR details on click', () => {
       render(<SettingsModal show={true} onClose={() => {}} />);
 
-      expect(screen.getByText('Tietosuoja ja evästeet')).toBeInTheDocument();
-      expect(screen.queryByText('Rekisterinpitäjä ja tarkoitus')).not.toBeInTheDocument();
+      const detailsEl = screen.getByText('Tietosuoja ja evästeet').closest('details');
+      expect(detailsEl).toBeInTheDocument();
+      expect(detailsEl).not.toHaveAttribute('open');
 
       fireEvent.click(screen.getByText('Tietosuoja ja evästeet'));
 
+      expect(detailsEl).toHaveAttribute('open');
       expect(screen.getByText('Rekisterinpitäjä ja tarkoitus')).toBeInTheDocument();
       expect(
         screen.getByText(/Tietoja käsitellään ainoastaan pelitilanteen tallentamiseen/),

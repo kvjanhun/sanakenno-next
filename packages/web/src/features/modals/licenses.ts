@@ -103,6 +103,13 @@ export const OPEN_LICENSES: readonly OpenLicenseEntry[] = [
     type: 'library',
   },
   {
+    name: 'Lucide (lucide-react)',
+    license: 'ISC',
+    copyright: 'Lucide Contributors',
+    url: 'https://lucide.dev',
+    type: 'library',
+  },
+  {
     name: 'Workbox',
     license: 'MIT',
     copyright: 'Google LLC',

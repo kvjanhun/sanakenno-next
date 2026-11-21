@@ -4,6 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '../gameplay/icons.js';
 import {
   formatFinnishMonth,
   getArchivePlayStatus,
+  loadArchivePlayerStats,
   type ArchivePlayStatus,
 } from './archiveStatus.js';
 
@@ -45,6 +46,8 @@ export function ArchiveCalendar({
     }
     return map;
   }, [entries]);
+
+  const playerStats = useMemo(() => loadArchivePlayerStats(), [entries, yearMonth]);
 
   const { daysInMonth, leadingEmptyCount, trailingEmptyCount } = useMemo(() => {
     const count = new Date(yearMonth.year, yearMonth.monthIndex + 1, 0).getDate();
@@ -119,7 +122,7 @@ export function ArchiveCalendar({
       </div>
 
       {/* 6-Week Days Grid */}
-      <div className="grid grid-cols-7 gap-1" role="grid" aria-label="Arkiston kalenteripäivät">
+      <div className="grid grid-cols-7 gap-1" role="group" aria-label="Arkiston kalenteripäivät">
         {Array.from({ length: leadingEmptyCount }).map((_, i) => (
           <div key={`empty-${i}`} className="h-9" aria-hidden="true" />
         ))}
@@ -146,6 +149,7 @@ export function ArchiveCalendar({
           const status: ArchivePlayStatus = getArchivePlayStatus(
             entry.puzzle_number,
             entry.max_score,
+            playerStats,
           );
           const isSelected = selectedEntry?.date === entry.date;
           const isCurrent = entry.puzzle_number === currentPuzzleNumber;

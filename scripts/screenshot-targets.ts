@@ -102,7 +102,7 @@ function buildSampleStatsScript(): string {
       const dateStr = d.toISOString().slice(0, 10);
       sampleRecords.push({
         puzzle_number: i + 1, date: dateStr, best_rank: 'Onnistuja', best_score: 80, max_score: 100,
-        words_found: i === 0 ? 600 : 0, pangrams_found: i === 0 ? 80 : 0, long_words_count: i === 0 ? 110 : 0,
+        words_found: i === 0 ? 600 : 1, pangrams_found: i === 0 ? 80 : 0, long_words_count: i === 0 ? 110 : 0,
         hints_used: 1, elapsed_ms: 60000, is_daily: true, played_at_date: dateStr,
       });
     }
@@ -124,7 +124,7 @@ function openDialogScript(ariaLabel: string, extraAfterOpen = ''): string {
   return `(async () => {
     document.querySelector('button[aria-label="${ariaLabel}"]')?.click();
     for (let i = 0; i < 20; i++) {
-      if (document.querySelector('[role="dialog"]')) break;
+      if (document.querySelector('dialog[open], [role="dialog"]')) break;
       await new Promise((r) => setTimeout(r, 100));
     }
     ${extraAfterOpen}

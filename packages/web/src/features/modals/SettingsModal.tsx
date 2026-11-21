@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { THEME_IDS, type ThemeId, type ThemePreference } from '@sanakenno/shared';
+import type { ThemePreference } from '@sanakenno/shared';
 import {
-  CheckIcon,
   ChevronDownIcon,
   LinkIcon,
   MonitorIcon,
@@ -11,8 +10,9 @@ import {
   type IconProps,
 } from '../gameplay/icons.js';
 import { msUntilMidnight } from '../gameplay/useMidnightRollover.js';
-import { PALETTE_LABELS, paletteAccent, usePaletteStore } from '../theme/usePaletteStore.js';
-import { resolveScheme, useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
+import { PaletteSwatches } from '../theme/ThemeSelector.js';
+import { usePaletteStore } from '../theme/usePaletteStore.js';
+import { useThemePreferenceStore } from '../theme/useThemePreferenceStore.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { OPEN_LICENSES } from './licenses.js';
 import { ModalShell } from './ModalShell.js';
@@ -22,7 +22,6 @@ export interface SettingsModalProps {
   show: boolean;
   onClose: () => void;
   onOpenSync?: () => void;
-  isLinked?: boolean;
   sessionCount?: number;
   syncSlot?: ReactNode;
 }
@@ -52,7 +51,6 @@ export function SettingsModal({
   show,
   onClose,
   onOpenSync,
-  isLinked: _isLinked = false,
   sessionCount = 1,
   syncSlot,
 }: SettingsModalProps): React.JSX.Element {
@@ -60,7 +58,7 @@ export function SettingsModal({
   const setThemeId = usePaletteStore((s) => s.setThemeId);
   const preference = useThemePreferenceStore((s) => s.preference);
   const setPreference = useThemePreferenceStore((s) => s.setPreference);
-  const scheme = resolveScheme(preference);
+  const scheme = useThemePreferenceStore((s) => s.resolvedScheme);
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -142,56 +140,25 @@ export function SettingsModal({
             className="space-y-2.5 p-2.5 rounded-lg"
             style={{ backgroundColor: 'var(--color-bg-secondary)' }}
           >
-            <div className="flex items-start justify-between gap-1.5">
-              {THEME_IDS.map((id: ThemeId) => {
-                const selected = id === themeId;
-                const isMonoDark = id === 'mono' && scheme === 'dark';
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    aria-label={PALETTE_LABELS[id]}
-                    onClick={() => setThemeId(id)}
-                    className="flex min-w-0 flex-1 flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-0"
-                  >
-                    <span
-                      className="flex items-center justify-center rounded-full transition-transform active:scale-95"
-                      style={{
-                        width: 30,
-                        height: 30,
-                        backgroundColor: paletteAccent(id, scheme),
-                        border: selected
-                          ? '2px solid var(--color-text-primary)'
-                          : '1px solid var(--color-border)',
-                        boxSizing: 'border-box',
-                      }}
-                    >
-                      {selected && (
-                        <CheckIcon
-                          size={14}
-                          strokeWidth={3}
-                          style={{ color: isMonoDark ? 'black' : 'white' }}
-                        />
-                      )}
-                    </span>
-                    <span
-                      className="truncate text-center w-full"
-                      style={{
-                        fontSize: 9.5,
-                        color: 'var(--color-text-primary)',
-                        fontWeight: selected ? 700 : 400,
-                      }}
-                    >
-                      {PALETTE_LABELS[id]}
-                    </span>
-                  </button>
-                );
-              })}
+            <div
+              role="radiogroup"
+              aria-label="Väriteema"
+              className="flex items-start justify-between gap-1.5"
+            >
+              <PaletteSwatches
+                themeId={themeId}
+                scheme={scheme}
+                onSelect={setThemeId}
+                itemRole="radio"
+                swatchSize={30}
+                labelFontSize={9.5}
+                compact
+              />
             </div>
 
             <div
+              role="radiogroup"
+              aria-label="Teematila"
               className="grid grid-cols-3 gap-1.5 mt-2.5 pt-2 border-t"
               style={{ borderColor: 'var(--color-border)' }}
             >
@@ -383,6 +350,8 @@ export function SettingsModal({
           </span>
           <button
             type="button"
+            aria-expanded={licensesOpen}
+            aria-controls="settings-licenses-panel"
             onClick={() => setLicensesOpen((v) => !v)}
             className="inline-flex items-center gap-0.5 bg-transparent border-none cursor-pointer p-0 text-[11px] hover:underline"
             style={{ color: 'inherit' }}
@@ -400,7 +369,7 @@ export function SettingsModal({
         </div>
 
         {licensesOpen && (
-          <div className="space-y-2 pt-1">
+          <div id="settings-licenses-panel" className="space-y-2 pt-1">
             <p
               className="text-[9.5px] text-center mb-1.5"
               style={{ color: 'var(--color-text-secondary)' }}

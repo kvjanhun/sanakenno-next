@@ -4,6 +4,80 @@ import { CheckIcon, PaletteIcon } from '../gameplay/icons.js';
 import { PALETTE_LABELS, paletteAccent, usePaletteStore } from './usePaletteStore.js';
 import { resolveScheme, useThemePreferenceStore } from './useThemePreferenceStore.js';
 
+export interface PaletteSwatchesProps {
+  themeId: ThemeId;
+  scheme: 'light' | 'dark';
+  onSelect: (id: ThemeId) => void;
+  itemRole?: 'radio' | 'menuitemradio';
+  swatchSize?: number;
+  labelFontSize?: number;
+  compact?: boolean;
+}
+
+/** Shared 6-palette swatch selector used in both ThemeSelector popover and SettingsModal. */
+export function PaletteSwatches({
+  themeId,
+  scheme,
+  onSelect,
+  itemRole = 'radio',
+  swatchSize = 30,
+  labelFontSize = 9.5,
+  compact = false,
+}: PaletteSwatchesProps): React.JSX.Element {
+  return (
+    <>
+      {THEME_IDS.map((id: ThemeId) => {
+        const selected = id === themeId;
+        const isMonoDark = id === 'mono' && scheme === 'dark';
+        return (
+          <button
+            key={id}
+            type="button"
+            role={itemRole}
+            aria-checked={selected}
+            aria-label={PALETTE_LABELS[id]}
+            onClick={() => onSelect(id)}
+            className={`flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-0 ${
+              compact ? 'min-w-0 flex-1' : ''
+            }`}
+          >
+            <span
+              className="flex items-center justify-center rounded-full transition-transform active:scale-95"
+              style={{
+                width: swatchSize,
+                height: swatchSize,
+                backgroundColor: paletteAccent(id, scheme),
+                border: selected
+                  ? '2px solid var(--color-text-primary)'
+                  : '1px solid var(--color-border)',
+                boxSizing: 'border-box',
+              }}
+            >
+              {selected && (
+                <CheckIcon
+                  size={14}
+                  strokeWidth={3}
+                  style={{ color: isMonoDark ? 'black' : 'white' }}
+                />
+              )}
+            </span>
+            <span
+              className={compact ? 'truncate text-center w-full' : undefined}
+              style={{
+                fontSize: labelFontSize,
+                color: 'var(--color-text-primary)',
+                fontWeight: selected ? (compact ? 700 : 600) : 400,
+              }}
+            >
+              {PALETTE_LABELS[id]}
+            </span>
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
 export interface ThemeSelectorProps {
   themeId?: ThemeId;
   setThemeId?: (id: ThemeId) => void;
@@ -23,12 +97,11 @@ export function ThemeSelector({
 
   const storeThemeId = usePaletteStore((s) => s.themeId);
   const storeSetThemeId = usePaletteStore((s) => s.setThemeId);
-  const storePreference = useThemePreferenceStore((s) => s.preference);
+  const storeResolvedScheme = useThemePreferenceStore((s) => s.resolvedScheme);
 
   const themeId = propThemeId !== undefined ? propThemeId : storeThemeId;
   const setThemeId = propSetThemeId !== undefined ? propSetThemeId : storeSetThemeId;
-  const preference = propPreference !== undefined ? propPreference : storePreference;
-  const scheme = resolveScheme(preference);
+  const scheme = propPreference !== undefined ? resolveScheme(propPreference) : storeResolvedScheme;
 
   useEffect(() => {
     if (!open) return;
@@ -77,54 +150,17 @@ export function ThemeSelector({
           }}
         >
           <div className="flex items-start gap-3">
-            {THEME_IDS.map((id) => {
-              const selected = id === themeId;
-              const isMonoDark = id === 'mono' && scheme === 'dark';
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={selected}
-                  aria-label={PALETTE_LABELS[id]}
-                  onClick={() => {
-                    setThemeId(id);
-                    setOpen(false);
-                  }}
-                  className="flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer p-0"
-                >
-                  <span
-                    className="flex items-center justify-center rounded-full"
-                    style={{
-                      width: 32,
-                      height: 32,
-                      backgroundColor: paletteAccent(id, scheme),
-                      border: selected
-                        ? '2px solid var(--color-text-primary)'
-                        : '1px solid var(--color-border)',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {selected ? (
-                      <CheckIcon
-                        size={14}
-                        strokeWidth={3}
-                        style={{ color: isMonoDark ? 'black' : 'white' }}
-                      />
-                    ) : null}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--color-text-primary)',
-                      fontWeight: selected ? 600 : 400,
-                    }}
-                  >
-                    {PALETTE_LABELS[id]}
-                  </span>
-                </button>
-              );
-            })}
+            <PaletteSwatches
+              themeId={themeId}
+              scheme={scheme}
+              itemRole="menuitemradio"
+              swatchSize={32}
+              labelFontSize={11}
+              onSelect={(id) => {
+                setThemeId(id);
+                setOpen(false);
+              }}
+            />
           </div>
         </div>
       )}

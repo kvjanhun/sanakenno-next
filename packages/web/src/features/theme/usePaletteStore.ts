@@ -1,9 +1,13 @@
 import { create } from 'zustand';
 import { DEFAULT_THEME_ID, THEME_IDS, type ThemeId } from '@sanakenno/shared';
 import { getRawStorage, loadFromStorage, saveToStorage } from '../gameplay/storage.js';
-import { notifyPreferenceChanged, registerPreferenceSyncCallback } from './preference-sync.js';
+import {
+  notifyPreferenceChanged,
+  PREFERENCES_UPDATED_AT_KEY,
+  registerPreferenceSyncCallback,
+} from './preference-sync.js';
 
-export { notifyPreferenceChanged, registerPreferenceSyncCallback };
+export { notifyPreferenceChanged, PREFERENCES_UPDATED_AT_KEY, registerPreferenceSyncCallback };
 
 export const PALETTE_STORAGE_KEY = 'sanakenno_palette';
 export const THEME_ID_STORAGE_KEY = 'sanakenno_theme_id';
@@ -62,7 +66,6 @@ function readStoredPalette(): ThemeId {
 
 function persistPalette(id: ThemeId): void {
   if (typeof window === 'undefined') return;
-  saveToStorage(PALETTE_STORAGE_KEY, id);
   saveToStorage(THEME_ID_STORAGE_KEY, id);
 }
 
@@ -88,7 +91,7 @@ export const usePaletteStore = create<PaletteState>()((set) => ({
     const next = isValidThemeId(id) ? id : DEFAULT_THEME_ID;
     persistPalette(next);
     if (typeof window !== 'undefined') {
-      saveToStorage('sanakenno_preferences_updated_at', new Date().toISOString());
+      saveToStorage(PREFERENCES_UPDATED_AT_KEY, new Date().toISOString());
     }
     applyPaletteToRoot(next);
     set({ themeId: next });

@@ -76,7 +76,7 @@ describe('Gameplay UI Components', () => {
 
     // Expanding hints shows the active tab content
     fireEvent.click(showHintsBtn);
-    expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('0');
+    expect(useUiStore.getState().hintsHidden).toBe(false);
 
     // Level 0: both tabs locked, matrix tab shows a single unlock button
     expect(screen.queryByTestId('upgrade-tier-button')).not.toBeInTheDocument();
@@ -192,11 +192,11 @@ describe('Gameplay UI Components', () => {
     expect(collapsedToolbar?.firstChild).toContainElement(screen.getByTestId('hint-words-counter'));
     expect(collapsedToolbar?.lastChild).toContainElement(screen.getByTestId('show-hints-button'));
     expect(deck).toHaveStyle({ height: '172px' });
-    expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('1');
+    expect(useUiStore.getState().hintsHidden).toBe(true);
     fireEvent.click(screen.getByTestId('show-hints-button'));
     expect(screen.getByTestId('hint-content-tier4')).toBeInTheDocument();
     expect(deck).toHaveStyle({ height: '172px' });
-    expect(window.localStorage.getItem('sanakenno_hints_hidden')).toBe('0');
+    expect(useUiStore.getState().hintsHidden).toBe(false);
   });
 
   it('renders FoundWords with Kotus dictionary links and pangram bolding', () => {

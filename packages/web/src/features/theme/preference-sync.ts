@@ -1,3 +1,5 @@
+export const PREFERENCES_UPDATED_AT_KEY = 'sanakenno_preferences_updated_at';
+
 let onPreferenceChangedCallback: (() => void) | null = null;
 
 /** Register an optional callback invoked when local palette/theme preferences change. */

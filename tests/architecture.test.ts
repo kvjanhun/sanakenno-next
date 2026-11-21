@@ -208,7 +208,7 @@ describe('Architectural Fitness Guardrails', () => {
       'packages/web/src/features/modals/licenses.ts',
     ]) {
       const content = fs.readFileSync(path.join(ROOT, file), 'utf8');
-      expect(content).not.toMatch(/\bLucide\b/i);
+      expect(content).toMatch(/\bLucide\b/i);
     }
 
     for (const file of [
@@ -226,6 +226,12 @@ describe('Architectural Fitness Guardrails', () => {
     ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
     expect(webPkg.dependencies?.['@sanakenno/server']).toBeUndefined();
     expect(webPkg.devDependencies?.['@sanakenno/server']).toBe('workspace:*');
+
+    const serverPkg = JSON.parse(
+      fs.readFileSync(path.join(ROOT, 'packages/server/package.json'), 'utf8'),
+    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+    expect(serverPkg.dependencies?.['tsx']).toBeUndefined();
+    expect(serverPkg.devDependencies?.['tsx']).toBeDefined();
   });
 
   it('keeps specs/NN-*.md files structurally valid and synchronized with specs/00-backlog.md', () => {

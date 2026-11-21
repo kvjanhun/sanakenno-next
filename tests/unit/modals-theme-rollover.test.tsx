@@ -133,14 +133,14 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     });
     expect(document.documentElement.getAttribute('data-palette')).toBe('meri');
     expect(JSON.parse(getRawStorage(THEME_ID_STORAGE_KEY) ?? '""')).toBe('meri');
-    expect(JSON.parse(getRawStorage(PALETTE_STORAGE_KEY) ?? '""')).toBe('meri');
+    expect(getRawStorage(PALETTE_STORAGE_KEY)).toBeNull();
 
     act(() => {
       useThemePreferenceStore.getState().setPreference('dark');
     });
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     expect(JSON.parse(getRawStorage(THEME_PREFERENCE_STORAGE_KEY) ?? '""')).toBe('dark');
-    expect(JSON.parse(getRawStorage(THEME_STORAGE_KEY) ?? '""')).toBe('dark');
+    expect(getRawStorage(THEME_STORAGE_KEY)).toBeNull();
 
     act(() => {
       useThemePreferenceStore.getState().setPreference('light');
@@ -187,13 +187,7 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
     useAuthStore.setState({ isLoggedIn: true });
     const onOpenSync = vi.fn();
     const { rerender } = render(
-      <SettingsModal
-        show={true}
-        onClose={() => {}}
-        onOpenSync={onOpenSync}
-        isLinked={false}
-        sessionCount={1}
-      />,
+      <SettingsModal show={true} onClose={() => {}} onOpenSync={onOpenSync} sessionCount={1} />,
     );
 
     expect(screen.getByText('Pilvitallennus aktiivinen')).toBeInTheDocument();
@@ -208,13 +202,7 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
 
     // When linked across multiple devices (sessionCount = 2)
     rerender(
-      <SettingsModal
-        show={true}
-        onClose={() => {}}
-        onOpenSync={onOpenSync}
-        isLinked={true}
-        sessionCount={2}
-      />,
+      <SettingsModal show={true} onClose={() => {}} onOpenSync={onOpenSync} sessionCount={2} />,
     );
     expect(screen.getByText('Synkronoitu (2 laitetta)')).toBeInTheDocument();
   });
@@ -275,8 +263,8 @@ describe('Spec 04: Theme & Palette Stores, Midnight Rollover, and Player Modals'
       expect(screen.getByTestId('archive-entry-1')).toBeInTheDocument();
       expect(screen.getByText('Kenno #2')).toBeInTheDocument();
     });
-    // Calendar grid always reserves 6 weeks (42 cells) so month changes never shift modal size
-    const calendarGrid = screen.getByRole('grid', { name: 'Arkiston kalenteripäivät' });
+    // Calendar group always reserves 6 weeks (42 cells) so month changes never shift modal size
+    const calendarGrid = screen.getByRole('group', { name: 'Arkiston kalenteripäivät' });
     expect(calendarGrid.children).toHaveLength(42);
     expect(screen.queryByText('Kenno #10')).not.toBeInTheDocument();
     expect(screen.queryByText('Kenno #5')).not.toBeInTheDocument();

@@ -66,10 +66,12 @@ export const pwaOptions: Partial<VitePWAOptions> = {
 };
 
 export const CHUNK_RELOAD_SESSION_KEY = 'sanakenno_chunk_reload_v1';
+export const CHUNK_RELOAD_COOLDOWN_MS = 15_000;
 
 /**
  * Recover gracefully from stale dynamic import chunks after a PWA/Service Worker update
- * by performing a single reload when online instead of letting React unmount the root tree.
+ * by performing a reload when online if no reload occurred within the last 15 seconds.
+ * If sessionStorage is unavailable or throws, skip reloading to avoid an infinite loop.
  */
 export function installChunkLoadErrorHandler(
   win: Pick<Window, 'addEventListener' | 'sessionStorage' | 'navigator'> & {
@@ -80,10 +82,20 @@ export function installChunkLoadErrorHandler(
     event.preventDefault();
     if (win.navigator.onLine === false) return;
     try {
-      if (win.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY) === '1') return;
-      win.sessionStorage.setItem(CHUNK_RELOAD_SESSION_KEY, '1');
+      const now = Date.now();
+      const raw = win.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY);
+      if (raw !== null) {
+        const lastReloadAt = Number(raw);
+        if (
+          raw === '1' ||
+          (Number.isFinite(lastReloadAt) && now - lastReloadAt < CHUNK_RELOAD_COOLDOWN_MS)
+        ) {
+          return;
+        }
+      }
+      win.sessionStorage.setItem(CHUNK_RELOAD_SESSION_KEY, String(now));
     } catch {
-      // Ignore sessionStorage restrictions
+      return;
     }
     win.location.reload();
   });

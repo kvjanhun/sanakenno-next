@@ -71,7 +71,7 @@ export function AchievementsList({ stats, streak }: AchievementsListProps): Reac
                 className="text-[11px] m-0 mt-0.5 leading-none"
                 style={{ color: 'var(--color-text-secondary)' }}
               >
-                {completedCount === 6
+                {completedCount === achievements.length
                   ? 'Kaikki saavutukset suoritettu!'
                   : `${totalUnlockedTiers} / ${totalPossibleTiers} saavutettu`}
               </p>

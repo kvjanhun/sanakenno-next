@@ -95,7 +95,9 @@ describe('PWA configuration', () => {
     );
   });
 
-  it('recovers from vite:preloadError with a single guarded reload when online', () => {
+  it('recovers from vite:preloadError with a 15s cooldown reload when online and skips reload when sessionStorage throws', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-10T12:00:00.000Z'));
     window.sessionStorage.clear();
     const listeners = new Map<string, EventListener>();
     const reloadSpy = vi.fn();
@@ -116,11 +118,42 @@ describe('PWA configuration', () => {
     handler!(firstEvent);
     expect(firstEvent.defaultPrevented).toBe(true);
     expect(reloadSpy).toHaveBeenCalledTimes(1);
-    expect(window.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY)).toBe('1');
+    const storedTs = Number(window.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY));
+    expect(Number.isFinite(storedTs)).toBe(true);
+    expect(storedTs).toBe(Date.now());
 
-    // Second firing in the same session does not loop
+    // Immediate second firing within 15s cooldown does not reload
+    vi.advanceTimersByTime(5_000);
     const secondEvent = new Event('vite:preloadError', { cancelable: true });
     handler!(secondEvent);
     expect(reloadSpy).toHaveBeenCalledTimes(1);
+
+    // After 15s cooldown window, another deploy chunk error triggers a reload
+    vi.advanceTimersByTime(11_000);
+    const thirdEvent = new Event('vite:preloadError', { cancelable: true });
+    handler!(thirdEvent);
+    expect(reloadSpy).toHaveBeenCalledTimes(2);
+
+    // If sessionStorage throws, do not reload (prevents infinite reload loops)
+    const throwingWin = {
+      addEventListener: ((type: string, cb: EventListener) => {
+        listeners.set(type, cb);
+      }) as Window['addEventListener'],
+      sessionStorage: {
+        getItem: () => {
+          throw new Error('QuotaExceededError');
+        },
+        setItem: () => {
+          throw new Error('QuotaExceededError');
+        },
+      } as unknown as Storage,
+      navigator: { onLine: true } as Navigator,
+      location: { reload: reloadSpy },
+    };
+    installChunkLoadErrorHandler(throwingWin);
+    const throwingHandler = listeners.get('vite:preloadError');
+    throwingHandler!(new Event('vite:preloadError', { cancelable: true }));
+    expect(reloadSpy).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 });

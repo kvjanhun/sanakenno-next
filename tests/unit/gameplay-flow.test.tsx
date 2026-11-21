@@ -305,4 +305,33 @@ describe('Integrated Gameplay Flow (in-process)', () => {
     expect(screen.getByRole('button', { name: 'OK' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Jaa' })).not.toBeDisabled();
   });
+
+  it('ignores keyboard letter input while SyncModal (showAuth) or Celebration is open', async () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <GameplayView />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: /Kirjainkenno/i })).toBeInTheDocument();
+    });
+
+    // Open SyncModal (showAuth: true)
+    useUiStore.getState().setShowAuth(true);
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(useGameStore.getState().currentWord).toBe('');
+
+    // Close SyncModal and open Celebration
+    useUiStore.getState().setShowAuth(false);
+    useUiStore.getState().setCelebration('taysikenno');
+    await waitFor(() => {
+      expect(useUiStore.getState().celebration).toBe('taysikenno');
+    });
+    fireEvent.keyDown(window, { key: 'a' });
+    expect(useGameStore.getState().currentWord).toBe('');
+  });
 });

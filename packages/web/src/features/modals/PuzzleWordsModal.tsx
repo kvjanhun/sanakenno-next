@@ -41,7 +41,7 @@ export function PuzzleWordsModal({
   }, [puzzleNumber, show]);
 
   useEffect(() => {
-    if (show && puzzleNumber !== null) {
+    if (show && puzzleNumber !== null && Boolean(data)) {
       setRawStorage(revealedKey(puzzleNumber), 'true');
     }
   }, [puzzleNumber, show, data]);
