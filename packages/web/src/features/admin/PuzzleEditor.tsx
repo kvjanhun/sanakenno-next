@@ -1,20 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { VariationData } from '@sanakenno/shared';
-import {
-  adminBlockWord,
-  adminDeletePuzzle,
-  adminGetPuzzleVariations,
-  adminGetSlots,
-  adminPreview,
-  adminSavePuzzle,
-  adminSwapPuzzles,
-} from '../../api/client.js';
 import { AdminAlert } from './AdminPrimitives.js';
 import { AdminWordListPanel } from './AdminWordListPanel.js';
 import { PuzzleSlotControls } from './PuzzleSlotControls.js';
 import { SuggestionPanel } from './SuggestionPanel.js';
 import { useAdminStore } from './useAdminStore.js';
+import {
+  usePuzzleEditorQueries,
+  type PreviewTargetParams,
+  type PuzzleTargetParams,
+} from './usePuzzleEditorQueries.js';
 
 interface PuzzleEditorProps {
   prefillLetters?: string | null;
@@ -27,22 +23,20 @@ export function PuzzleEditor({
 }: PuzzleEditorProps = {}): React.JSX.Element {
   const csrfToken = useAdminStore((s) => s.csrfToken);
 
+  const [targetPuzzle, setTargetPuzzle] = useState<PuzzleTargetParams | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<PreviewTargetParams | null>(null);
+
   const [currentSlot, setCurrentSlot] = useState<number | null>(null);
   const [currentDisplayNumber, setCurrentDisplayNumber] = useState<number | null>(null);
   const [prevSlot, setPrevSlot] = useState<number | null>(null);
   const [nextSlot, setNextSlot] = useState<number | null>(null);
   const [totalPuzzles, setTotalPuzzles] = useState(0);
-  const [activeSlots, setActiveSlots] = useState<number[]>([]);
-  const [todaySlot, setTodaySlot] = useState<number | null>(null);
   const [savedLetters, setSavedLetters] = useState('');
   const [savedCenter, setSavedCenter] = useState('');
   const [activeLetters, setActiveLetters] = useState('');
   const [activeCenter, setActiveCenter] = useState('');
   const [variations, setVariations] = useState<VariationData[]>([]);
   const [isActive, setIsActive] = useState(true);
-  const [words, setWords] = useState<string[]>([]);
-  const [wordsLetters, setWordsLetters] = useState('');
-  const [wordsLoading, setWordsLoading] = useState(false);
 
   const [jumpTarget, setJumpTarget] = useState('');
   const [swapTarget, setSwapTarget] = useState('');
@@ -50,129 +44,107 @@ export function PuzzleEditor({
   const [newCenter, setNewCenter] = useState('');
   const [newSlot, setNewSlot] = useState<number | ''>('');
 
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'success' | 'error' | 'warning' | null>(null);
-  const [forceRequired, setForceRequired] = useState(false);
+  const [currentForceRequired, setCurrentForceRequired] = useState(false);
+  const [formForceRequired, setFormForceRequired] = useState(false);
 
-  const [preview, setPreview] = useState<{
-    words: string[];
-    max_score: number;
-    hint_data: { word_count: number; pangram_count: number };
-  } | null>(null);
+  const {
+    slotsQuery,
+    puzzleQuery,
+    previewQuery,
+    saveMutation,
+    deleteMutation,
+    swapMutation,
+    blockWordMutation,
+    saving,
+  } = usePuzzleEditorQueries(csrfToken, targetPuzzle, previewTarget);
 
-  const isDirty = activeLetters !== savedLetters || activeCenter !== savedCenter;
+  const activeSlots = slotsQuery.data?.slots ?? [];
+  const todaySlot = slotsQuery.data?.todaySlot ?? null;
 
-  const loadWordsFor = useCallback(
-    async (letters: string | string[], center: string) => {
-      if (!csrfToken || !letters || !center) return;
-      const lettersStr = Array.isArray(letters) ? letters.join(',') : letters;
-      setWordsLoading(true);
-      try {
-        const res = await adminPreview(csrfToken, { letters, center });
-        setWords(res.words);
-        setWordsLetters(lettersStr);
-        setPreview({
-          words: res.words,
-          max_score: res.max_score,
-          hint_data: res.hint_data,
-        });
-      } catch {
-        setWords([]);
-        setWordsLetters('');
-      } finally {
-        setWordsLoading(false);
-      }
-    },
-    [csrfToken],
-  );
-
-  const loadPuzzle = useCallback(
-    async (params: { slot?: number; display_number?: number }) => {
-      if (!csrfToken) return;
-      setLoading(true);
-      try {
-        const data = await adminGetPuzzleVariations(csrfToken, params);
-        setCurrentSlot(data.slot);
-        setCurrentDisplayNumber(data.display_number);
-        setPrevSlot(data.prev_slot);
-        setNextSlot(data.next_slot);
-        setTotalPuzzles(data.total_puzzles);
-        const lStr = data.letters.join(',');
-        setSavedLetters(lStr);
-        setSavedCenter(data.center);
-        setActiveLetters(lStr);
-        setActiveCenter(data.center);
-        setVariations(data.variations);
-        setIsActive(data.is_active);
-
-        setJumpTarget(data.display_number !== null ? String(data.display_number) : '');
-
-        void loadWordsFor(data.letters, data.center);
-      } catch (err: unknown) {
-        setStatusMessage(err instanceof Error ? err.message : 'Pelin lataus epäonnistui');
-        setStatusType('error');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [csrfToken, loadWordsFor],
-  );
-
-  const refreshSlotsList = useCallback(async () => {
-    if (!csrfToken) return;
-    try {
-      const res = await adminGetSlots(csrfToken);
-      const slots = res.active_slots ?? res.slots.map((s) => s.slot);
-      const resolvedToday = res.today_slot ?? null;
-      setActiveSlots(slots);
-      setTotalPuzzles(res.total_puzzles);
-      setTodaySlot(resolvedToday);
-      return { slots, todaySlot: resolvedToday };
-    } catch {
-      return { slots: [] as number[], todaySlot: null as number | null };
+  useEffect(() => {
+    if (!slotsQuery.data) return;
+    setTotalPuzzles(slotsQuery.data.totalPuzzles);
+    if (targetPuzzle === null && slotsQuery.data.slots.length > 0) {
+      const initialSlot = slotsQuery.data.todaySlot ?? slotsQuery.data.slots[0]!;
+      setTargetPuzzle({ slot: initialSlot });
     }
-  }, [csrfToken]);
+  }, [slotsQuery.data, targetPuzzle]);
+
+  useEffect(() => {
+    const data = puzzleQuery.data;
+    if (!data) return;
+    setCurrentSlot(data.slot);
+    setCurrentDisplayNumber(data.display_number);
+    setPrevSlot(data.prev_slot);
+    setNextSlot(data.next_slot);
+    setTotalPuzzles(data.total_puzzles);
+    const lStr = data.letters.join(',');
+    setSavedLetters(lStr);
+    setSavedCenter(data.center);
+    setActiveLetters(lStr);
+    setActiveCenter(data.center);
+    setVariations(data.variations);
+    setIsActive(data.is_active);
+    setCurrentForceRequired(false);
+    setJumpTarget(data.display_number !== null ? String(data.display_number) : '');
+    setPreviewTarget({
+      letters: data.letters,
+      lettersKey: lStr,
+      center: data.center,
+    });
+  }, [puzzleQuery.data]);
+
+  useEffect(() => {
+    if (!puzzleQuery.error) return;
+    setStatusMessage(
+      puzzleQuery.error instanceof Error ? puzzleQuery.error.message : 'Pelin lataus epäonnistui',
+    );
+    setStatusType('error');
+  }, [puzzleQuery.error]);
 
   useEffect(() => {
     if (!prefillLetters) return;
     setNewLetters(prefillLetters);
     setNewCenter('');
     setNewSlot('');
-    setForceRequired(false);
+    setFormForceRequired(false);
     onPrefillConsumed?.();
   }, [prefillLetters, onPrefillConsumed]);
 
-  useEffect(() => {
-    void refreshSlotsList().then((result) => {
-      if (result && result.slots.length > 0 && currentSlot === null) {
-        const initialSlot = result.todaySlot ?? result.slots[0]!;
-        void loadPuzzle({ slot: initialSlot });
-      }
-    });
-  }, [refreshSlotsList, loadPuzzle, currentSlot]);
+  const isDirty = activeLetters !== savedLetters || activeCenter !== savedCenter;
+  const words = previewQuery.data?.words ?? [];
+  const wordsLetters = previewTarget?.lettersKey ?? '';
+  const wordsLoading = previewQuery.isFetching;
+  const loading = puzzleQuery.isFetching;
 
   const handleCenterSelect = (center: string) => {
     setActiveCenter(center);
-    setNewCenter(center);
-    void loadWordsFor(activeLetters, center);
+    setCurrentForceRequired(false);
+    setPreviewTarget({
+      letters: activeLetters,
+      lettersKey: activeLetters,
+      center,
+    });
   };
 
   const handleRestore = () => {
     setActiveLetters(savedLetters);
     setActiveCenter(savedCenter);
-    setNewLetters(savedLetters);
-    setNewCenter(savedCenter);
-    void loadWordsFor(savedLetters, savedCenter);
+    setCurrentForceRequired(false);
+    setPreviewTarget({
+      letters: savedLetters,
+      lettersKey: savedLetters,
+      center: savedCenter,
+    });
   };
 
   const handleSaveCurrent = async (force = false) => {
     if (!csrfToken || currentSlot === null) return;
-    setSaving(true);
     setStatusMessage(null);
     try {
-      await adminSavePuzzle(csrfToken, {
+      await saveMutation.mutateAsync({
         slot: currentSlot,
         letters: activeLetters,
         center: activeCenter,
@@ -180,25 +152,14 @@ export function PuzzleEditor({
       });
       setStatusMessage('Peli tallennettu onnistuneesti!');
       setStatusType('success');
-      setForceRequired(false);
-      await refreshSlotsList();
-      await loadPuzzle({ slot: currentSlot });
+      setCurrentForceRequired(false);
+      setTargetPuzzle({ slot: currentSlot });
     } catch (err: unknown) {
       const reqForce = (err as { requires_force?: boolean }).requires_force;
-      if (reqForce) setForceRequired(true);
+      if (reqForce) setCurrentForceRequired(true);
       setStatusMessage(err instanceof Error ? err.message : 'Tallennus epäonnistui');
       setStatusType('error');
-    } finally {
-      setSaving(false);
     }
-  };
-
-  const handlePrev = () => {
-    if (prevSlot !== null) void loadPuzzle({ slot: prevSlot });
-  };
-
-  const handleNext = () => {
-    if (nextSlot !== null) void loadPuzzle({ slot: nextSlot });
   };
 
   const handleJump = (e: FormEvent) => {
@@ -209,7 +170,7 @@ export function PuzzleEditor({
       setStatusType('warning');
       return;
     }
-    void loadPuzzle({ display_number: target });
+    setTargetPuzzle({ display_number: target });
   };
 
   const handleSwap = async () => {
@@ -228,57 +189,49 @@ export function PuzzleEditor({
     const targetSlot = activeSlots[targetDisp - 1];
     if (targetSlot === undefined || targetSlot === currentSlot) return;
 
-    setSaving(true);
     try {
-      await adminSwapPuzzles(csrfToken, currentSlot, targetSlot);
+      await swapMutation.mutateAsync({ slotA: currentSlot, slotB: targetSlot });
       setStatusMessage('Pelit vaihdettu keskenään onnistuneesti!');
       setStatusType('success');
       setSwapTarget('');
-      await refreshSlotsList();
-      await loadPuzzle({ slot: targetSlot });
+      setTargetPuzzle({ slot: targetSlot });
     } catch (err: unknown) {
       setStatusMessage(err instanceof Error ? err.message : 'Vaihto epäonnistui');
       setStatusType('error');
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (targetSlot: number) => {
     if (!csrfToken) return;
-    const target = typeof newSlot === 'number' && newSlot >= 0 ? newSlot : currentSlot;
-    if (target === null) return;
-    if (!window.confirm(`Haluatko varmasti poistaa slotin ${target}?`)) return;
+    if (!window.confirm(`Haluatko varmasti poistaa slotin ${targetSlot}?`)) return;
 
-    setSaving(true);
     setStatusMessage(null);
     try {
-      await adminDeletePuzzle(csrfToken, target);
-      setStatusMessage(`Slotti ${target} poistettu.`);
+      const refreshed = await deleteMutation.mutateAsync(targetSlot);
+      setStatusMessage(`Slotti ${targetSlot} poistettu.`);
       setStatusType('success');
-      const result = await refreshSlotsList();
-      if (result && result.slots.length > 0) {
-        await loadPuzzle({ slot: result.slots[0] });
+      if (targetSlot === newSlot) {
+        setNewSlot('');
+      }
+      if (refreshed && refreshed.slots.length > 0) {
+        setTargetPuzzle({ slot: refreshed.slots[0] });
       } else {
+        setTargetPuzzle(null);
+        setPreviewTarget(null);
         setCurrentSlot(null);
         setCurrentDisplayNumber(null);
-        setWords([]);
-        setWordsLetters('');
         setVariations([]);
       }
     } catch (err: unknown) {
       setStatusMessage(err instanceof Error ? err.message : 'Poisto epäonnistui');
       setStatusType('error');
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleReactivate = async () => {
     if (!csrfToken || currentSlot === null) return;
-    setSaving(true);
     try {
-      await adminSavePuzzle(csrfToken, {
+      await saveMutation.mutateAsync({
         slot: currentSlot,
         letters: activeLetters,
         center: activeCenter,
@@ -286,34 +239,20 @@ export function PuzzleEditor({
       });
       setStatusMessage('Peli palautettu onnistuneesti kiertoon!');
       setStatusType('success');
-      await refreshSlotsList();
-      await loadPuzzle({ slot: currentSlot });
+      setTargetPuzzle({ slot: currentSlot });
     } catch (err: unknown) {
       setStatusMessage(err instanceof Error ? err.message : 'Palautus epäonnistui');
       setStatusType('error');
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handlePreviewForm = async () => {
+  const handlePreviewForm = () => {
     if (!csrfToken || !newLetters || !newCenter) return;
-    setSaving(true);
-    try {
-      const res = await adminPreview(csrfToken, { letters: newLetters, center: newCenter });
-      setPreview({
-        words: res.words,
-        max_score: res.max_score,
-        hint_data: res.hint_data,
-      });
-      setWords(res.words);
-      setWordsLetters(newLetters);
-    } catch (err: unknown) {
-      setStatusMessage(err instanceof Error ? err.message : 'Esikatselu epäonnistui');
-      setStatusType('error');
-    } finally {
-      setSaving(false);
-    }
+    setPreviewTarget({
+      letters: newLetters,
+      lettersKey: newLetters,
+      center: newCenter,
+    });
   };
 
   const savePuzzlePayload = async (
@@ -321,22 +260,17 @@ export function PuzzleEditor({
     successMessage: (res: { slot: number; display_number: number }) => string,
   ): Promise<void> => {
     if (!csrfToken) return;
-    setSaving(true);
     setStatusMessage(null);
     try {
-      const res = (await adminSavePuzzle(csrfToken, payload)) as {
-        slot: number;
-        display_number: number;
-      };
+      const res = await saveMutation.mutateAsync(payload);
       setStatusMessage(successMessage(res));
       setStatusType('success');
-      setForceRequired(false);
-      await refreshSlotsList();
-      await loadPuzzle({ slot: res.slot });
+      setFormForceRequired(false);
+      setTargetPuzzle({ slot: res.slot });
     } catch (err: unknown) {
       const reqForce = (err as { requires_force?: boolean }).requires_force;
       if (reqForce) {
-        setForceRequired(true);
+        setFormForceRequired(true);
         if (payload.slot === undefined) {
           setNewLetters(payload.letters);
           setNewCenter(payload.center);
@@ -346,8 +280,6 @@ export function PuzzleEditor({
       setStatusMessage(err instanceof Error ? err.message : 'Tallennus epäonnistui');
       setStatusType('error');
       throw err;
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -356,7 +288,7 @@ export function PuzzleEditor({
     const payload: { slot?: number; letters: string; center: string; force?: boolean } = {
       letters: newLetters,
       center: newCenter,
-      force: overrideForce || forceRequired,
+      force: overrideForce || formForceRequired,
     };
     if (typeof newSlot === 'number' && newSlot >= 0) {
       payload.slot = newSlot;
@@ -379,12 +311,9 @@ export function PuzzleEditor({
     if (!csrfToken) return;
     if (!window.confirm(`Estä sana "${word}" pysyvästi?`)) return;
     try {
-      await adminBlockWord(csrfToken, word);
+      await blockWordMutation.mutateAsync(word);
       setStatusMessage(`Sana "${word}" estetty.`);
       setStatusType('success');
-      if (currentSlot !== null) {
-        await loadPuzzle({ slot: currentSlot });
-      }
     } catch (err: unknown) {
       setStatusMessage(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
       setStatusType('error');
@@ -423,41 +352,54 @@ export function PuzzleEditor({
             newLetters={newLetters}
             newCenter={newCenter}
             newSlot={newSlot}
-            forceRequired={forceRequired}
+            forceRequired={formForceRequired}
+            currentForceRequired={currentForceRequired}
             onJumpTargetChange={setJumpTarget}
             onSwapTargetChange={setSwapTarget}
             onFirst={() => {
-              if (activeSlots.length > 0) void loadPuzzle({ slot: activeSlots[0] });
+              if (activeSlots.length > 0) setTargetPuzzle({ slot: activeSlots[0] });
             }}
-            onPrev={handlePrev}
+            onPrev={() => {
+              if (prevSlot !== null) setTargetPuzzle({ slot: prevSlot });
+            }}
             onToday={() => {
-              if (todaySlot !== null) void loadPuzzle({ slot: todaySlot });
+              if (todaySlot !== null) setTargetPuzzle({ slot: todaySlot });
             }}
-            onNext={handleNext}
+            onNext={() => {
+              if (nextSlot !== null) setTargetPuzzle({ slot: nextSlot });
+            }}
             onLast={() => {
               if (activeSlots.length > 0) {
-                void loadPuzzle({ slot: activeSlots[activeSlots.length - 1] });
+                setTargetPuzzle({ slot: activeSlots[activeSlots.length - 1] });
               }
             }}
             onJump={handleJump}
-            onSwap={handleSwap}
+            onSwap={() => void handleSwap()}
             onCenterSelect={handleCenterSelect}
-            onSave={() => handleSaveCurrent(false)}
+            onSave={() => void handleSaveCurrent(false)}
+            onForceSaveCurrent={() => void handleSaveCurrent(true)}
             onRestore={handleRestore}
-            onDelete={handleDelete}
-            onReactivate={handleReactivate}
+            onDelete={() => {
+              if (currentSlot !== null) void handleDelete(currentSlot);
+            }}
+            onDeleteForm={
+              typeof newSlot === 'number' && newSlot >= 0
+                ? () => void handleDelete(newSlot)
+                : undefined
+            }
+            onReactivate={() => void handleReactivate()}
             onToggleCreateMode={() => {
               setNewLetters('');
               setNewCenter('');
               setNewSlot('');
-              setForceRequired(false);
+              setFormForceRequired(false);
               setStatusMessage(null);
             }}
             onNewLettersChange={setNewLetters}
             onNewCenterChange={setNewCenter}
             onNewSlotChange={setNewSlot}
             onPreviewForm={handlePreviewForm}
-            onCreateForm={handleSaveForm}
+            onCreateForm={(force) => void handleSaveForm(force)}
           />
 
           <SuggestionPanel
@@ -467,9 +409,13 @@ export function PuzzleEditor({
               setNewLetters(sLetters);
               setNewCenter(sCenter);
               setNewSlot('');
-              setForceRequired(false);
+              setFormForceRequired(false);
               setStatusMessage(null);
-              void loadWordsFor(sLetters, sCenter);
+              setPreviewTarget({
+                letters: sLetters,
+                lettersKey: sLetters,
+                center: sCenter,
+              });
             }}
           />
         </div>
@@ -478,9 +424,9 @@ export function PuzzleEditor({
           <AdminWordListPanel
             words={words}
             letters={wordsLetters || activeLetters || newLetters}
-            maxScore={preview?.max_score}
+            maxScore={previewQuery.data?.max_score}
             loading={wordsLoading}
-            onBlock={handleBlockWord}
+            onBlock={(word) => void handleBlockWord(word)}
           />
         </div>
       </div>

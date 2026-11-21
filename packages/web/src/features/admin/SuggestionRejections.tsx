@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminSuggestionRejection } from '@sanakenno/shared';
 import { adminDeleteSuggestionRejection, adminGetSuggestionRejections } from '../../api/client.js';
 import {
@@ -21,44 +22,51 @@ interface SuggestionRejectionsProps {
 
 export function SuggestionRejections({ csrfToken }: SuggestionRejectionsProps): React.JSX.Element {
   const isDesktop = useIsDesktop();
-  const [rejections, setRejections] = useState<AdminSuggestionRejection[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<number | null>(null);
 
-  const loadRejections = useCallback(async () => {
-    if (!csrfToken) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = (await adminGetSuggestionRejections(csrfToken)) as {
+  const {
+    data,
+    isFetching: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ['admin', 'suggestion-rejections', csrfToken],
+    enabled: Boolean(csrfToken),
+    queryFn: async () => {
+      return (await adminGetSuggestionRejections(csrfToken!)) as {
         rejections: AdminSuggestionRejection[];
       };
-      setRejections(res.rejections ?? []);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Hylättyjen ehdotusten haku epäonnistui');
-    } finally {
-      setLoading(false);
-    }
-  }, [csrfToken]);
+    },
+  });
 
-  useEffect(() => {
-    void loadRejections();
-  }, [loadRejections]);
-
-  const handleRestore = async (id: number) => {
-    if (!csrfToken) return;
-    setRestoringId(id);
-    setError(null);
-    try {
-      await adminDeleteSuggestionRejection(csrfToken, id);
-      setRejections((prev) => prev.filter((r) => r.id !== id));
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Palautus epäonnistui');
-    } finally {
+  const restoreMutation = useMutation({
+    mutationFn: async (id: number) => {
+      setRestoringId(id);
+      setMutationError(null);
+      await adminDeleteSuggestionRejection(csrfToken!, id);
+      return id;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'suggestion-rejections'] });
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Palautus epäonnistui');
+    },
+    onSettled: () => {
       setRestoringId(null);
-    }
-  };
+    },
+  });
+
+  const rejections = data?.rejections ?? [];
+  const error =
+    mutationError ??
+    (queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? 'Hylättyjen ehdotusten haku epäonnistui'
+        : null);
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
@@ -68,7 +76,7 @@ export function SuggestionRejections({ csrfToken }: SuggestionRejectionsProps): 
         actions={
           <button
             type="button"
-            onClick={loadRejections}
+            onClick={() => void refetch()}
             disabled={loading}
             className={adminButtonClass('md')}
             style={adminButtonStyle('secondary', 'secondary')}
@@ -109,7 +117,7 @@ export function SuggestionRejections({ csrfToken }: SuggestionRejectionsProps): 
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleRestore(r.id)}
+                  onClick={() => restoreMutation.mutate(r.id)}
                   disabled={restoringId === r.id}
                   className={`${adminButtonClass('sm')} shrink-0`}
                   style={adminButtonStyle('secondary', 'primary')}
@@ -159,7 +167,7 @@ export function SuggestionRejections({ csrfToken }: SuggestionRejectionsProps): 
                     <td className="p-3 text-right">
                       <button
                         type="button"
-                        onClick={() => handleRestore(r.id)}
+                        onClick={() => restoreMutation.mutate(r.id)}
                         disabled={restoringId === r.id}
                         className={adminButtonClass('sm')}
                         style={adminButtonStyle('secondary', 'primary')}

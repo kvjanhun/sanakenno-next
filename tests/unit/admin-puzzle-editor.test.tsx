@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VariationData } from '@sanakenno/shared';
 import { AdminWordListPanel } from '../../packages/web/src/features/admin/AdminWordListPanel.js';
@@ -13,6 +15,7 @@ const mockAdminGetPuzzleVariations = vi.fn();
 const mockAdminPreview = vi.fn();
 const mockAdminSavePuzzle = vi.fn();
 const mockAdminGetSuggestion = vi.fn();
+const mockAdminDeletePuzzle = vi.fn();
 
 vi.mock('../../packages/web/src/api/client.js', () => ({
   adminGetSlots: (...args: unknown[]) => mockAdminGetSlots(...args),
@@ -21,10 +24,19 @@ vi.mock('../../packages/web/src/api/client.js', () => ({
   adminSavePuzzle: (...args: unknown[]) => mockAdminSavePuzzle(...args),
   adminGetSuggestion: (...args: unknown[]) => mockAdminGetSuggestion(...args),
   adminRejectSuggestion: vi.fn(),
-  adminDeletePuzzle: vi.fn(),
+  adminDeletePuzzle: (...args: unknown[]) => mockAdminDeletePuzzle(...args),
   adminSwapPuzzles: vi.fn(),
   adminBlockWord: vi.fn(),
 }));
+
+function renderWithQuery(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 describe('Admin Puzzle Editor UI Components', () => {
   const sampleVariations: VariationData[] = [
@@ -269,7 +281,7 @@ describe('Admin Puzzle Editor UI Components', () => {
         total_puzzles: 4,
       });
 
-      render(<PuzzleEditor />);
+      renderWithQuery(<PuzzleEditor />);
 
       await waitFor(() => {
         expect(mockAdminGetPuzzleVariations).toHaveBeenCalledWith('test-csrf', { slot: 5 });
@@ -348,7 +360,7 @@ describe('Admin Puzzle Editor UI Components', () => {
           total_puzzles: 1,
         });
 
-      render(<PuzzleEditor />);
+      renderWithQuery(<PuzzleEditor />);
 
       await waitFor(() => {
         expect(screen.getByText('Peli 1 / 1')).toBeInTheDocument();
@@ -391,6 +403,95 @@ describe('Admin Puzzle Editor UI Components', () => {
           center: 'e',
           force: true,
         });
+      });
+    });
+
+    it('targets currentSlot on top-bar delete and newSlot on ManualPuzzleForm delete, and supports current-slot force-save without bleeding center selection into form inputs', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      mockAdminGetSlots.mockResolvedValue({
+        slots: [{ slot: 5, display_number: 1 }],
+        active_slots: [5],
+        total_puzzles: 1,
+        today_slot: 5,
+      });
+
+      mockAdminGetPuzzleVariations.mockResolvedValue({
+        slot: 5,
+        display_number: 1,
+        total_puzzles: 1,
+        prev_slot: null,
+        next_slot: null,
+        letters: ['a', 'e', 'i', 'k', 'l', 'n', 's'],
+        center: 'a',
+        variations: sampleVariations,
+        is_active: true,
+      });
+
+      mockAdminPreview.mockResolvedValue({
+        words: ['kala', 'kansa'],
+        max_score: 20,
+        word_count: 2,
+        pangram_count: 1,
+        hint_data: { word_count: 2, pangram_count: 1 },
+        variations: [],
+      });
+
+      mockAdminDeletePuzzle.mockResolvedValue({ status: 'deleted' });
+
+      const forceError = new Error('Keskuskirjaimen vaihto vaatii vahvistuksen') as Error & {
+        requires_force?: boolean;
+      };
+      forceError.requires_force = true;
+
+      mockAdminSavePuzzle.mockRejectedValueOnce(forceError).mockResolvedValueOnce({
+        status: 'saved',
+        slot: 5,
+        display_number: 1,
+        total_puzzles: 1,
+      });
+
+      renderWithQuery(<PuzzleEditor />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Peli 1 / 1')).toBeInTheDocument();
+      });
+
+      // Populate ManualPuzzleForm slot (99) and center ('s'), then click top variation center 'k'
+      fireEvent.change(screen.getByLabelText(/Slotti/i), { target: { value: '99' } });
+      fireEvent.change(screen.getByLabelText(/Keskuskirjain/i), { target: { value: 's' } });
+      fireEvent.click(screen.getByTitle('Valitse K keskuskirjaimeksi'));
+
+      // Variation click must NOT overwrite ManualPuzzleForm center input
+      expect(screen.getByLabelText(/Keskuskirjain/i)).toHaveValue('s');
+
+      // Current-slot save triggers requires_force -> shows "Tallenna silti (Ohita varoitus)"
+      fireEvent.click(screen.getByRole('button', { name: 'Tallenna muutokset' }));
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: 'Tallenna silti (Ohita varoitus)' }),
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Tallenna silti (Ohita varoitus)' }));
+      await waitFor(() => {
+        expect(mockAdminSavePuzzle).toHaveBeenNthCalledWith(2, 'test-csrf', {
+          slot: 5,
+          letters: 'a,e,i,k,l,n,s',
+          center: 'k',
+          force: true,
+        });
+      });
+
+      // Top-bar "Poista kierrosta" deletes currentSlot (5), NOT newSlot (99)
+      fireEvent.click(screen.getByRole('button', { name: 'Poista kierrosta' }));
+      await waitFor(() => {
+        expect(mockAdminDeletePuzzle).toHaveBeenCalledWith('test-csrf', 5);
+      });
+
+      // ManualPuzzleForm "Poista peli" deletes newSlot (99)
+      fireEvent.click(screen.getByRole('button', { name: 'Poista peli' }));
+      await waitFor(() => {
+        expect(mockAdminDeletePuzzle).toHaveBeenCalledWith('test-csrf', 99);
       });
     });
   });

@@ -1,3 +1,4 @@
+import { List } from 'lucide-react';
 import { ADMIN_CARD_STYLE } from './AdminPrimitives.js';
 import { WordList } from './WordList.js';
 
@@ -34,24 +35,7 @@ export function AdminWordListPanel({
               color: 'var(--color-accent)',
             }}
           >
-            <svg
-              width={16}
-              height={16}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="8" y1="6" x2="21" y2="6" />
-              <line x1="8" y1="12" x2="21" y2="12" />
-              <line x1="8" y1="18" x2="21" y2="18" />
-              <line x1="3" y1="6" x2="3.01" y2="6" />
-              <line x1="3" y1="12" x2="3.01" y2="12" />
-              <line x1="3" y1="18" x2="3.01" y2="18" />
-            </svg>
+            <List size={16} strokeWidth={2} aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>

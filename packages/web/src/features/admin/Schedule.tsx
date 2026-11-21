@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { adminGetSchedule } from '../../api/client.js';
 import {
   ADMIN_CARD_STYLE,
@@ -6,6 +6,7 @@ import {
   ADMIN_TABLE_HEAD_ROW_STYLE,
   ADMIN_TABLE_ROW_CLASS,
   ADMIN_TABLE_WRAPPER_CLASS,
+  AdminAlert,
   AdminPageHeader,
   LetterTile,
   adminButtonClass,
@@ -17,37 +18,25 @@ import { useAdminStore } from './useAdminStore.js';
 export function Schedule(): React.JSX.Element {
   const csrfToken = useAdminStore((s) => s.csrfToken);
   const isDesktop = useIsDesktop();
-  const [schedule, setSchedule] = useState<
-    Array<{
-      date: string;
-      slot: number;
-      display_number: number;
-      letters: string[] | null;
-      center: string | null;
-      word_count: number;
-      max_score: number;
-      pangram_count: number;
-      is_today: boolean;
-    }>
-  >([]);
-  const [loading, setLoading] = useState(false);
 
-  const loadSchedule = useCallback(async () => {
-    if (!csrfToken) return;
-    setLoading(true);
-    try {
-      const res = await adminGetSchedule(csrfToken, 14);
-      setSchedule(res.schedule);
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [csrfToken]);
+  const {
+    data,
+    isFetching: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ['admin', 'schedule', csrfToken],
+    enabled: Boolean(csrfToken),
+    queryFn: () => adminGetSchedule(csrfToken!, 14),
+  });
 
-  useEffect(() => {
-    void loadSchedule();
-  }, [loadSchedule]);
+  const schedule = data?.schedule ?? [];
+  const error =
+    queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? 'Aikataulun haku epäonnistui'
+        : null;
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
@@ -57,7 +46,7 @@ export function Schedule(): React.JSX.Element {
         actions={
           <button
             type="button"
-            onClick={loadSchedule}
+            onClick={() => void refetch()}
             disabled={loading}
             className={adminButtonClass('md')}
             style={adminButtonStyle('secondary', 'secondary')}
@@ -66,6 +55,8 @@ export function Schedule(): React.JSX.Element {
           </button>
         }
       />
+
+      {error && <AdminAlert variant="error">{error}</AdminAlert>}
 
       {!isDesktop ? (
         <div className="space-y-2.5 tabular-nums">

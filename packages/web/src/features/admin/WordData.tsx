@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { AdminFailedGuessesResponse } from '@sanakenno/shared';
 import { adminGetFailedGuesses } from '../../api/client.js';
 import {
@@ -22,29 +23,26 @@ interface WordDataProps {
 export function WordData({ csrfToken }: WordDataProps): React.JSX.Element {
   const [tab, setTab] = useState<'failed' | 'words'>('failed');
   const [days, setDays] = useState(7);
-  const [data, setData] = useState<AdminFailedGuessesResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadFailedGuesses = useCallback(async () => {
-    if (!csrfToken) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = (await adminGetFailedGuesses(csrfToken, days)) as AdminFailedGuessesResponse;
-      setData(res);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Virhearvausten haku epäonnistui');
-    } finally {
-      setLoading(false);
-    }
-  }, [csrfToken, days]);
+  const {
+    data,
+    isFetching: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ['admin', 'failed-guesses', csrfToken, days],
+    enabled: Boolean(csrfToken) && tab === 'failed',
+    queryFn: async () => {
+      return (await adminGetFailedGuesses(csrfToken!, days)) as AdminFailedGuessesResponse;
+    },
+  });
 
-  useEffect(() => {
-    if (tab === 'failed') {
-      void loadFailedGuesses();
-    }
-  }, [tab, loadFailedGuesses]);
+  const error =
+    queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? 'Virhearvausten haku epäonnistui'
+        : null;
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
@@ -89,7 +87,7 @@ export function WordData({ csrfToken }: WordDataProps): React.JSX.Element {
               />
               <button
                 type="button"
-                onClick={loadFailedGuesses}
+                onClick={() => void refetch()}
                 disabled={loading}
                 className={adminButtonClass('sm')}
                 style={adminButtonStyle('secondary', 'secondary')}

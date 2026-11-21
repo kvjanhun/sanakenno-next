@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminBlockWord, adminGetBlocked, adminUnblockWord } from '../../api/client.js';
 import {
   ADMIN_CARD_CLASS,
@@ -14,56 +15,61 @@ import { useAdminStore } from './useAdminStore.js';
 
 export function BlockedWords(): React.JSX.Element {
   const csrfToken = useAdminStore((s) => s.csrfToken);
-  const [blocked, setBlocked] = useState<Array<{ id: number; word: string; blocked_at: string }>>(
-    [],
-  );
+  const queryClient = useQueryClient();
   const [newWord, setNewWord] = useState('');
   const [filter, setFilter] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  const loadBlocked = useCallback(async () => {
-    if (!csrfToken) return;
-    try {
-      const res = await adminGetBlocked(csrfToken);
-      setBlocked(res.blocked);
-    } catch {
-      // ignore
-    }
-  }, [csrfToken]);
+  const { data, error: queryError } = useQuery({
+    queryKey: ['admin', 'blocked', csrfToken],
+    enabled: Boolean(csrfToken),
+    queryFn: () => adminGetBlocked(csrfToken!),
+  });
 
-  useEffect(() => {
-    void loadBlocked();
-  }, [loadBlocked]);
+  const blockMutation = useMutation({
+    mutationFn: (word: string) => adminBlockWord(csrfToken!, word),
+    onSuccess: async () => {
+      setNewWord('');
+      setMutationError(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'blocked'] });
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
+    },
+  });
 
-  const handleBlock = async (e: React.FormEvent) => {
+  const unblockMutation = useMutation({
+    mutationFn: (id: number) => adminUnblockWord(csrfToken!, id),
+    onSuccess: async () => {
+      setMutationError(null);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'blocked'] });
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Eston poisto epäonnistui');
+    },
+  });
+
+  const blocked = data?.blocked ?? [];
+  const loading = blockMutation.isPending || unblockMutation.isPending;
+  const error =
+    mutationError ??
+    (queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? 'Estettyjen sanojen haku epäonnistui'
+        : null);
+
+  const handleBlock = (e: React.FormEvent) => {
     e.preventDefault();
     if (!csrfToken || !newWord.trim()) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await adminBlockWord(csrfToken, newWord.trim());
-      setNewWord('');
-      void loadBlocked();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
-    } finally {
-      setLoading(false);
-    }
+    setMutationError(null);
+    blockMutation.mutate(newWord.trim());
   };
 
-  const handleUnblock = async (id: number) => {
+  const handleUnblock = (id: number) => {
     if (!csrfToken) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await adminUnblockWord(csrfToken, id);
-      void loadBlocked();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Eston poisto epäonnistui');
-    } finally {
-      setLoading(false);
-    }
+    setMutationError(null);
+    unblockMutation.mutate(id);
   };
 
   return (

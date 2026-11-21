@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { compareFinnishAlphabetically, isPangram } from '@sanakenno/shared';
+import { Trash2 } from 'lucide-react';
 
 interface WordListProps {
   words: string[];
@@ -7,16 +9,15 @@ interface WordListProps {
   onBlock: (word: string) => void;
 }
 
-function isPangramWord(word: string, letters: string): boolean {
-  const chars = Array.from(new Set(letters.toLowerCase().replace(/[^a-zåäö]/g, '')));
-  return chars.length === 7 && chars.every((l) => word.includes(l));
-}
-
 export function WordList({ words, letters, loading, onBlock }: WordListProps): React.JSX.Element {
-  const sorted = useMemo(() => [...words].sort(), [words]);
+  const sorted = useMemo(() => [...words].sort(compareFinnishAlphabetically), [words]);
+  const letterSet = useMemo(
+    () => new Set(letters.toLowerCase().replace(/[^a-zåäö]/g, '')),
+    [letters],
+  );
   const pangramCount = useMemo(
-    () => sorted.filter((w) => isPangramWord(w, letters)).length,
-    [sorted, letters],
+    () => (letterSet.size === 7 ? sorted.filter((w) => isPangram(w, letterSet)).length : 0),
+    [sorted, letterSet],
   );
 
   if (loading) {
@@ -50,7 +51,7 @@ export function WordList({ words, letters, loading, onBlock }: WordListProps): R
         }}
       >
         {sorted.map((word) => {
-          const pg = isPangramWord(word, letters);
+          const pg = letterSet.size === 7 && isPangram(word, letterSet);
           return (
             <div key={word} className="flex items-center gap-1.5 group py-0.5 min-w-0">
               <button
@@ -65,19 +66,7 @@ export function WordList({ words, letters, loading, onBlock }: WordListProps): R
                 title={`Estä "${word}"`}
                 aria-label={`Estä ${word}`}
               >
-                <svg
-                  width={13}
-                  height={13}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                </svg>
+                <Trash2 size={13} strokeWidth={2} aria-hidden="true" />
               </button>
               <span
                 style={{

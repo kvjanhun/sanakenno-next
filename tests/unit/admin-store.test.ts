@@ -120,10 +120,10 @@ describe('Admin Store (Web)', () => {
     await useAdminStore.getState().logout();
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/auth/logout',
-      expect.objectContaining({ method: 'POST' }),
-    );
+    const [logoutUrl, logoutInit] = fetchSpy.mock.calls[0]!;
+    expect(logoutUrl).toBe('/api/auth/logout');
+    expect(logoutInit?.method).toBe('POST');
+    expect(new Headers(logoutInit?.headers).get('X-CSRF-Token')).toBe('test-token');
     expect(useAdminStore.getState()).toMatchObject({
       isAuthenticated: false,
       username: null,

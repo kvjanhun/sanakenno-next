@@ -1,17 +1,8 @@
 import type { VariationData } from '@sanakenno/shared';
-import { apiClient } from './client.js';
+import { apiClient, readErrorMessage } from './client.js';
 
 function csrfHeaders(token: string): Record<string, string> {
   return { 'X-CSRF-Token': token };
-}
-
-async function readErrorMessage(res: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await res.json()) as { error?: string };
-    return body.error ?? fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 export async function adminCheckSession(): Promise<{ username: string; csrfToken: string } | null> {
@@ -32,8 +23,10 @@ export async function adminLogin(payload: {
   return (await res.json()) as { username: string; csrfToken: string };
 }
 
-export async function adminLogout(): Promise<void> {
-  await apiClient.api.auth.logout.$post().catch(() => undefined);
+export async function adminLogout(csrfToken?: string | null): Promise<void> {
+  await apiClient.api.auth.logout
+    .$post({}, { headers: csrfToken ? csrfHeaders(csrfToken) : undefined })
+    .catch(() => undefined);
 }
 
 export async function adminSavePuzzle(
@@ -42,7 +35,7 @@ export async function adminSavePuzzle(
 ) {
   const res = await apiClient.api.admin.puzzle.$post(
     { json: payload },
-    { headers: csrfHeaders(csrfToken), init: { credentials: 'same-origin' } },
+    { headers: csrfHeaders(csrfToken) },
   );
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as {
@@ -59,7 +52,7 @@ export async function adminSavePuzzle(
 export async function adminDeletePuzzle(csrfToken: string, slot: number) {
   const res = await apiClient.api.admin.puzzle[':slot'].$delete(
     { param: { slot: String(slot) } },
-    { headers: csrfHeaders(csrfToken), init: { credentials: 'same-origin' } },
+    { headers: csrfHeaders(csrfToken) },
   );
   if (!res.ok) throw new Error(await readErrorMessage(res, 'Poisto epäonnistui'));
   return res.json();
@@ -68,17 +61,14 @@ export async function adminDeletePuzzle(csrfToken: string, slot: number) {
 export async function adminSwapPuzzles(csrfToken: string, slotA: number, slotB: number) {
   const res = await apiClient.api.admin.puzzle.swap.$post(
     { json: { slotA, slotB } },
-    { headers: csrfHeaders(csrfToken), init: { credentials: 'same-origin' } },
+    { headers: csrfHeaders(csrfToken) },
   );
   if (!res.ok) throw new Error(await readErrorMessage(res, 'Vaihto epäonnistui'));
   return res.json();
 }
 
 export async function adminGetSlots(csrfToken: string) {
-  const res = await apiClient.api.admin.puzzle.slots.$get(
-    {},
-    { headers: csrfHeaders(csrfToken), init: { credentials: 'same-origin' } },
-  );
+  const res = await apiClient.api.admin.puzzle.slots.$get({}, { headers: csrfHeaders(csrfToken) });
   if (!res.ok) {
     return { slots: [], active_slots: [] as number[], total_puzzles: 0, today_slot: null };
   }
@@ -100,7 +90,7 @@ export async function adminGetPuzzleVariations(
   if (params.letters !== undefined) query.letters = params.letters;
   const res = await apiClient.api.admin.puzzle.variations.$get(
     { query },
-    { headers: csrfHeaders(csrfToken), init: { credentials: 'same-origin' } },
+    { headers: csrfHeaders(csrfToken) },
   );
   if (!res.ok) throw new Error(await readErrorMessage(res, 'Pelin lataus epäonnistui'));
   return (await res.json()) as {
@@ -116,22 +106,13 @@ export async function adminGetPuzzleVariations(
   };
 }
 
-export async function adminChangeCenter(csrfToken: string, slot: number, center: string) {
-  const res = await apiClient.api.admin.puzzle.center.$post(
-    { json: { slot, center } },
-    { headers: csrfHeaders(csrfToken), init: { credentials: 'same-origin' } },
-  );
-  if (!res.ok) throw new Error(await readErrorMessage(res, 'Keskuksen vaihto epäonnistui'));
-  return res.json();
-}
-
 export async function adminPreview(
   csrfToken: string,
   payload: { letters: string | string[]; center: string },
 ) {
   const res = await apiClient.api.admin.preview.$post(
     { json: payload },
-    { headers: csrfHeaders(csrfToken), init: { credentials: 'same-origin' } },
+    { headers: csrfHeaders(csrfToken) },
   );
   if (!res.ok) throw new Error(await readErrorMessage(res, 'Esikatselu epäonnistui'));
   return (await res.json()) as {
@@ -146,7 +127,9 @@ export async function adminPreview(
 
 export async function adminGetBlocked(csrfToken: string) {
   const res = await apiClient.api.admin.blocked.$get({}, { headers: csrfHeaders(csrfToken) });
-  if (!res.ok) return { blocked: [] };
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, 'Estettyjen sanojen haku epäonnistui'));
+  }
   return (await res.json()) as { blocked: Array<{ id: number; word: string; blocked_at: string }> };
 }
 
@@ -177,7 +160,9 @@ export async function adminGetSchedule(csrfToken: string, days = 14) {
     { query: { days: String(days) } },
     { headers: csrfHeaders(csrfToken) },
   );
-  if (!res.ok) return { schedule: [] };
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, 'Aikataulun haku epäonnistui'));
+  }
   return (await res.json()) as {
     schedule: Array<{
       date: string;
@@ -249,7 +234,9 @@ export async function adminGetSuggestionRejections(csrfToken: string) {
     {},
     { headers: csrfHeaders(csrfToken) },
   );
-  if (!res.ok) return { rejections: [] };
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, 'Hylättyjen ehdotusten haku epäonnistui'));
+  }
   return res.json();
 }
 

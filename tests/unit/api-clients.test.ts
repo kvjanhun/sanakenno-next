@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   adminDeletePuzzle,
+  adminGetBlocked,
+  adminGetSchedule,
   adminGetSlots,
+  adminGetSuggestionRejections,
   adminSavePuzzle,
   fetchPlayerMe,
   postAchievement,
@@ -110,7 +113,7 @@ describe('Web API Clients (client.ts & admin-client.ts)', () => {
     expect(telemetryHeaders.get('Authorization')).toBe('Bearer stored-tok');
   });
 
-  it('attaches X-CSRF-Token & credentials on adminSavePuzzle, propagates requires_force, falls back on errors', async () => {
+  it('attaches X-CSRF-Token on adminSavePuzzle, propagates requires_force, and throws on non-OK admin list endpoints', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
@@ -120,7 +123,15 @@ describe('Web API Clients (client.ts & admin-client.ts)', () => {
         }),
       )
       .mockResolvedValueOnce(new Response('Forbidden', { status: 403 }))
-      .mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }));
+      .mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'Estot epäonnistuivat' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(new Response('Schedule Error', { status: 500 }))
+      .mockResolvedValueOnce(new Response('Rejections Error', { status: 500 }));
 
     let caught: (Error & { requires_force?: boolean }) | null = null;
     try {
@@ -132,7 +143,7 @@ describe('Web API Clients (client.ts & admin-client.ts)', () => {
     expect(caught?.requires_force).toBe(true);
 
     const saveInit = fetchSpy.mock.calls[0]?.[1] as RequestInit | undefined;
-    expect(saveInit?.credentials).toBe('same-origin');
+    expect(saveInit?.credentials).toBeUndefined();
     expect(new Headers(saveInit?.headers).get('X-CSRF-Token')).toBe('csrf-xyz');
 
     const slotsFallback = await adminGetSlots('csrf-xyz');
@@ -144,5 +155,10 @@ describe('Web API Clients (client.ts & admin-client.ts)', () => {
     });
 
     await expect(adminDeletePuzzle('csrf-xyz', 1)).rejects.toThrow('Poisto epäonnistui');
+    await expect(adminGetBlocked('csrf-xyz')).rejects.toThrow('Estot epäonnistuivat');
+    await expect(adminGetSchedule('csrf-xyz')).rejects.toThrow('Aikataulun haku epäonnistui');
+    await expect(adminGetSuggestionRejections('csrf-xyz')).rejects.toThrow(
+      'Hylättyjen ehdotusten haku epäonnistui',
+    );
   });
 });

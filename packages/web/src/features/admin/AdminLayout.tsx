@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { ThemeToggle } from '../theme/ThemeToggle.js';
-import { usePaletteStore } from '../theme/usePaletteStore.js';
 import { adminButtonClass, adminButtonStyle } from './AdminPrimitives.js';
 import { BlockedWords } from './BlockedWords.js';
 import { CombinationsBrowser } from './CombinationsBrowser.js';
@@ -28,7 +27,6 @@ const ADMIN_TABS: readonly { id: Tab; label: string }[] = [
 export function AdminLayout(): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('editor');
   const [prefillLetters, setPrefillLetters] = useState<string | null>(null);
-  usePaletteStore((s) => s.themeId);
   const isAuthenticated = useAdminStore((s) => s.isAuthenticated);
   const isLoading = useAdminStore((s) => s.isLoading);
   const username = useAdminStore((s) => s.username);

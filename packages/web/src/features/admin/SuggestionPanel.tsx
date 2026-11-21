@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AdminSuggestionResponse } from '@sanakenno/shared';
 import { adminGetSuggestion, adminRejectSuggestion } from '../../api/client.js';
 import {
@@ -23,27 +24,45 @@ export function SuggestionPanel({
   onAddSuggestion,
   onPreviewSuggestion,
 }: SuggestionPanelProps): React.JSX.Element {
+  const queryClient = useQueryClient();
   const [suggestion, setSuggestion] = useState<AdminSuggestionResponse | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [declined, setDeclined] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
 
-  const fetchSuggestion = async (declinedList = declined) => {
-    if (!csrfToken) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = (await adminGetSuggestion(csrfToken, {
+  const suggestMutation = useMutation({
+    mutationFn: async (declinedList: string[]) => {
+      return (await adminGetSuggestion(csrfToken!, {
         declined: declinedList,
       })) as AdminSuggestionResponse;
+    },
+    onSuccess: (res) => {
       setSuggestion(res);
-    } catch (err: unknown) {
+      setError(null);
+    },
+    onError: (err: unknown) => {
       setError(err instanceof Error ? err.message : 'Ehdotuksen haku epäonnistui');
       setSuggestion(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (item: AdminSuggestionResponse) => {
+      await adminRejectSuggestion(csrfToken!, item.letters, item.center);
+      return item;
+    },
+    onSuccess: async (item) => {
+      const nextDeclined = appendDeclined(item);
+      setSuggestion(null);
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'suggestion-rejections'] });
+      await suggestMutation.mutateAsync(nextDeclined).catch(() => undefined);
+    },
+    onError: (err: unknown) => {
+      setError(err instanceof Error ? err.message : 'Ehdotuksen hylkäys epäonnistui');
+    },
+  });
+
+  const loading = suggestMutation.isPending || rejectMutation.isPending || adding;
 
   const appendDeclined = (item: AdminSuggestionResponse): string[] => {
     const key = `${item.letters_key}:${item.center}`;
@@ -53,14 +72,16 @@ export function SuggestionPanel({
     return next;
   };
 
-  const handleSuggestClick = async () => {
+  const handleSuggestClick = () => {
+    if (!csrfToken) return;
     const nextDeclined = suggestion ? appendDeclined(suggestion) : declined;
-    await fetchSuggestion(nextDeclined);
+    setError(null);
+    suggestMutation.mutate(nextDeclined);
   };
 
   const handleAdd = async () => {
     if (!csrfToken || !suggestion) return;
-    setLoading(true);
+    setAdding(true);
     setError(null);
     try {
       await onAddSuggestion(suggestion.letters.join(','), suggestion.center);
@@ -69,22 +90,14 @@ export function SuggestionPanel({
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Pelin lisäys epäonnistui');
     } finally {
-      setLoading(false);
+      setAdding(false);
     }
   };
 
-  const handleReject = async () => {
+  const handleReject = () => {
     if (!csrfToken || !suggestion) return;
-    setLoading(true);
-    try {
-      await adminRejectSuggestion(csrfToken, suggestion.letters, suggestion.center);
-      const nextDeclined = appendDeclined(suggestion);
-      setSuggestion(null);
-      await fetchSuggestion(nextDeclined);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Ehdotuksen hylkäys epäonnistui');
-      setLoading(false);
-    }
+    setError(null);
+    rejectMutation.mutate(suggestion);
   };
 
   return (
@@ -98,7 +111,7 @@ export function SuggestionPanel({
         </div>
         <button
           type="button"
-          onClick={() => void handleSuggestClick()}
+          onClick={handleSuggestClick}
           disabled={loading}
           className={adminButtonClass('md')}
           style={adminButtonStyle('primary')}

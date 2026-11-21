@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AdminWordFindsResponse } from '@sanakenno/shared';
-import { adminBlockWord, adminGetWordFinds } from '../../api/client.js';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { compareFinnishAlphabetically, type AdminWordFindsResponse } from '@sanakenno/shared';
+import { adminBlockWord, adminGetSlots, adminGetWordFinds } from '../../api/client.js';
 import {
   ADMIN_CARD_CLASS,
   ADMIN_CARD_STYLE,
@@ -22,49 +23,69 @@ interface WordFindsProps {
 
 export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
   const isDesktop = useIsDesktop();
+  const queryClient = useQueryClient();
   const [displayNumber, setDisplayNumber] = useState(1);
-  const [data, setData] = useState<AdminWordFindsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<'found' | 'hardest'>('hardest');
   const [blockingWord, setBlockingWord] = useState<string | null>(null);
 
-  const loadWordFinds = useCallback(async () => {
-    if (!csrfToken) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = (await adminGetWordFinds(csrfToken, {
+  const slotsQuery = useQuery({
+    queryKey: ['admin', 'slots', csrfToken],
+    enabled: Boolean(csrfToken),
+    queryFn: () => adminGetSlots(csrfToken!),
+  });
+
+  const totalPuzzles = slotsQuery.data?.total_puzzles ?? 0;
+
+  const {
+    data,
+    isFetching: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ['admin', 'word-finds', csrfToken, displayNumber],
+    enabled: Boolean(csrfToken),
+    queryFn: async () => {
+      return (await adminGetWordFinds(csrfToken!, {
         display_number: displayNumber,
       })) as AdminWordFindsResponse;
-      setData(res);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sanalöytöjen haku epäonnistui');
-    } finally {
-      setLoading(false);
-    }
-  }, [csrfToken, displayNumber]);
+    },
+  });
 
-  useEffect(() => {
-    void loadWordFinds();
-  }, [loadWordFinds]);
+  const blockMutation = useMutation({
+    mutationFn: async (word: string) => {
+      setBlockingWord(word);
+      setStatusMessage(null);
+      setMutationError(null);
+      await adminBlockWord(csrfToken!, word);
+      return word;
+    },
+    onSuccess: async (word) => {
+      setStatusMessage(`Sana "${word}" estetty onnistuneesti.`);
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'word-finds'] });
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'blocked'] });
+    },
+    onError: (err: unknown) => {
+      setMutationError(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
+    },
+    onSettled: () => {
+      setBlockingWord(null);
+    },
+  });
 
-  const handleBlock = async (word: string) => {
+  const handleBlock = (word: string) => {
     if (!csrfToken) return;
     if (!window.confirm(`Haluatko varmasti estää sanan "${word}" tulevista peleistä?`)) return;
-    setBlockingWord(word);
-    setStatusMessage(null);
-    setError(null);
-    try {
-      await adminBlockWord(csrfToken, word);
-      setStatusMessage(`Sana "${word}" estetty onnistuneesti.`);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sanan esto epäonnistui');
-    } finally {
-      setBlockingWord(null);
-    }
+    blockMutation.mutate(word);
   };
+
+  const error =
+    mutationError ??
+    (queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? 'Sanalöytöjen haku epäonnistui'
+        : null);
 
   const sortedWords = useMemo(() => {
     if (!data) return [];
@@ -72,14 +93,16 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
     if (sortMode === 'hardest') {
       return list.sort((a, b) => {
         if (a.find_count !== b.find_count) return a.find_count - b.find_count;
-        return a.word.localeCompare(b.word, 'fi');
+        return compareFinnishAlphabetically(a.word, b.word);
       });
     }
     return list.sort((a, b) => {
       if (a.find_count !== b.find_count) return b.find_count - a.find_count;
-      return a.word.localeCompare(b.word, 'fi');
+      return compareFinnishAlphabetically(a.word, b.word);
     });
   }, [data, sortMode]);
+
+  const atLastPuzzle = totalPuzzles > 0 && displayNumber >= totalPuzzles;
 
   return (
     <div className="space-y-4 text-sm" style={{ color: 'var(--color-text-primary)' }}>
@@ -104,8 +127,10 @@ export function WordFinds({ csrfToken }: WordFindsProps): React.JSX.Element {
           <span className="font-bold text-xs px-2 tabular-nums">Peli #{displayNumber}</span>
           <button
             type="button"
-            disabled={loading}
-            onClick={() => setDisplayNumber((d) => d + 1)}
+            disabled={loading || atLastPuzzle}
+            onClick={() =>
+              setDisplayNumber((d) => (totalPuzzles > 0 ? Math.min(totalPuzzles, d + 1) : d + 1))
+            }
             className={adminButtonClass('sm')}
             style={adminButtonStyle('secondary', 'secondary')}
           >

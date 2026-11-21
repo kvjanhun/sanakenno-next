@@ -1,19 +1,20 @@
 import { hc } from 'hono/client';
 import type { AppType } from '@sanakenno/server/app';
-import type {
-  AchievementPayload,
-  FailedGuessPayload,
-  PlayerAuthInitResponse,
-  PlayerAuthRotateResponse,
-  PlayerMeResponse,
-  PlayerPreferences,
-  PlayerStats,
-  SyncPayload,
-  SyncProgressPayload,
-  SyncPuzzleState,
-  TransferTicketResponse,
-  TransferUseResponse,
-  WordFindPayload,
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  type AchievementPayload,
+  type FailedGuessPayload,
+  type PlayerAuthInitResponse,
+  type PlayerAuthRotateResponse,
+  type PlayerMeResponse,
+  type PlayerPreferences,
+  type PlayerStats,
+  type SyncPayload,
+  type SyncProgressPayload,
+  type SyncPuzzleState,
+  type TransferTicketResponse,
+  type TransferUseResponse,
+  type WordFindPayload,
 } from '@sanakenno/shared';
 
 export * from './admin-client.js';
@@ -31,7 +32,7 @@ function authHeaders(token: string): Record<string, string> {
 function optionalAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   try {
-    const raw = window.localStorage.getItem('sanakenno_auth_token');
+    const raw = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
     if (!raw) return {};
     const token = JSON.parse(raw);
     if (typeof token === 'string' && token.length > 0) {
@@ -43,7 +44,7 @@ function optionalAuthHeaders(): Record<string, string> {
   return {};
 }
 
-async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+export async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
     const body = (await res.json()) as { error?: string };
     return body.error ?? fallback;

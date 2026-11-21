@@ -13,7 +13,7 @@ export interface AdminState {
   clearError: () => void;
 }
 
-export const useAdminStore = create<AdminState>((set) => ({
+export const useAdminStore = create<AdminState>((set, get) => ({
   isAuthenticated: false,
   username: null,
   csrfToken: null,
@@ -72,8 +72,9 @@ export const useAdminStore = create<AdminState>((set) => ({
   },
 
   logout: async () => {
+    const token = get().csrfToken;
     set({ isLoading: true });
-    await adminLogout();
+    await adminLogout(token);
     set({
       isAuthenticated: false,
       username: null,

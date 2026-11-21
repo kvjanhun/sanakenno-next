@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { AdminCombinationItem } from '@sanakenno/shared';
 import { adminGetCombinations } from '../../api/client.js';
 import {
@@ -28,51 +29,53 @@ export function CombinationsBrowser({
   onSelectLetters,
 }: CombinationsBrowserProps): React.JSX.Element {
   const isDesktop = useIsDesktop();
-  const [combinations, setCombinations] = useState<AdminCombinationItem[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const [requires, setRequires] = useState('');
   const [excludes, setExcludes] = useState('');
   const [inRotation, setInRotation] = useState('');
   const [sort, setSort] = useState('max_word_count');
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
 
-  const loadCombinations = useCallback(
-    async (currentPage = page) => {
-      if (!csrfToken) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const res = (await adminGetCombinations(csrfToken, {
-          requires,
-          excludes,
-          in_rotation: inRotation === '' ? undefined : Number(inRotation),
-          sort,
-          order,
-          page: currentPage,
-          per_page: 25,
-        })) as { combinations: AdminCombinationItem[]; total: number; page: number; pages: number };
-
-        setCombinations(res.combinations);
-        setTotal(res.total);
-        setPage(res.page);
-        setPages(res.pages);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Yhdistelmien haku epäonnistui');
-      } finally {
-        setLoading(false);
-      }
+  const {
+    data,
+    isFetching: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: [
+      'admin',
+      'combinations',
+      csrfToken,
+      { requires, excludes, inRotation, sort, order, page },
+    ],
+    enabled: Boolean(csrfToken),
+    queryFn: async () => {
+      return (await adminGetCombinations(csrfToken!, {
+        requires,
+        excludes,
+        in_rotation: inRotation === '' ? undefined : Number(inRotation),
+        sort,
+        order,
+        page,
+        per_page: 25,
+      })) as {
+        combinations: AdminCombinationItem[];
+        total: number;
+        page: number;
+        pages: number;
+      };
     },
-    [csrfToken, requires, excludes, inRotation, sort, order, page],
-  );
+  });
 
-  useEffect(() => {
-    void loadCombinations(1);
-  }, [loadCombinations]);
+  const combinations = data?.combinations ?? [];
+  const total = data?.total ?? 0;
+  const pages = data?.pages ?? 1;
+  const error =
+    queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? 'Yhdistelmien haku epäonnistui'
+        : null;
 
   return (
     <div className="space-y-6 text-sm" style={{ color: 'var(--color-text-primary)' }}>
@@ -82,7 +85,7 @@ export function CombinationsBrowser({
         actions={
           <button
             type="button"
-            onClick={() => loadCombinations(page)}
+            onClick={() => void refetch()}
             disabled={loading}
             className={adminButtonClass('md')}
             style={adminButtonStyle('secondary', 'secondary')}
@@ -107,7 +110,10 @@ export function CombinationsBrowser({
               type="text"
               placeholder="esim. s,k"
               value={requires}
-              onChange={(e) => setRequires(e.target.value)}
+              onChange={(e) => {
+                setRequires(e.target.value);
+                setPage(1);
+              }}
               className={`w-full ${ADMIN_INPUT_CLASS}`}
               style={ADMIN_INPUT_STYLE}
             />
@@ -126,7 +132,10 @@ export function CombinationsBrowser({
               type="text"
               placeholder="esim. z,w"
               value={excludes}
-              onChange={(e) => setExcludes(e.target.value)}
+              onChange={(e) => {
+                setExcludes(e.target.value);
+                setPage(1);
+              }}
               className={`w-full ${ADMIN_INPUT_CLASS}`}
               style={ADMIN_INPUT_STYLE}
             />
@@ -143,7 +152,10 @@ export function CombinationsBrowser({
             <select
               id="filter-in-rotation"
               value={inRotation}
-              onChange={(e) => setInRotation(e.target.value)}
+              onChange={(e) => {
+                setInRotation(e.target.value);
+                setPage(1);
+              }}
               className={`w-full cursor-pointer ${ADMIN_INPUT_CLASS}`}
               style={ADMIN_INPUT_STYLE}
             >
@@ -165,7 +177,10 @@ export function CombinationsBrowser({
               <select
                 id="filter-sort"
                 value={sort}
-                onChange={(e) => setSort(e.target.value)}
+                onChange={(e) => {
+                  setSort(e.target.value);
+                  setPage(1);
+                }}
                 className={`w-full text-xs cursor-pointer ${ADMIN_INPUT_CLASS}`}
                 style={ADMIN_INPUT_STYLE}
               >
@@ -177,7 +192,10 @@ export function CombinationsBrowser({
               </select>
               <button
                 type="button"
-                onClick={() => setOrder(order === 'asc' ? 'desc' : 'asc')}
+                onClick={() => {
+                  setOrder(order === 'asc' ? 'desc' : 'asc');
+                  setPage(1);
+                }}
                 aria-label={order === 'asc' ? 'Nouseva järjestys' : 'Laskeva järjestys'}
                 className={adminButtonClass('md')}
                 style={adminButtonStyle('secondary', 'primary')}
@@ -348,7 +366,7 @@ export function CombinationsBrowser({
             <button
               type="button"
               disabled={page <= 1 || loading}
-              onClick={() => loadCombinations(page - 1)}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               className={adminButtonClass('md')}
               style={adminButtonStyle('secondary', 'secondary')}
             >
@@ -357,7 +375,7 @@ export function CombinationsBrowser({
             <button
               type="button"
               disabled={page >= pages || loading}
-              onClick={() => loadCombinations(page + 1)}
+              onClick={() => setPage((p) => p + 1)}
               className={adminButtonClass('md')}
               style={adminButtonStyle('secondary', 'secondary')}
             >

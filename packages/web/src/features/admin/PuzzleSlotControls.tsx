@@ -33,6 +33,7 @@ interface PuzzleSlotControlsProps {
   newCenter: string;
   newSlot: number | '';
   forceRequired: boolean;
+  currentForceRequired?: boolean;
   onJumpTargetChange: (val: string) => void;
   onSwapTargetChange: (val: string) => void;
   onFirst?: () => void;
@@ -44,8 +45,10 @@ interface PuzzleSlotControlsProps {
   onSwap: () => void;
   onCenterSelect: (center: string) => void;
   onSave: () => void;
+  onForceSaveCurrent?: () => void;
   onRestore: () => void;
   onDelete: () => void;
+  onDeleteForm?: () => void;
   onReactivate: () => void;
   onToggleCreateMode: () => void;
   onNewLettersChange: (val: string) => void;
@@ -79,6 +82,7 @@ export function PuzzleSlotControls({
   newCenter,
   newSlot,
   forceRequired,
+  currentForceRequired = false,
   onJumpTargetChange,
   onSwapTargetChange,
   onFirst,
@@ -90,8 +94,10 @@ export function PuzzleSlotControls({
   onSwap,
   onCenterSelect,
   onSave,
+  onForceSaveCurrent,
   onRestore,
   onDelete,
+  onDeleteForm,
   onReactivate,
   onToggleCreateMode,
   onNewLettersChange,
@@ -318,6 +324,18 @@ export function PuzzleSlotControls({
             Tallenna muutokset
           </button>
 
+          {currentForceRequired && onForceSaveCurrent && (
+            <button
+              type="button"
+              onClick={onForceSaveCurrent}
+              disabled={saving}
+              className={adminButtonClass('sm')}
+              style={adminButtonStyle('primary')}
+            >
+              Tallenna silti (Ohita varoitus)
+            </button>
+          )}
+
           {currentSlot !== null &&
             (isActive ? (
               <button
@@ -369,7 +387,9 @@ export function PuzzleSlotControls({
           onSlotChange={onNewSlotChange}
           onPreview={onPreviewForm}
           onCreate={onCreateForm}
-          onDelete={typeof newSlot === 'number' && newSlot >= 0 ? onDelete : undefined}
+          onDelete={
+            typeof newSlot === 'number' && newSlot >= 0 ? (onDeleteForm ?? onDelete) : undefined
+          }
         />
       </div>
     </div>

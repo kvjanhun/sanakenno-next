@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { AdminAchievementsResponse } from '@sanakenno/shared';
 import { adminGetAchievements } from '../../api/client.js';
 import {
@@ -24,28 +25,26 @@ export function Stats({ csrfToken }: StatsProps): React.JSX.Element {
   const isDesktop = useIsDesktop();
   const [days, setDays] = useState(7);
   const [mode, setMode] = useState<'users' | 'all'>('users');
-  const [data, setData] = useState<AdminAchievementsResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadStats = useCallback(async () => {
-    if (!csrfToken) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = (await adminGetAchievements(csrfToken, days, mode)) as AdminAchievementsResponse;
-      setData(res);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Tilastojen haku epäonnistui');
-    } finally {
-      setLoading(false);
-    }
-  }, [csrfToken, days, mode]);
+  const {
+    data,
+    isFetching: loading,
+    error: queryError,
+    refetch,
+  } = useQuery({
+    queryKey: ['admin', 'achievements', csrfToken, days, mode],
+    enabled: Boolean(csrfToken),
+    queryFn: async () => {
+      return (await adminGetAchievements(csrfToken!, days, mode)) as AdminAchievementsResponse;
+    },
+  });
 
-  useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
-
+  const error =
+    queryError instanceof Error
+      ? queryError.message
+      : queryError
+        ? 'Tilastojen haku epäonnistui'
+        : null;
   const grandTotal = data?.daily.reduce((sum, d) => sum + d.total, 0) ?? 0;
 
   return (
@@ -76,7 +75,7 @@ export function Stats({ csrfToken }: StatsProps): React.JSX.Element {
             />
             <button
               type="button"
-              onClick={loadStats}
+              onClick={() => void refetch()}
               disabled={loading}
               className={adminButtonClass('md')}
               style={adminButtonStyle('secondary', 'secondary')}

@@ -1,6 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BlockedWords } from '../../packages/web/src/features/admin/BlockedWords.js';
+import { CombinationsBrowser } from '../../packages/web/src/features/admin/CombinationsBrowser.js';
 import { LoginPage } from '../../packages/web/src/features/admin/LoginPage.js';
 import { ManualPuzzleForm } from '../../packages/web/src/features/admin/ManualPuzzleForm.js';
 import { Schedule } from '../../packages/web/src/features/admin/Schedule.js';
@@ -8,6 +11,7 @@ import { Stats } from '../../packages/web/src/features/admin/Stats.js';
 import { SuggestionPanel } from '../../packages/web/src/features/admin/SuggestionPanel.js';
 import { SuggestionRejections } from '../../packages/web/src/features/admin/SuggestionRejections.js';
 import { useAdminStore } from '../../packages/web/src/features/admin/useAdminStore.js';
+import { WordFinds } from '../../packages/web/src/features/admin/WordFinds.js';
 
 const mockAdminGetBlocked = vi.fn();
 const mockAdminBlockWord = vi.fn();
@@ -18,6 +22,9 @@ const mockAdminRejectSuggestion = vi.fn();
 const mockAdminGetSuggestionRejections = vi.fn();
 const mockAdminDeleteSuggestionRejection = vi.fn();
 const mockAdminGetAchievements = vi.fn();
+const mockAdminGetCombinations = vi.fn();
+const mockAdminGetWordFinds = vi.fn();
+const mockAdminGetSlots = vi.fn();
 
 vi.mock('../../packages/web/src/api/client.js', () => ({
   adminGetBlocked: (...args: unknown[]) => mockAdminGetBlocked(...args),
@@ -30,7 +37,19 @@ vi.mock('../../packages/web/src/api/client.js', () => ({
   adminDeleteSuggestionRejection: (...args: unknown[]) =>
     mockAdminDeleteSuggestionRejection(...args),
   adminGetAchievements: (...args: unknown[]) => mockAdminGetAchievements(...args),
+  adminGetCombinations: (...args: unknown[]) => mockAdminGetCombinations(...args),
+  adminGetWordFinds: (...args: unknown[]) => mockAdminGetWordFinds(...args),
+  adminGetSlots: (...args: unknown[]) => mockAdminGetSlots(...args),
 }));
+
+function renderWithQuery(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 describe('Admin UI Components', () => {
   beforeEach(() => {
@@ -91,7 +110,7 @@ describe('Admin UI Components', () => {
       });
       mockAdminBlockWord.mockResolvedValue({ status: 'ok' });
 
-      render(<BlockedWords />);
+      renderWithQuery(<BlockedWords />);
 
       await waitFor(() => {
         expect(screen.getByText('pahatsanat')).toBeInTheDocument();
@@ -115,7 +134,7 @@ describe('Admin UI Components', () => {
       });
       mockAdminUnblockWord.mockResolvedValue({ status: 'ok' });
 
-      render(<BlockedWords />);
+      renderWithQuery(<BlockedWords />);
 
       await waitFor(() => {
         expect(screen.getByText('poistettava')).toBeInTheDocument();
@@ -159,7 +178,7 @@ describe('Admin UI Components', () => {
         ],
       });
 
-      render(<Schedule />);
+      renderWithQuery(<Schedule />);
 
       await waitFor(() => {
         expect(screen.getByText('14 päivän kierrosaikataulu')).toBeInTheDocument();
@@ -248,7 +267,7 @@ describe('Admin UI Components', () => {
 
       const onAddSuggestion = vi.fn().mockResolvedValue(undefined);
       const onPreviewSuggestion = vi.fn();
-      render(
+      renderWithQuery(
         <SuggestionPanel
           csrfToken="test-csrf-token"
           onAddSuggestion={onAddSuggestion}
@@ -292,7 +311,7 @@ describe('Admin UI Components', () => {
         .mockResolvedValueOnce(secondSuggestion);
       mockAdminRejectSuggestion.mockResolvedValueOnce({ id: 1 });
 
-      render(
+      renderWithQuery(
         <SuggestionPanel
           csrfToken="test-csrf-token"
           onAddSuggestion={vi.fn().mockResolvedValue(undefined)}
@@ -334,7 +353,7 @@ describe('Admin UI Components', () => {
       });
       mockAdminDeleteSuggestionRejection.mockResolvedValue({ status: 'ok' });
 
-      render(<SuggestionRejections csrfToken="test-csrf-token" />);
+      renderWithQuery(<SuggestionRejections csrfToken="test-csrf-token" />);
 
       await waitFor(() => {
         expect(screen.getByText('Hylätyt peliehdotukset')).toBeInTheDocument();
@@ -368,11 +387,103 @@ describe('Admin UI Components', () => {
         ],
       });
 
-      render(<Stats csrfToken="test-csrf-token" />);
+      renderWithQuery(<Stats csrfToken="test-csrf-token" />);
 
       await waitFor(() => {
         expect(screen.getByText('Saavutustilastot')).toBeInTheDocument();
         expect(screen.getByText(/20 tapahtumaa/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('CombinationsBrowser & WordFinds regressions', () => {
+    it('advances CombinationsBrowser to page 2 without bouncing back to page 1', async () => {
+      mockAdminGetCombinations.mockImplementation(
+        async (_token: string, params: { page?: number }) => ({
+          combinations: [
+            {
+              letters: params.page === 2 ? 'bceklno' : 'aeiklns',
+              total_pangrams: 2,
+              min_word_count: 20,
+              max_word_count: 45,
+              min_max_score: 70,
+              max_max_score: 140,
+              in_rotation: true,
+              variations: [],
+            },
+          ],
+          total: 50,
+          page: params.page ?? 1,
+          pages: 2,
+        }),
+      );
+
+      renderWithQuery(<CombinationsBrowser csrfToken="test-csrf-token" />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Sivu 1 \/ 2/)).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Seuraava' }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Sivu 2 \/ 2/)).toBeInTheDocument();
+      });
+      expect(mockAdminGetCombinations).toHaveBeenCalledTimes(2);
+      expect(mockAdminGetCombinations).toHaveBeenLastCalledWith(
+        'test-csrf-token',
+        expect.objectContaining({ page: 2 }),
+      );
+    });
+
+    it('invalidates WordFinds after blocking a word and disables "Seuraava peli" at the last puzzle', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      mockAdminGetSlots.mockResolvedValue({
+        slots: [{ slot: 0, display_number: 1 }],
+        active_slots: [0],
+        total_puzzles: 1,
+        today_slot: 0,
+      });
+      mockAdminGetWordFinds
+        .mockResolvedValueOnce({
+          puzzle_number: 0,
+          display_number: 1,
+          letters: 'aeiklns',
+          center: 'a',
+          total_words: 2,
+          recorded_words: 1,
+          total_finds: 3,
+          words: [
+            { word: 'poistettava', find_count: 0 },
+            { word: 'kana', find_count: 3 },
+          ],
+        })
+        .mockResolvedValueOnce({
+          puzzle_number: 0,
+          display_number: 1,
+          letters: 'aeiklns',
+          center: 'a',
+          total_words: 1,
+          recorded_words: 1,
+          total_finds: 3,
+          words: [{ word: 'kana', find_count: 3 }],
+        });
+      mockAdminBlockWord.mockResolvedValue({ status: 'blocked' });
+
+      renderWithQuery(<WordFinds csrfToken="test-csrf-token" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('poistettava')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Seuraava peli/i })).toBeDisabled();
+      });
+
+      const blockButtons = screen.getAllByRole('button', { name: 'Estä sana' });
+      fireEvent.click(blockButtons[0]!);
+
+      await waitFor(() => {
+        expect(mockAdminBlockWord).toHaveBeenCalledWith('test-csrf-token', 'poistettava');
+        expect(mockAdminGetWordFinds).toHaveBeenCalledTimes(2);
+        expect(screen.queryByText('poistettava')).not.toBeInTheDocument();
       });
     });
   });
