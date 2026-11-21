@@ -1,9 +1,9 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 
 /** Player session lifetime: 90 days in milliseconds. */
-export const PLAYER_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const PLAYER_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface PlayerSessionData {
   playerId: number;
@@ -101,7 +101,10 @@ export async function validatePlayerToken(
     return null;
   }
 
-  const expiresMs = Date.parse(row.expires_at);
+  const normalizedIso = row.expires_at.includes('T')
+    ? row.expires_at
+    : `${row.expires_at.replace(' ', 'T')}Z`;
+  const expiresMs = Date.parse(normalizedIso);
   if (Number.isNaN(expiresMs) || expiresMs <= Date.now()) {
     return null;
   }
@@ -123,9 +126,7 @@ export async function cleanupExpiredPlayerSessions(db: Kysely<Database>): Promis
   const nowIso = new Date().toISOString();
   await db
     .deleteFrom('player_sessions')
-    .where((eb) =>
-      eb.or([eb('expires_at', '<=', nowIso), eb('expires_at', '<=', sql<string>`datetime('now')`)]),
-    )
+    .where(sql<boolean>`julianday(expires_at) <= julianday(${nowIso})`)
     .execute();
 }
 
@@ -141,9 +142,7 @@ export async function countActivePlayerSessions(
     .selectFrom('player_sessions')
     .select(db.fn.count<number>('id').as('count'))
     .where('player_id', '=', playerId)
-    .where((eb) =>
-      eb.and([eb('expires_at', '>', nowIso), eb('expires_at', '>', sql<string>`datetime('now')`)]),
-    )
+    .where(sql<boolean>`julianday(expires_at) > julianday(${nowIso})`)
     .executeTakeFirst();
 
   return row ? Number(row.count) : 0;
@@ -214,14 +213,25 @@ export async function rotatePlayerKeyAndInvalidateOtherSessions(
 }
 
 /** 15-minute transfer ticket lifetime. */
-export const TRANSFER_TICKET_TTL_MS = 15 * 60 * 1000;
+const TRANSFER_TICKET_TTL_MS = 15 * 60 * 1000;
 
 function generatePairingCode(): string {
-  const num = Math.floor(100000 + Math.random() * 900000).toString();
+  const num = randomInt(100_000, 1_000_000).toString();
   return `${num.slice(0, 3)}-${num.slice(3)}`;
 }
 
-export function normalizePairingCode(code: string): string {
+function isUniqueConstraintError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as Error & { code?: unknown }).code;
+  if (typeof code === 'string' && code.startsWith('SQLITE_CONSTRAINT')) {
+    return true;
+  }
+  return (
+    err.message.includes('UNIQUE constraint failed') || err.message.includes('SQLITE_CONSTRAINT')
+  );
+}
+
+function normalizePairingCode(code: string): string {
   const digits = code.replace(/\D/g, '');
   if (digits.length === 6) {
     return `${digits.slice(0, 3)}-${digits.slice(3)}`;
@@ -244,7 +254,7 @@ export async function createTransferTicket(
   const nowIso = new Date().toISOString();
   await db
     .deleteFrom('player_transfer_tickets')
-    .where('expires_at', '<=', nowIso)
+    .where(sql<boolean>`julianday(expires_at) <= julianday(${nowIso})`)
     .execute()
     .catch(() => undefined);
 
@@ -261,7 +271,10 @@ export async function createTransferTicket(
         })
         .execute();
       return { ticket, code, expiresAt };
-    } catch {
+    } catch (err) {
+      if (!isUniqueConstraintError(err)) {
+        throw err;
+      }
       code = generatePairingCode();
     }
   }

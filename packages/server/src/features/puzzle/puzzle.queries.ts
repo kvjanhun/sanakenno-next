@@ -52,7 +52,7 @@ function getCycleStartIndex(activeSlots: number[]): number {
 /**
  * Parse a YYYY-MM-DD date string or Date into a normalized Helsinki YYYY-MM-DD string.
  */
-export function normalizeHelsinkiDate(dateInput: string | Date = new Date()): string {
+function normalizeHelsinkiDate(dateInput: string | Date = new Date()): string {
   if (typeof dateInput === 'string') {
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
       return dateInput;
@@ -191,7 +191,11 @@ export function computeDaysRemainingInCycle(
   const currentSlot = computePuzzleSlotForDate(activeSlots, epochDateStr, helsinkiDate);
   if (currentSlot === null) return 0;
   const index = activeSlots.indexOf(currentSlot);
-  return index === -1 ? 0 : activeSlots.length - index;
+  if (index === -1) return 0;
+  const startIndex = getCycleStartIndex(activeSlots);
+  const totalActive = activeSlots.length;
+  const cycleOffset = (((index - startIndex) % totalActive) + totalActive) % totalActive;
+  return totalActive - cycleOffset;
 }
 
 /** Resolve the active puzzle slot for a calendar date in Europe/Helsinki. */
@@ -249,23 +253,10 @@ export async function getSlotScheduleInfo(
   return { relation: 'future', activeSlots };
 }
 
-/** Determine whether an active puzzle slot is past, today, future, or inactive. */
-export async function getSlotScheduleRelation(
-  db: Kysely<Database>,
-  slot: number,
-  todayHelsinki: string | Date = new Date(),
-): Promise<SlotScheduleRelation> {
-  const { relation } = await getSlotScheduleInfo(db, slot, todayHelsinki);
-  return relation;
-}
-
 /**
  * Fetch the raw active puzzle row for a given slot, or null if missing/inactive.
  */
-export async function getPuzzleRowBySlot(
-  db: Kysely<Database>,
-  slot: number,
-): Promise<PuzzleRow | null> {
+async function getPuzzleRowBySlot(db: Kysely<Database>, slot: number): Promise<PuzzleRow | null> {
   const row = await db
     .selectFrom('puzzles')
     .select(['slot', 'letters', 'center', 'max_score'])
@@ -378,7 +369,7 @@ export async function getFullPuzzleForDate(
 /**
  * Add or subtract days from a YYYY-MM-DD ISO date string in UTC.
  */
-export function addDaysToIsoDate(dateStr: string, deltaDays: number): string {
+function addDaysToIsoDate(dateStr: string, deltaDays: number): string {
   const [y, m, d] = dateStr.split('-').map(Number);
   const utc = new Date(Date.UTC(y ?? 2026, (m ?? 1) - 1, (d ?? 1) + deltaDays));
   const year = utc.getUTCFullYear();
@@ -389,11 +380,12 @@ export function addDaysToIsoDate(dateStr: string, deltaDays: number): string {
 
 /**
  * Retrieve high-level archive metadata in a single fast query without wordlist scans or cache pollution.
+ * Caps returned days so the archive never walks before `epoch_date` or wraps modulo into future slots.
  */
 export async function getArchiveMetadata(
   db: Kysely<Database>,
   todayHelsinki: string,
-  days: number,
+  requestedDays: number | 'all' = 7,
 ): Promise<ArchiveEntry[]> {
   const [activeRows, epochDateStr] = await Promise.all([
     db
@@ -414,6 +406,14 @@ export async function getArchiveMetadata(
   const startIndex = getCycleStartIndex(activeSlots);
   const totalActive = activeSlots.length;
   const epochUtcMs = parseIsoDateUtcMs(epochDateStr);
+  const todayUtcMs = parseIsoDateUtcMs(todayHelsinki);
+  const daysSinceEpoch = Math.round((todayUtcMs - epochUtcMs) / 86_400_000);
+  if (daysSinceEpoch < 0) {
+    return [];
+  }
+
+  const targetDays = requestedDays === 'all' ? totalActive : requestedDays;
+  const days = Math.max(0, Math.min(targetDays, daysSinceEpoch + 1, totalActive));
 
   const entries: ArchiveEntry[] = [];
   const missingScoresToUpdate: Array<{ slot: number; max_score: number }> = [];

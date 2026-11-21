@@ -20,9 +20,14 @@ import {
   requirePlayerAuth,
   resetEmailRateLimit,
   resetInitPlayerRateLimit,
+  resetPlayerAuthRateLimits,
   resetTransferCreateRateLimit,
+  resetTransferTicketRateLimit,
+  resetTransferUseRateLimit,
   setEmailRateLimitEntry,
   transferCreateRateLimit,
+  transferTicketRateLimit,
+  transferUseRateLimit,
   type PlayerVariables,
 } from './player-auth.middleware.js';
 import {
@@ -44,7 +49,10 @@ import { sendTransferLink } from './send-transfer-link.js';
 export {
   resetEmailRateLimit,
   resetInitPlayerRateLimit,
+  resetPlayerAuthRateLimits,
   resetTransferCreateRateLimit,
+  resetTransferTicketRateLimit,
+  resetTransferUseRateLimit,
   setEmailRateLimitEntry,
 };
 
@@ -58,9 +66,17 @@ class TransferTicketClaimError extends Error {
 }
 
 const transferEmailErrorHook = zodErrorHook<{ Variables: PlayerVariables }>((err) => {
-  const field = err.issues[0]?.path[0];
+  const issue = err.issues[0];
+  const field = issue?.path[0];
   if (field === 'player_key') return { error: 'Tunniste puuttuu' };
-  if (field === 'email') return { error: 'Sähköpostiosoite puuttuu' };
+  if (field === 'email') {
+    return {
+      error:
+        issue?.code === 'invalid_string'
+          ? 'Virheellinen sähköpostiosoite'
+          : 'Sähköpostiosoite puuttuu',
+    };
+  }
   return { error: 'Virheellinen pyyntö' };
 });
 
@@ -73,7 +89,10 @@ async function handleTransferEmail(
   const email = body.email.trim();
   const playerKey = typeof body.player_key === 'string' ? body.player_key.trim() : '';
 
-  if (playerKey && PLAYER_KEY_HEX_RE.test(playerKey)) {
+  if (playerKey) {
+    if (!PLAYER_KEY_HEX_RE.test(playerKey)) {
+      return c.json({ error: 'Virheellinen tunniste' }, 400);
+    }
     const row = await getPlayerById(db, player.playerId);
     if (!row || row.player_key_hash !== hashPlayerKey(playerKey)) {
       return c.json({ error: 'Virheellinen tunniste' }, 400);
@@ -116,7 +135,7 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
       );
       return c.json({ player_key: playerKey, token, player_id: playerId }, 200);
     })
-    .post('/auth/transfer/ticket', authMiddleware, async (c) => {
+    .post('/auth/transfer/ticket', authMiddleware, transferTicketRateLimit, async (c) => {
       const player = c.get('player');
       const ticket = await runImmediateTransactionWithRetry(db, (trx) =>
         createTransferTicket(trx, player.playerId),
@@ -139,6 +158,7 @@ export function createPlayerAuthRoutes(db: Kysely<Database>) {
     )
     .post(
       '/auth/transfer/use',
+      transferUseRateLimit,
       zValidator(
         'json',
         TransferUsePayloadSchema,

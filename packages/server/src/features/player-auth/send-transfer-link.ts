@@ -8,7 +8,8 @@ export async function sendTransferLink(
   token: string,
   baseUrl: string,
 ): Promise<void> {
-  const link = `${baseUrl}/?connect=${encodeURIComponent(token)}`;
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+  const link = `${normalizedBaseUrl}/?connect=${encodeURIComponent(token)}`;
   const apiKey = process.env.RESEND_API_KEY;
   const resendApiUrl = process.env.RESEND_API_URL || 'https://api.resend.com';
 
@@ -18,6 +19,7 @@ export async function sendTransferLink(
 
   const res = await fetch(`${resendApiUrl}/emails`, {
     method: 'POST',
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
@@ -29,7 +31,7 @@ export async function sendTransferLink(
       html: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1a1a1a;">
         <h1 style="color: #ff643e; margin: 0 0 20px 0; font-size: 24px; font-weight: 700;">
-          <img src="${baseUrl}/icons/sanakenno-192x192.png" alt="" width="32" height="32" style="vertical-align: middle; margin-right: 10px; border-radius: 6px;" />
+          <img src="${normalizedBaseUrl}/icons/sanakenno-192x192.png" alt="" width="32" height="32" style="vertical-align: middle; margin-right: 10px; border-radius: 6px;" />
           <span style="vertical-align: middle;">Sanakenno</span>
         </h1>
         <p style="font-size: 16px; line-height: 1.5; margin: 0 0 28px 0;">

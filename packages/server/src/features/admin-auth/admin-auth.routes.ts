@@ -2,7 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { AdminChangePasswordPayloadSchema, AdminLoginPayloadSchema } from '@sanakenno/shared';
 import argon2 from 'argon2';
 import { Hono, type Context, type Next } from 'hono';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, setCookie } from 'hono/cookie';
 import type { Kysely } from 'kysely';
 import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
@@ -28,7 +28,7 @@ import {
 
 const LOGIN_RATE_LIMIT = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-export const loginLimiter = new SlidingWindowRateLimiter({
+const loginLimiter = new SlidingWindowRateLimiter({
   windowMs: LOGIN_WINDOW_MS,
   maxRequests: LOGIN_RATE_LIMIT,
 });
@@ -45,7 +45,8 @@ function loginRateLimiter(c: Context, next: Next) {
   return next();
 }
 
-const DUMMY_HASH = '$argon2id$v=19$m=65536,t=3,p=4$dW5rbm93bg$dW5rbm93bg';
+export const DUMMY_HASH =
+  '$argon2id$v=19$m=65536,p=4,t=3$yg48xWU9Z+mbcozTHHwHPg$yk+ePbxDbFV0sgv86Tz8d9l1jtTys3TJiitbxYHccvw';
 
 function setSessionCookie(c: Context, sessionId: string): void {
   setCookie(c, SESSION_COOKIE, sessionId, {
@@ -54,6 +55,15 @@ function setSessionCookie(c: Context, sessionId: string): void {
     sameSite: 'Strict',
     path: '/',
     maxAge: 7 * 24 * 60 * 60,
+  });
+}
+
+function clearSessionCookie(c: Context): void {
+  deleteCookie(c, SESSION_COOKIE, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Strict',
+    path: '/',
   });
 }
 
@@ -92,12 +102,10 @@ export function createAdminAuthRoutes(db: Kysely<Database>) {
         return c.json({ status: 'ok' as const, csrfToken, username: admin.username }, 200);
       },
     )
-    .post('/logout', async (c) => {
-      const sessionId = getCookie(c, SESSION_COOKIE);
-      if (sessionId) {
-        await deleteAdminSession(db, sessionId);
-      }
-      deleteCookie(c, SESSION_COOKIE, { path: '/' });
+    .post('/logout', authMiddleware, requireCsrf, async (c) => {
+      const sessionId = c.get('sessionId');
+      await deleteAdminSession(db, sessionId);
+      clearSessionCookie(c);
       return c.json({ status: 'ok' as const }, 200);
     })
     .get('/session', authMiddleware, (c) => {

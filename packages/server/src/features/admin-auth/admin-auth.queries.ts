@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import type { Kysely } from 'kysely';
+import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 
-export const ADMIN_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ADMIN_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface AdminSessionData {
   adminId: number;
@@ -41,7 +41,10 @@ export async function updateAdminPassword(
 ): Promise<void> {
   await db
     .updateTable('admins')
-    .set({ password_hash: passwordHash })
+    .set({
+      password_hash: passwordHash,
+      updated_at: sql<string>`datetime('now')`,
+    })
     .where('id', '=', adminId)
     .execute();
 }
@@ -80,7 +83,10 @@ export async function validateAdminSession(
 
   if (!row) return null;
 
-  const expiresMs = Date.parse(row.expires_at);
+  const normalizedIso = row.expires_at.includes('T')
+    ? row.expires_at
+    : `${row.expires_at.replace(' ', 'T')}Z`;
+  const expiresMs = Date.parse(normalizedIso);
   if (Number.isNaN(expiresMs) || expiresMs <= Date.now()) {
     return null;
   }
@@ -110,7 +116,10 @@ export async function deleteSessionsForAdmin(
 
 export async function cleanupExpiredAdminSessions(db: Kysely<Database>): Promise<void> {
   const nowIso = new Date().toISOString();
-  await db.deleteFrom('sessions').where('expires_at', '<=', nowIso).execute();
+  await db
+    .deleteFrom('sessions')
+    .where(sql<boolean>`julianday(expires_at) <= julianday(${nowIso})`)
+    .execute();
 }
 
 export async function insertAdminLog(

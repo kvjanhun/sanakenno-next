@@ -29,8 +29,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Full Mechanical Gate (check:agent)
-        run: pnpm run check:agent
+      - name: Full Mechanical Gate (check:ci)
+        run: pnpm run check:ci
 
   deploy:
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
             --memory 512Mi \
             --cpu 1 \
             --max-instances 3 \
-            --set-env-vars BASE_URL=https://sanakenno.fi,SEED_ON_BOOT=false,GIT_COMMIT=${{ github.sha }} \
+            --update-env-vars BASE_URL=https://sanakenno.fi,SEED_ON_BOOT=false,GIT_COMMIT=${{ github.sha }} \
             --update-secrets TURSO_DATABASE_URL=turso-database-url:latest,TURSO_AUTH_TOKEN=turso-auth-token:latest
 
       - name: Verify Live Deployment

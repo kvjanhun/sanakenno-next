@@ -16,7 +16,14 @@ import {
   SlidingWindowRateLimiter,
 } from '../player-auth/rate-limiter.js';
 import { validatePlayerToken } from '../player-auth/player-auth.queries.js';
-import { getFullPuzzleBySlot, getFullPuzzleForDate } from '../puzzle/puzzle.queries.js';
+import {
+  computePuzzleSlotForDate,
+  getActiveSlots,
+  getEpochDate,
+  getFullPuzzleBySlot,
+  getSlotScheduleInfo,
+} from '../puzzle/puzzle.queries.js';
+import { isValidIsoCalendarDate } from '../puzzle/puzzle.routes.js';
 import {
   insertAchievement,
   isActivePuzzleSlot,
@@ -31,15 +38,15 @@ const FAILED_GUESS_RATE_LIMIT = 30;
 const WORD_FIND_RATE_LIMIT = 60;
 const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 
-export const achievementLimiter = new SlidingWindowRateLimiter({
+const achievementLimiter = new SlidingWindowRateLimiter({
   windowMs: RATE_LIMIT_WINDOW_MS,
   maxRequests: ACHIEVEMENT_RATE_LIMIT,
 });
-export const failedGuessLimiter = new SlidingWindowRateLimiter({
+const failedGuessLimiter = new SlidingWindowRateLimiter({
   windowMs: RATE_LIMIT_WINDOW_MS,
   maxRequests: FAILED_GUESS_RATE_LIMIT,
 });
-export const wordFindLimiter = new SlidingWindowRateLimiter({
+const wordFindLimiter = new SlidingWindowRateLimiter({
   windowMs: RATE_LIMIT_WINDOW_MS,
   maxRequests: WORD_FIND_RATE_LIMIT,
 });
@@ -128,6 +135,10 @@ export function createFailedGuessRoutes(db: Kysely<Database>) {
     async (c) => {
       const { word, date } = c.req.valid('json');
 
+      if (!isValidIsoCalendarDate(date)) {
+        return c.json({ error: 'Invalid date' }, 400);
+      }
+
       const todayHelsinki = getHelsinkiDateString();
       if (date > todayHelsinki) {
         return c.json({ error: 'Invalid date' }, 400);
@@ -138,7 +149,13 @@ export function createFailedGuessRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Invalid word' }, 400);
       }
 
-      const puzzleData = await getFullPuzzleForDate(db, date);
+      const [activeSlots, epochDateStr] = await Promise.all([getActiveSlots(db), getEpochDate(db)]);
+      if (date < epochDateStr) {
+        return c.json({ error: 'Invalid date' }, 400);
+      }
+
+      const slot = computePuzzleSlotForDate(activeSlots, epochDateStr, date);
+      const puzzleData = slot !== null ? await getFullPuzzleBySlot(db, slot, activeSlots) : null;
       if (!puzzleData) {
         return c.json({ error: 'Peliä ei löydy' }, 400);
       }
@@ -189,7 +206,19 @@ export function createWordFindRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Invalid word' }, 400);
       }
 
-      const puzzleData = await getFullPuzzleBySlot(db, puzzle_number);
+      const { relation, activeSlots } = await getSlotScheduleInfo(
+        db,
+        puzzle_number,
+        getHelsinkiDateString(),
+      );
+      if (relation === 'inactive') {
+        return c.json({ error: 'Valittua peliä ei löydy tai se ei ole aktiivinen' }, 400);
+      }
+      if (relation === 'future') {
+        return c.json({ error: 'Tulevaa kennoa ei voi vielä hakea' }, 403);
+      }
+
+      const puzzleData = await getFullPuzzleBySlot(db, puzzle_number, activeSlots);
       if (!puzzleData) {
         return c.json({ error: 'Valittua peliä ei löydy tai se ei ole aktiivinen' }, 400);
       }

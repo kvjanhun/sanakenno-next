@@ -263,15 +263,28 @@ export async function verifyDatabaseParity(
     recordInvariant('admins.count', localAdmins.length, remoteAdmins.length);
     recordInvariant('admins.usernames', JSON.stringify(localAdmins), JSON.stringify(remoteAdmins));
 
-    // config: epoch_date
-    const localEpoch = localDb
-      .prepare("SELECT value FROM config WHERE key = 'epoch_date'")
-      .get() as { value: string } | undefined;
-    const remoteEpoch = await queryRemoteScalar(
-      remoteClient,
-      "SELECT value FROM config WHERE key = 'epoch_date'",
+    // config: epoch_date (supporting legacy rotation_epoch fallback)
+    const localEpochRows = localDb
+      .prepare("SELECT key, value FROM config WHERE key IN ('epoch_date', 'rotation_epoch')")
+      .all() as Array<{ key: string; value: string }>;
+    const localEpoch =
+      localEpochRows.find((r) => r.key === 'epoch_date') ??
+      localEpochRows.find((r) => r.key === 'rotation_epoch');
+    const remoteEpochResult = await remoteClient.execute(
+      "SELECT key, value FROM config WHERE key IN ('epoch_date', 'rotation_epoch')",
     );
-    recordInvariant('config.epoch_date', localEpoch?.value ?? null, toNullableStr(remoteEpoch));
+    const remoteEpochRows = remoteEpochResult.rows.map((r) => ({
+      key: String(r[0]),
+      value: String(r[1]),
+    }));
+    const remoteEpoch =
+      remoteEpochRows.find((r) => r.key === 'epoch_date') ??
+      remoteEpochRows.find((r) => r.key === 'rotation_epoch');
+    recordInvariant(
+      'config.epoch_date',
+      localEpoch?.value ?? null,
+      toNullableStr(remoteEpoch?.value ?? null),
+    );
 
     return {
       ok: mismatches.length === 0,

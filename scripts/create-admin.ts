@@ -67,7 +67,7 @@ async function main() {
     ? process.env
     : {
         ...process.env,
-        DB_PATH: process.env.DB_PATH || process.env.DATABASE_PATH || './sanakenno.db',
+        DB_PATH: process.env.DB_PATH || process.env.DATABASE_PATH || './sanakenno.dev.db',
       };
   const { db, engine } = await initDb(env);
 

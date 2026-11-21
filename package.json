@@ -18,6 +18,7 @@
     "screenshot": "tsx scripts/screenshot.ts",
     "db:seed": "pnpm --filter @sanakenno/server db:seed",
     "db:migrate-v1": "tsx scripts/migrate-v1-db.ts",
+    "check:ci": "pnpm run typecheck && pnpm run lint && pnpm run test:arch && pnpm run test:unit && pnpm run build",
     "check:agent": "pnpm run format && pnpm run typecheck && pnpm run lint && pnpm run test:arch && pnpm run test:unit && pnpm run build"
   },
   "pnpm": {

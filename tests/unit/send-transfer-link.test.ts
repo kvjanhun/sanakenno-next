@@ -43,12 +43,13 @@ describe('sendTransferLink (Resend email transport)', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'email-1' }), { status: 200 }));
 
-    await sendTransferLink('pelaaja@example.com', 'abc+1/2=3', 'https://sanakenno.fi');
+    await sendTransferLink('pelaaja@example.com', 'abc+1/2=3', 'https://sanakenno.fi///');
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0]!;
     expect(url).toBe('https://eu.resend.example/emails');
     expect(init?.method).toBe('POST');
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer re_live_123');
 
     const body = JSON.parse(String(init?.body)) as {
@@ -58,6 +59,7 @@ describe('sendTransferLink (Resend email transport)', () => {
     };
     expect(body.to).toBe('pelaaja@example.com');
     expect(body.html).toContain('https://sanakenno.fi/?connect=abc%2B1%2F2%3D3');
+    expect(body.html).toContain('https://sanakenno.fi/icons/sanakenno-192x192.png');
     expect(body.text).toContain('https://sanakenno.fi/?connect=abc%2B1%2F2%3D3');
   });
 

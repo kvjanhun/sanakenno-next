@@ -1,5 +1,6 @@
 import {
   getHelsinkiDateString,
+  isPangram,
   PuzzleDateQuerySchema,
   PuzzleResponseSchema,
   PuzzleWordsResponseSchema,
@@ -11,14 +12,15 @@ import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import { zodErrorHook } from '../../lib/zod-validator.js';
 import {
-  getBlockedWords,
+  computePuzzleSlotForDate,
+  getActiveSlots,
+  getEpochDate,
   getFullPuzzleBySlot,
-  getFullPuzzleForDate,
   getSlotScheduleInfo,
 } from './puzzle.queries.js';
-import { getCanonicalLemma, puzzleWords, type FullPuzzleData } from './wordlist.js';
+import { getCanonicalLemma, MIN_WORD_LENGTH, type FullPuzzleData } from './wordlist.js';
 
-function isValidIsoCalendarDate(dateStr: string): boolean {
+export function isValidIsoCalendarDate(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     return false;
   }
@@ -62,8 +64,21 @@ export function createPuzzleRoutes(db: Kysely<Database>) {
           }
         }
 
+        const [activeSlots, epochDateStr] = await Promise.all([
+          getActiveSlots(db),
+          getEpochDate(db),
+        ]);
+        if (dateParam !== undefined && dateParam < epochDateStr) {
+          return c.json({ error: 'Invalid date parameter' }, 400);
+        }
+
         const targetDate = dateParam ?? todayHelsinki;
-        const data = await getFullPuzzleForDate(db, targetDate);
+        const slot = computePuzzleSlotForDate(activeSlots, epochDateStr, targetDate);
+        if (slot === null) {
+          return c.json({ error: 'Puzzle not found' }, 404);
+        }
+
+        const data = await getFullPuzzleBySlot(db, slot, activeSlots);
         if (!data) {
           return c.json({ error: 'Puzzle not found' }, 404);
         }
@@ -131,17 +146,21 @@ export function createPuzzleRoutes(db: Kysely<Database>) {
 
       let words = data.words;
       if (hasFilters) {
-        const blockedWords = await getBlockedWords(db);
-        const minLength =
-          minLengthParam !== undefined ? Number.parseInt(minLengthParam, 10) : undefined;
-        const maxLength =
-          maxLengthParam !== undefined ? Number.parseInt(maxLengthParam, 10) : undefined;
+        const parsedMin =
+          minLengthParam !== undefined ? Number.parseInt(minLengthParam, 10) : MIN_WORD_LENGTH;
+        const minLength = Number.isFinite(parsedMin)
+          ? Math.max(MIN_WORD_LENGTH, parsedMin)
+          : MIN_WORD_LENGTH;
+        const parsedMax =
+          maxLengthParam !== undefined ? Number.parseInt(maxLengthParam, 10) : Infinity;
+        const maxLength = Number.isFinite(parsedMax) ? parsedMax : Infinity;
         const pangramOnly = pangramOnlyParam === 'true' || pangramOnlyParam === '1';
+        const allLetterSet = new Set([data.center, ...data.letters]);
 
-        words = puzzleWords(data.all_letters, data.center, blockedWords, {
-          minLength: Number.isFinite(minLength) ? minLength : undefined,
-          maxLength: Number.isFinite(maxLength) ? maxLength : undefined,
-          pangramOnly,
+        words = data.words.filter((word) => {
+          if (word.length < minLength || word.length > maxLength) return false;
+          if (pangramOnly && !isPangram(word, allLetterSet)) return false;
+          return true;
         });
       }
 

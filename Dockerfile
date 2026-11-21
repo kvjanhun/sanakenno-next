@@ -52,10 +52,11 @@ COPY --from=prod-deps /app/packages/shared/node_modules ./packages/shared/node_m
 COPY --from=prod-deps /app/packages/server/package.json ./packages/server/package.json
 COPY --from=prod-deps /app/packages/server/node_modules ./packages/server/node_modules
 
-# Copy compiled shared & server JS, server assets, and built frontend
+# Copy compiled shared & server JS, runtime server assets, and built frontend
 COPY --from=build /app/packages/shared/dist ./packages/shared/dist
 COPY --from=build /app/packages/server/dist ./packages/server/dist
-COPY --from=build /app/packages/server/assets ./packages/server/assets
+COPY --from=build /app/packages/server/assets/kotus_words.txt ./packages/server/assets/kotus_words.txt
+COPY --from=build /app/packages/server/assets/pangram-quality.json ./packages/server/assets/pangram-quality.json
 COPY --from=build /app/packages/web/dist ./dist
 
 # Stamp the source commit into the frontend so CI can verify deployed SHA

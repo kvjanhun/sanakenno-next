@@ -9,6 +9,7 @@ import { createMaintenanceApp, createServerApp } from './edge-middleware.js';
 
 interface ClosableServer {
   close: (callback?: (err?: Error) => void) => unknown;
+  closeIdleConnections?: () => void;
 }
 
 function resolveBootDbPath(env: NodeJS.ProcessEnv): string {
@@ -53,10 +54,16 @@ export async function shutdownServer(
   server: ClosableServer | null,
   db: Kysely<Database> | null,
   engine: DbEngine = 'kysely-sqlite',
+  timeoutMs = 5_000,
 ): Promise<void> {
   if (server) {
+    server.closeIdleConnections?.();
     await new Promise<void>((resolve) => {
-      server.close(() => resolve());
+      const timer = setTimeout(() => resolve(), timeoutMs);
+      server.close(() => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
   }
   if (db) {
