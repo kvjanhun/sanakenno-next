@@ -4,7 +4,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  bumpPuzzleCacheGeneration,
   computePuzzle,
   computeVariations,
   DEFAULT_SEED_WORDS,
@@ -12,7 +11,6 @@ import {
   getCachedPuzzle,
   getCanonicalLemma,
   getLemmaMap,
-  getPuzzleCacheGeneration,
   getWordlist,
   hashWord,
   invalidatePuzzleCache,
@@ -190,7 +188,7 @@ describe('wordlist engine (unit)', () => {
     });
   });
 
-  it('manages slot cache and invalidates per-slot or via generation bump', () => {
+  it('manages slot cache and invalidates per-slot or globally', () => {
     const sample: FullPuzzleData = {
       center: 'a',
       letters: ['e', 'i', 'k', 'l', 'n', 's'],
@@ -210,9 +208,7 @@ describe('wordlist engine (unit)', () => {
     expect(getCachedPuzzle(1)).toBeUndefined();
     expect(getCachedPuzzle(2)?.slot).toBe(2);
 
-    const prevGen = getPuzzleCacheGeneration();
-    const nextGen = bumpPuzzleCacheGeneration();
-    expect(nextGen).toBe(prevGen + 1);
+    invalidatePuzzleCache();
     expect(getCachedPuzzle(2)).toBeUndefined();
   });
 });

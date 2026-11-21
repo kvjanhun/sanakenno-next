@@ -32,9 +32,9 @@ export const WORD_COUNT_BANDS: WordCountBand[] = [
   { id: 'long', label: 'pitkä', min: 56, max: 80, target: 64 },
 ];
 
-export const WORD_COUNT_BAND_BY_ID = new Map(WORD_COUNT_BANDS.map((band) => [band.id, band]));
+const WORD_COUNT_BAND_BY_ID = new Map(WORD_COUNT_BANDS.map((band) => [band.id, band]));
 
-export const SUGGESTION_TARGET_SEQUENCE: SuggestionTarget[] = [
+const SUGGESTION_TARGET_SEQUENCE: SuggestionTarget[] = [
   { wordBand: 'regular', pangrams: 1 },
   { wordBand: 'open', pangrams: 2 },
   { wordBand: 'short', pangrams: 1 },
@@ -169,7 +169,7 @@ export function recentPenalty(
   return letterPenalty + centerCount * 8;
 }
 
-export function intersectCount<T>(a: Set<T>, b: Set<T>): number {
+function intersectCount<T>(a: Set<T>, b: Set<T>): number {
   let count = 0;
   for (const value of a) {
     if (b.has(value)) count++;
@@ -239,8 +239,8 @@ export function selectCandidatePool(
 ): PreliminaryCandidate[] {
   const rankedPools = [
     candidates.filter((c) => c.grade === 'good' || c.grade === 'ok'),
-    candidates.filter((c) => c.grade === 'risky'),
     candidates.filter((c) => c.grade === 'unreviewed'),
+    candidates.filter((c) => c.grade === 'risky'),
   ];
 
   for (const pool of rankedPools) {

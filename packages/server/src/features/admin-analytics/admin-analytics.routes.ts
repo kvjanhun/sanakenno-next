@@ -3,6 +3,7 @@ import {
   AdminAchievementsQuerySchema,
   AdminFailedGuessesQuerySchema,
   AdminWordFindsQuerySchema,
+  compareFinnishAlphabetically,
 } from '@sanakenno/shared';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
@@ -58,18 +59,18 @@ export function createAdminAnalyticsRoutes(db: Kysely<Database>) {
 
       let slot: number | null = null;
 
-      if (rawDisplayNumber) {
+      if (rawDisplayNumber !== undefined && rawDisplayNumber !== '') {
         const dispNum = Number(rawDisplayNumber);
-        if (isNaN(dispNum) || dispNum < 1) {
+        if (!Number.isInteger(dispNum) || dispNum < 1) {
           return c.json({ error: 'Virheellinen display_number' }, 400);
         }
         slot = await getSlotByDisplayNumber(db, dispNum);
         if (slot === null) {
           return c.json({ error: 'Peliä ei löydy' }, 404);
         }
-      } else if (rawPuzzleNumber) {
+      } else if (rawPuzzleNumber !== undefined && rawPuzzleNumber !== '') {
         const pNum = Number(rawPuzzleNumber);
-        if (isNaN(pNum) || pNum < 1) {
+        if (!Number.isInteger(pNum) || pNum < 0) {
           return c.json({ error: 'Virheellinen puzzle_number' }, 400);
         }
         slot = pNum;
@@ -94,7 +95,7 @@ export function createAdminAnalyticsRoutes(db: Kysely<Database>) {
           if (a.find_count !== b.find_count) {
             return a.find_count - b.find_count;
           }
-          return a.word.localeCompare(b.word, 'fi');
+          return compareFinnishAlphabetically(a.word, b.word);
         });
 
       const totalFinds = words.reduce((sum, item) => sum + item.find_count, 0);

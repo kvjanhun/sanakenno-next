@@ -1,7 +1,10 @@
 import argon2 from 'argon2';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAdminUser } from '../../packages/server/src/features/admin-auth/admin-auth.queries.js';
-import { resetLoginRateLimit } from '../../packages/server/src/features/admin-auth/admin-auth.routes.js';
+import {
+  DUMMY_HASH,
+  resetLoginRateLimit,
+} from '../../packages/server/src/features/admin-auth/admin-auth.routes.js';
 import {
   DEFAULT_SEED_WORDS,
   setWordlist,
@@ -9,14 +12,14 @@ import {
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
   let adminId: number;
   let sessionCookie: string;
   let csrfToken: string;
 
   beforeEach(async () => {
     resetLoginRateLimit();
-    harness = createTestHarness();
+    harness = await createTestHarness();
     setWordlist(DEFAULT_SEED_WORDS);
 
     const hash = await argon2.hash('correct-horse-battery-staple');
@@ -112,6 +115,34 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         json: { username: 'admin', password: 'new-secure-password-1234' },
       });
       expect(loginRes.status).toBe(200);
+
+      const adminRow = await harness.db
+        .selectFrom('admins')
+        .select('updated_at')
+        .where('id', '=', adminId)
+        .executeTakeFirstOrThrow();
+      expect(adminRow.updated_at).toBeTruthy();
+    });
+
+    it('verifies DUMMY_HASH in Argon2 without throwing a salt-length error and enforces CSRF on POST /api/auth/logout', async () => {
+      await expect(argon2.verify(DUMMY_HASH, 'any-password')).resolves.toBe(false);
+
+      // Missing CSRF token on logout returns 403
+      const missingCsrf = await harness.client.api.auth.logout.$post(
+        {},
+        { headers: { Cookie: sessionCookie } },
+      );
+      expect(missingCsrf.status).toBe(403);
+
+      // Valid CSRF token deletes session and clears cookie
+      const okLogout = await harness.client.api.auth.logout.$post({}, { headers: adminHeaders() });
+      expect(okLogout.status).toBe(200);
+
+      const sessionAfter = await harness.client.api.auth.session.$get(
+        {},
+        { headers: { Cookie: sessionCookie } },
+      );
+      expect(sessionAfter.status).toBe(401);
     });
 
     it('enforces sliding-window rate limit on admin login and resets after window expires', async () => {
@@ -237,6 +268,20 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
 
       expect(p1?.center).toBe('n');
       expect(p2?.center).toBe('a');
+
+      // Refuses swapping with a missing or soft-deleted slot with 404
+      const missingSwap = await harness.client.api.admin.puzzle.swap.$post(
+        { json: { slotA: 1, slotB: 999 } },
+        { headers: adminHeaders() },
+      );
+      expect(missingSwap.status).toBe(404);
+
+      await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 2).execute();
+      const inactiveSwap = await harness.client.api.admin.puzzle.swap.$post(
+        { json: { slotA: 1, slotB: 2 } },
+        { headers: adminHeaders() },
+      );
+      expect(inactiveSwap.status).toBe(404);
     });
 
     it('changes center letter for a puzzle slot', async () => {
@@ -279,6 +324,15 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
       expect(byDispRes.status).toBe(200);
       const dispData = (await byDispRes.json()) as unknown as { slot: number };
       expect(dispData.slot).toBe(1);
+
+      // Soft-deleting slot 2 causes neighbour navigation from slot 1 to skip slot 2 and point to slot 3
+      await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 2).execute();
+      const skipInactiveRes = await harness.client.api.admin.puzzle.variations.$get(
+        { query: { slot: '1' } },
+        { headers: adminHeaders() },
+      );
+      const skipData = (await skipInactiveRes.json()) as unknown as { next_slot: number | null };
+      expect(skipData.next_slot).toBe(3);
     });
 
     it('allows slot 0 creation, updates, and swaps', async () => {
@@ -306,7 +360,18 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
   });
 
   describe('Word Blocking & Preview', () => {
-    it('blocks a word, filters it out of previews, and allows unblocking', async () => {
+    it('blocks a word, recomputes affected puzzles.max_score, rejects duplicates with 409, and unblocks', async () => {
+      // Ensure initial max_score is populated on slot 1
+      await harness.client.api.admin.puzzle.center.$post(
+        { json: { slot: 1, center: 'a' } },
+        { headers: adminHeaders() },
+      );
+      const slot1Before = await harness.db
+        .selectFrom('puzzles')
+        .select('max_score')
+        .where('slot', '=', 1)
+        .executeTakeFirstOrThrow();
+
       const previewBefore = await harness.client.api.admin.preview.$post(
         { json: { letters: 'a,e,i,k,l,n,s', center: 'a' } },
         { headers: adminHeaders() },
@@ -319,6 +384,21 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         { headers: adminHeaders() },
       );
       expect(blockRes.status).toBe(200);
+
+      // Duplicate block returns 409 Conflict
+      const dupBlockRes = await harness.client.api.admin.block.$post(
+        { json: { word: 'kana' } },
+        { headers: adminHeaders() },
+      );
+      expect(dupBlockRes.status).toBe(409);
+
+      // Persisted puzzles.max_score for affected slot 1 decreased by 1 ('kana' = 4 letters = 1 pt)
+      const slot1Blocked = await harness.db
+        .selectFrom('puzzles')
+        .select('max_score')
+        .where('slot', '=', 1)
+        .executeTakeFirstOrThrow();
+      expect(slot1Blocked.max_score).toBe(Number(slot1Before.max_score) - 1);
 
       const previewAfter = await harness.client.api.admin.preview.$post(
         { json: { letters: 'a,e,i,k,l,n,s', center: 'a' } },
@@ -337,21 +417,41 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         { headers: adminHeaders() },
       );
       expect(unblockRes.status).toBe(200);
+
+      // Persisted puzzles.max_score restored after unblock, and deleting non-existent id returns 404
+      const slot1Restored = await harness.db
+        .selectFrom('puzzles')
+        .select('max_score')
+        .where('slot', '=', 1)
+        .executeTakeFirstOrThrow();
+      expect(slot1Restored.max_score).toBe(slot1Before.max_score);
+
+      const missingUnblock = await harness.client.api.admin.block[':id'].$delete(
+        { param: { id: String(blockedId) } },
+        { headers: adminHeaders() },
+      );
+      expect(missingUnblock.status).toBe(404);
     });
   });
 
   describe('14-Day Schedule', () => {
-    it('returns upcoming puzzle rotation schedule', async () => {
+    it('returns upcoming puzzle rotation schedule without N+1 queries and rejects invalid start dates with 400', async () => {
       const res = await harness.client.api.admin.schedule.$get(
-        { query: { days: '14' } },
+        { query: { days: '90' } },
         { headers: adminHeaders() },
       );
       expect(res.status).toBe(200);
       const data = (await res.json()) as {
         schedule: Array<{ date: string; slot: number; display_number: number }>;
       };
-      expect(data.schedule).toHaveLength(14);
+      expect(data.schedule).toHaveLength(90);
       expect(data.schedule[0]?.display_number).toBeGreaterThan(0);
+
+      const badStartRes = await harness.client.api.admin.schedule.$get(
+        { query: { start: '2026-99-99' } },
+        { headers: adminHeaders() },
+      );
+      expect(badStartRes.status).toBe(400);
     });
   });
 });

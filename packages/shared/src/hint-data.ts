@@ -243,16 +243,18 @@ function countByPair(foundWords: Set<string>): Record<string, number> {
 }
 
 function getFoundPangrams(foundWords: Set<string>, allLetters: Set<string>): string[] {
+  const normalizedLetters = [...allLetters].map((c) => normalizeFinnishText(c));
   const pangrams: string[] = [];
   for (const word of foundWords) {
+    const normWord = normalizeFinnishText(word);
     let isP = true;
-    for (const c of allLetters) {
-      if (!word.includes(c)) {
+    for (const c of normalizedLetters) {
+      if (!normWord.includes(c)) {
         isP = false;
         break;
       }
     }
-    if (isP) pangrams.push(normalizeFinnishText(word));
+    if (isP) pangrams.push(normWord);
   }
   return pangrams;
 }
@@ -362,11 +364,12 @@ export function deriveHintData(
   }
 
   for (const l of matrixLetters) {
-    const letterTotals = hintData.matrix?.[l] ?? {};
+    const normL = normalizeFinnishText(l);
+    const letterTotals = hintData.matrix?.[l] ?? hintData.matrix?.[normL] ?? {};
     const row = matrixCells[l] ?? (matrixCells[l] = {});
     for (const len of matrixLengths) {
       const total = letterTotals[String(len)] ?? 0;
-      const found = foundByLetterAndLen[l]?.[len] ?? 0;
+      const found = foundByLetterAndLen[normL]?.[len] ?? 0;
       const remaining = Math.max(0, total - found);
       row[len] = { total, found, remaining };
       matrixTotalsByLetter[l] = (matrixTotalsByLetter[l] ?? 0) + remaining;

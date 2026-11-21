@@ -30,13 +30,15 @@ import {
   nextFreeSlot,
   totalPuzzles,
 } from '../puzzle/puzzle.queries.js';
+import { isValidIsoCalendarDate } from '../puzzle/puzzle.routes.js';
 import {
-  bumpPuzzleCacheGeneration,
   computePuzzle,
   computeVariations,
   FINNISH_LETTERS,
+  invalidatePuzzleCache,
 } from '../puzzle/wordlist.js';
 import {
+  buildAdminSchedule,
   deleteBlockedWord,
   findDuplicateConflicts,
   getBlockedWordsList,
@@ -45,6 +47,7 @@ import {
   insertBlockedWord,
   insertOrUpdatePuzzle,
   normalizeLettersKey,
+  recomputeMaxScoresForAffectedWord,
   softDeletePuzzle,
   swapPuzzles,
   updatePuzzleCenter,
@@ -107,35 +110,26 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         }
 
         const lettersKey = normalizeLettersKey(letters);
-        const conflicts = await findDuplicateConflicts(db, lettersKey, requestedSlot);
-
-        const exact = conflicts.find((conflict) => conflict.center === center);
-        if (exact) {
-          return c.json(
-            {
-              error: `Sama peli on jo kierrossa slotissa ${exact.slot} keskuksella "${center}".`,
-              duplicate: exact,
-            },
-            409,
-          );
-        }
-
-        if (conflicts.length > 0 && !force) {
-          const first = conflicts[0]!;
-          return c.json(
-            {
-              error: `Samat kirjaimet ovat jo pelissä slotissa ${first.slot} (keskus "${first.center}"). Luodaanko silti?`,
-              requires_force: true,
-              duplicate: first,
-            },
-            409,
-          );
-        }
-
         const lettersString = letters.join(',');
-        const targetSlot = requestedSlot ?? (await nextFreeSlot(db));
 
-        await runImmediateTransactionWithRetry(db, async (trx) => {
+        const saveResult = await runImmediateTransactionWithRetry(db, async (trx) => {
+          const conflicts = await findDuplicateConflicts(trx, lettersKey, requestedSlot);
+          const exact = conflicts.find((conflict) => conflict.center === center);
+          if (exact) {
+            return {
+              kind: 'exact_conflict' as const,
+              conflict: exact,
+            };
+          }
+
+          if (conflicts.length > 0 && !force) {
+            return {
+              kind: 'force_required' as const,
+              conflict: conflicts[0]!,
+            };
+          }
+
+          const targetSlot = requestedSlot ?? (await nextFreeSlot(trx));
           await insertOrUpdatePuzzle(trx, targetSlot, lettersString, center);
           await insertAdminLog(
             trx,
@@ -143,9 +137,35 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
             requestedSlot !== undefined ? 'update_puzzle' : 'create_puzzle',
             `slot=${targetSlot},letters=${lettersString},center=${center}`,
           );
+          return {
+            kind: 'saved' as const,
+            targetSlot,
+          };
         });
 
-        bumpPuzzleCacheGeneration();
+        if (saveResult.kind === 'exact_conflict') {
+          return c.json(
+            {
+              error: `Sama peli on jo kierrossa slotissa ${saveResult.conflict.slot} keskuksella "${center}".`,
+              duplicate: saveResult.conflict,
+            },
+            409,
+          );
+        }
+
+        if (saveResult.kind === 'force_required') {
+          return c.json(
+            {
+              error: `Samat kirjaimet ovat jo pelissä slotissa ${saveResult.conflict.slot} (keskus "${saveResult.conflict.center}"). Luodaanko silti?`,
+              requires_force: true,
+              duplicate: saveResult.conflict,
+            },
+            409,
+          );
+        }
+
+        const targetSlot = saveResult.targetSlot;
+        invalidatePuzzleCache();
         const displayNumber = (await getDisplayNumber(db, targetSlot)) ?? targetSlot + 1;
         const total = await totalPuzzles(db);
 
@@ -180,7 +200,7 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         await insertAdminLog(trx, admin.adminId, 'delete_puzzle', `slot=${slot}`);
       });
 
-      bumpPuzzleCacheGeneration();
+      invalidatePuzzleCache();
       const total = await totalPuzzles(db);
       return c.json({ status: 'deleted' as const, slot, total_puzzles: total }, 200);
     })
@@ -198,12 +218,18 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         const slotA = (body.slotA ?? body.slot_a)!;
         const slotB = (body.slotB ?? body.slot_b)!;
 
-        await runImmediateTransactionWithRetry(db, async (trx) => {
-          await swapPuzzles(trx, slotA, slotB);
+        const swapped = await runImmediateTransactionWithRetry(db, async (trx) => {
+          const ok = await swapPuzzles(trx, slotA, slotB);
+          if (!ok) return false;
           await insertAdminLog(trx, admin.adminId, 'swap_puzzles', `slotA=${slotA},slotB=${slotB}`);
+          return true;
         });
 
-        bumpPuzzleCacheGeneration();
+        if (!swapped) {
+          return c.json({ error: 'Molemmat aktiiviset pelit vaaditaan vaihtoon' }, 404);
+        }
+
+        invalidatePuzzleCache();
         return c.json({ status: 'swapped' as const, slotA, slotB }, 200);
       },
     )
@@ -240,7 +266,7 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
           );
         });
 
-        bumpPuzzleCacheGeneration();
+        invalidatePuzzleCache();
         return c.json({ status: 'updated' as const, slot, center }, 200);
       },
     )
@@ -380,12 +406,19 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         const body = c.req.valid('json');
         const word = body.word.trim().toLowerCase();
 
-        await runImmediateTransactionWithRetry(db, async (trx) => {
-          await insertBlockedWord(trx, word);
+        const inserted = await runImmediateTransactionWithRetry(db, async (trx) => {
+          const ok = await insertBlockedWord(trx, word);
+          if (!ok) return false;
+          await recomputeMaxScoresForAffectedWord(trx, word);
           await insertAdminLog(trx, admin.adminId, 'block_word', `word=${word}`);
+          return true;
         });
 
-        bumpPuzzleCacheGeneration();
+        if (!inserted) {
+          return c.json({ error: 'Sana on jo estetty' }, 409);
+        }
+
+        invalidatePuzzleCache();
         return c.json({ status: 'blocked' as const, word }, 200);
       },
     )
@@ -396,12 +429,19 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Virheellinen tunniste' }, 400);
       }
 
-      await runImmediateTransactionWithRetry(db, async (trx) => {
-        await deleteBlockedWord(trx, id);
-        await insertAdminLog(trx, admin.adminId, 'unblock_word', `id=${id}`);
+      const deletedWord = await runImmediateTransactionWithRetry(db, async (trx) => {
+        const word = await deleteBlockedWord(trx, id);
+        if (!word) return null;
+        await recomputeMaxScoresForAffectedWord(trx, word);
+        await insertAdminLog(trx, admin.adminId, 'unblock_word', `id=${id},word=${word}`);
+        return word;
       });
 
-      bumpPuzzleCacheGeneration();
+      if (!deletedWord) {
+        return c.json({ error: 'Estettyä sanaa ei löydy' }, 404);
+      }
+
+      invalidatePuzzleCache();
       return c.json({ status: 'unblocked' as const, id }, 200);
     })
     .get('/schedule', zValidator('query', AdminScheduleQuerySchema), async (c) => {
@@ -410,61 +450,13 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
       const days = Math.min(90, Math.max(1, Number.isFinite(requestedDays) ? requestedDays : 14));
       const todayStr = getHelsinkiDateString();
       const startParam = query.start;
-      const startDateStr =
-        startParam && /^\d{4}-\d{2}-\d{2}$/.test(startParam) ? startParam : todayStr;
 
-      const startDate = new Date(`${startDateStr}T00:00:00Z`);
-      const blocked = await getBlockedWords(db);
-      const schedule = [];
-
-      for (let d = 0; d < days; d++) {
-        const curDate = new Date(startDate.getTime() + d * 86400000);
-        const dateKey = curDate.toISOString().slice(0, 10);
-        const slot = await getPuzzleSlotForDate(db, curDate);
-
-        let letters: string[] | null = null;
-        let center: string | null = null;
-        let wordCount = 0;
-        let maxScore = 0;
-        let pangramCount = 0;
-
-        if (slot !== null) {
-          const puzzle = await getPuzzleBySlot(db, slot);
-          if (puzzle) {
-            letters = puzzle.letters.split(',').map((l) => l.trim());
-            center = puzzle.center;
-            const computed = computePuzzle(letters, center, blocked);
-            wordCount = computed.hint_data.word_count;
-            maxScore = computed.max_score;
-            pangramCount = computed.hint_data.pangram_count;
-          }
-        }
-
-        const dispNum = slot !== null ? await getDisplayNumber(db, slot) : null;
-
-        schedule.push({
-          date: dateKey,
-          slot: slot ?? 0,
-          display_number: dispNum ?? (slot !== null ? slot : 1),
-          letters,
-          center,
-          word_count: wordCount,
-          max_score: maxScore,
-          pangram_count: pangramCount,
-          is_today: dateKey === todayStr,
-        });
+      if (startParam !== undefined && startParam !== '' && !isValidIsoCalendarDate(startParam)) {
+        return c.json({ error: 'Virheellinen aloituspäivämäärä' }, 400);
       }
 
-      const total = await totalPuzzles(db);
-
-      return c.json(
-        {
-          start: startDateStr,
-          days,
-          schedule,
-          total_puzzles: total,
-        },
-        200,
-      );
+      const startDateStr = startParam && startParam !== '' ? startParam : todayStr;
+      const result = await buildAdminSchedule(db, startDateStr, days, todayStr);
+      return c.json(result, 200);
     });
 }

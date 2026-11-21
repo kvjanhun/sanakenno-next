@@ -10,13 +10,13 @@ import {
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Admin Suggestions & Combinations (Kysely + Hono integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
   let sessionCookie: string;
   let csrfToken: string;
 
   beforeEach(async () => {
     resetLoginRateLimit();
-    harness = createTestHarness();
+    harness = await createTestHarness();
     setWordlist(DEFAULT_SEED_WORDS);
 
     const hash = await argon2.hash('admin-suggestions-secret');
@@ -140,6 +140,22 @@ describe('Admin Suggestions & Combinations (Kysely + Hono integration)', () => {
       const rotBody = (await rotRes.json()) as { combinations: Array<{ letters: string }> };
       expect(rotBody.combinations.map((c) => c.letters)).toContain('eilmors');
       expect(rotBody.combinations.map((c) => c.letters)).not.toContain('aekmnos');
+
+      // Empty query strings (e.g. ?in_rotation=) are treated as omitted/unfiltered
+      const emptyRotRes = await harness.app.request('/api/admin/combinations?in_rotation=', {
+        headers: adminHeaders(),
+      });
+      expect(emptyRotRes.status).toBe(200);
+      const emptyRotBody = (await emptyRotRes.json()) as { total: number };
+      expect(emptyRotBody.total).toBe(3);
+
+      // Invalid numeric query params or out-of-range per_page/in_rotation return 400
+      for (const badQuery of ['per_page=0', 'per_page=201', 'per_page=abc', 'in_rotation=2']) {
+        const badRes = await harness.app.request(`/api/admin/combinations?${badQuery}`, {
+          headers: adminHeaders(),
+        });
+        expect(badRes.status, `Expected 400 for ?${badQuery}`).toBe(400);
+      }
     });
   });
 

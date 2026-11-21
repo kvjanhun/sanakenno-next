@@ -9,13 +9,13 @@ import {
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Admin Analytics & Word Data (Kysely + Hono integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
   let sessionCookie: string;
   let csrfToken: string;
 
   beforeEach(async () => {
     resetLoginRateLimit();
-    harness = createTestHarness();
+    harness = await createTestHarness();
     setWordlist(DEFAULT_SEED_WORDS);
 
     const hash = await argon2.hash('admin-analytics-secret');
@@ -88,6 +88,16 @@ describe('Admin Analytics & Word Data (Kysely + Hono integration)', () => {
             session_id: 'player-session-1',
             achieved_at: nowIso,
           },
+          // Out-of-window historical achievement that must NOT leak into 7-day totals
+          {
+            puzzle_number: 1,
+            rank: 'Täysi kenno',
+            score: 100,
+            max_score: 100,
+            words_found: 20,
+            session_id: 'old-session-2020',
+            achieved_at: '2020-01-01 12:00:00',
+          },
         ])
         .execute();
 
@@ -101,9 +111,10 @@ describe('Admin Analytics & Word Data (Kysely + Hono integration)', () => {
         daily: Array<{ total: number; counts: Record<string, number> }>;
       };
 
-      // In users mode, only highest rank 'Onnistuja' is counted for the user
+      // In users mode, only highest rank 'Onnistuja' is counted for the user, and out-of-window rows are excluded
       expect(usersData.totals['Onnistuja']).toBe(1);
       expect(usersData.totals['Hyvä alku']).toBe(0);
+      expect(usersData.totals['Täysi kenno']).toBe(0);
 
       // Query mode=all
       const allRes = await harness.app.request('/api/admin/achievements?days=7&mode=all', {
@@ -115,9 +126,13 @@ describe('Admin Analytics & Word Data (Kysely + Hono integration)', () => {
         daily: Array<{ total: number; counts: Record<string, number> }>;
       };
 
-      // In all mode, both events are counted
+      // In all mode, both in-window events are counted and totals match sum of daily buckets
       expect(allData.totals['Onnistuja']).toBe(1);
       expect(allData.totals['Hyvä alku']).toBe(1);
+      expect(allData.totals['Täysi kenno']).toBe(0);
+      const sumOfDaily = allData.daily.reduce((sum, d) => sum + d.total, 0);
+      const sumOfTotals = Object.values(allData.totals).reduce((sum, c) => sum + c, 0);
+      expect(sumOfTotals).toBe(sumOfDaily);
     });
   });
 
@@ -190,6 +205,28 @@ describe('Admin Analytics & Word Data (Kysely + Hono integration)', () => {
       // Other valid words in slot 1 have find_count = 0
       const unfound = body.words.filter((w) => w.find_count === 0);
       expect(unfound.length).toBeGreaterThan(0);
+
+      // Supports slot 0 via puzzle_number=0 and rejects fractional puzzle_number/display_number with 400
+      await harness.db
+        .insertInto('puzzles')
+        .values({ slot: 0, letters: 'a,e,i,k,l,n,s', center: 'a', is_active: 1 })
+        .execute();
+      const slot0Res = await harness.app.request('/api/admin/word-finds?puzzle_number=0', {
+        headers: adminHeaders(),
+      });
+      expect(slot0Res.status).toBe(200);
+      const slot0Body = (await slot0Res.json()) as { puzzle_number: number };
+      expect(slot0Body.puzzle_number).toBe(0);
+
+      const floatSlotRes = await harness.app.request('/api/admin/word-finds?puzzle_number=1.5', {
+        headers: adminHeaders(),
+      });
+      expect(floatSlotRes.status).toBe(400);
+
+      const floatDispRes = await harness.app.request('/api/admin/word-finds?display_number=1.5', {
+        headers: adminHeaders(),
+      });
+      expect(floatDispRes.status).toBe(400);
     });
   });
 });

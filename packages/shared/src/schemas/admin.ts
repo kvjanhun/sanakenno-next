@@ -1,16 +1,19 @@
 import { z } from 'zod';
 
+function optionalQueryInt(schema: z.ZodNumber = z.number().int()) {
+  return z.preprocess((v) => {
+    if (v === '' || v === undefined) return undefined;
+    if (typeof v === 'string' && v.trim() === '') return undefined;
+    const n = Number(v);
+    return Number.isNaN(n) ? v : n;
+  }, schema.optional());
+}
+
 export const AdminLoginPayloadSchema = z.object({
   username: z.string().trim().min(1),
   password: z.string().min(1),
 });
 export type AdminLoginPayload = z.infer<typeof AdminLoginPayloadSchema>;
-
-export const AdminSessionResponseSchema = z.object({
-  username: z.string(),
-  csrfToken: z.string(),
-});
-export type AdminSessionResponse = z.infer<typeof AdminSessionResponseSchema>;
 
 export const AdminChangePasswordPayloadSchema = z.object({
   currentPassword: z.string().min(1),
@@ -68,26 +71,6 @@ export const AdminBlockWordPayloadSchema = z.object({
 });
 export type AdminBlockWordPayload = z.infer<typeof AdminBlockWordPayloadSchema>;
 
-export const BlockedWordEntrySchema = z.object({
-  id: z.number().int().positive(),
-  word: z.string(),
-  blocked_at: z.string(),
-});
-export type BlockedWordEntry = z.infer<typeof BlockedWordEntrySchema>;
-
-export const AdminScheduleEntrySchema = z.object({
-  date: z.string(),
-  dayOfWeek: z.string(),
-  displayNumber: z.number().int().positive(),
-  slot: z.number().int().positive(),
-  center: z.string(),
-  letters: z.string(),
-  pangramCount: z.number().int().nonnegative(),
-  wordCount: z.number().int().nonnegative(),
-  maxScore: z.number().int().nonnegative(),
-});
-export type AdminScheduleEntry = z.infer<typeof AdminScheduleEntrySchema>;
-
 export const PangramQualityGradeSchema = z.enum(['reject', 'risky', 'ok', 'good']);
 export type PangramQualityGrade = z.infer<typeof PangramQualityGradeSchema>;
 
@@ -122,15 +105,6 @@ export const AdminCombinationItemSchema = z.object({
   in_rotation: z.boolean(),
 });
 export type AdminCombinationItem = z.infer<typeof AdminCombinationItemSchema>;
-
-export const AdminCombinationsResponseSchema = z.object({
-  combinations: z.array(AdminCombinationItemSchema),
-  total: z.number(),
-  page: z.number(),
-  pages: z.number(),
-  per_page: z.number(),
-});
-export type AdminCombinationsResponse = z.infer<typeof AdminCombinationsResponseSchema>;
 
 export const AdminSuggestionOverlapSchema = z.object({
   slot: z.number().nullable(),
@@ -242,23 +216,23 @@ export const AdminCombinationsQuerySchema = z
   .object({
     requires: z.string().optional(),
     excludes: z.string().optional(),
-    min_pangrams: z.string().optional(),
-    max_pangrams: z.string().optional(),
-    min_words: z.string().optional(),
-    max_words: z.string().optional(),
-    in_rotation: z.string().optional(),
+    min_pangrams: optionalQueryInt(z.number().int().nonnegative()),
+    max_pangrams: optionalQueryInt(z.number().int().nonnegative()),
+    min_words: optionalQueryInt(z.number().int().nonnegative()),
+    max_words: optionalQueryInt(z.number().int().nonnegative()),
+    in_rotation: optionalQueryInt(z.number().int().min(0).max(1)),
     sort: z.string().optional(),
     order: z.string().optional(),
-    page: z.string().optional(),
-    per_page: z.string().optional(),
+    page: optionalQueryInt(z.number().int().min(1)),
+    per_page: optionalQueryInt(z.number().int().min(1).max(200)),
   })
   .optional();
 
 export const AdminSuggestionQuerySchema = z
   .object({
     declined: z.string().optional(),
-    min_words: z.string().optional(),
-    max_words: z.string().optional(),
+    min_words: optionalQueryInt(z.number().int().nonnegative()),
+    max_words: optionalQueryInt(z.number().int().nonnegative()),
   })
   .optional();
 

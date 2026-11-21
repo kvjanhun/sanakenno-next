@@ -10,10 +10,8 @@ sanakenno-next/
   OPEN_SOURCE_LICENSES.md    # Comprehensive open source & open data license attribution
   PROJECT_MAP.md             # Current architecture & domain invariants
   Dockerfile                 # Multi-stage production container (Node 22 Alpine, commit.txt stamp)
-  docker-compose.yml         # Dual-instance zero-downtime services (sanakenno-a & sanakenno-b)
   scripts/
     create-admin.ts          # Admin credential provisioning CLI
-    deploy-sanakenno.sh      # Server deployment & verification pipeline
     filter-kotus-wordlist.ts # Kotus dictionary filtering & hyphenated lemma extractor
     migrate-v1-db.ts         # Standalone 1.0 -> 2.0 SQLite snapshot & backfill migration CLI
     screenshot-targets.ts    # Desktop/mobile screenshot scenario targets & CDP action builders
@@ -26,9 +24,9 @@ sanakenno-next/
     shared/                  # @sanakenno/shared — Pure Finnish game logic (scoring, hint-data, stats, achievements, sync-merge, kotus lemma links, share-text, honeycomb-theme, auth-types) & Zod schemas
     server/                  # @sanakenno/server — Hono RPC API + Kysely SQLite layer + Cloud Run edge middleware
       src/
-        edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), Google security headers, zero-DB MAINTENANCE_MODE app & PWA static serving
+        edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), hono/secure-headers security headers, zero-DB MAINTENANCE_MODE app & PWA static serving
         lib/                 # Shared server utilities (@hono/zod-validator error hook helper)
-        db/                  # 18-table Kysely Database<Schema>, dual SQLite (BEGIN IMMEDIATE) & repo-owned Turso/libSQL dialect (libsql-dialect.ts), pre-commit transient retry policy (retry.ts), sync/async 0001-0005 migration runners (async-migrations.ts), 1.0 backfill helper (backfill-stats.ts), deterministic seed
+        db/                  # 18-table Kysely Database<Schema>, dual SQLite (BEGIN IMMEDIATE) & repo-owned Turso/libSQL dialect (libsql-dialect.ts), pre-commit transient retry policy (retry.ts), unified async 0001-0005 migration & 1.0 backfill runner (async-migrations.ts), deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
           puzzle/            # Finnish wordlist engine, bounded 10-entry TTL/content-validated LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
@@ -39,17 +37,17 @@ sanakenno-next/
           admin-puzzles/     # Puzzle CRUD, swap, center override, preview, blocked words & 14-day schedule (POST/GET/DELETE /api/admin/*)
           admin-suggestions/ # No-spoiler puzzle suggestion engine, curated pangram quality, combinations browser & rejections (GET/POST/DELETE /api/admin/*)
           admin-analytics/   # Achievement, failed-guess & per-puzzle word-find telemetry aggregations (GET /api/admin/*)
-    web/                     # @sanakenno/web — React 19 + TanStack Query + Hono RPC client
+    web/                     # @sanakenno/web — React 19 + TanStack Query + Hono RPC client + lucide-react icons
       src/
         api/                 # Typed Hono RPC client (hc<AppType>), split into client.ts and admin-client.ts
         pwa.config.ts        # PWA manifest, service worker registration, Workbox runtime caching & vite:preloadError recovery
         features/
           gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AnnouncementBanner), announcements, gameplay-effects.ts, offline puzzle cache (storage.ts / usePuzzleQuery.ts), useMidnightRollover, and hybrid state
-          modals/            # Statically bundled player modals (ModalShell, ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal) and PrivacySection (GDPR Art. 13 & localStorage disclosure)
+          modals/            # Statically bundled player modals (native <dialog> ModalShell, ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal) and native <details> PrivacySection (GDPR Art. 13 & localStorage disclosure)
           player-sync/       # Player auth store with debounced sync queue and keepalive, monotonic sync reconciliation, 6-digit PIN SyncModal, ConnectBanner
-          theme/             # 6-palette CSS custom property theme system (usePaletteStore, useThemePreferenceStore, preference-sync, ThemeSelector, ThemeToggle)
-          admin/             # Code-split admin panel (AdminLayout, LoginPage, PuzzleEditor, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
-        styles/              # CSS custom property design tokens (--color-*, --font-*)
+          theme/             # 6-palette CSS custom property theme system (usePaletteStore, reactive OS matchMedia useThemePreferenceStore, preference-sync, ThemeSelector, ThemeToggle)
+          admin/             # Code-split TanStack Query admin panel (AdminLayout, LoginPage, PuzzleEditor, usePuzzleEditorQueries, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
+        styles/              # CSS custom property design tokens (--color-*, --font-*, @custom-variant dark)
   tests/
     architecture.test.ts     # Mechanical boundary & monolith guardrails
     integration/             # In-memory Kysely SQLite + Hono testClient specs + edge middleware + production snapshot tests
@@ -93,4 +91,4 @@ Daily puzzle rotation strictly follows `Europe/Helsinki` midnight.
 
 - **Milestones (`NoHintMilestone`):** Per-puzzle unassisted point markers (25%, 50%, 70%) on the progress bar.
 - **Achievements (`ACHIEVEMENT_DEFINITIONS`):** Long-term player badges across 6 categories with 5 tiers each (Pronssi, Hopea, Kulta, Timantti, Mestari). `AnnouncementBanner` only announces unlocked achievement tiers (`achievement_unlocked`), letter-cleared callouts (`letter_cleared`), and 25%/50% unassisted milestones (`no_hint_milestone`)—never intermediate achievement progress nudges.
-- **Streak ("Putki"):** Strictly measures consecutive calendar days in `Europe/Helsinki` on which the player solved words in the active daily puzzle. Archive plays never advance or create streaks.
+- **Streak ("Putki"):** Strictly measures consecutive calendar days in `Europe/Helsinki` on which the player solved at least one word (`words_found > 0`) in the active daily puzzle. Zero-word hint unlocks and archive plays never advance or create streaks.

@@ -77,7 +77,6 @@ interface CachedPuzzleEntry {
 }
 
 const _puzzleCache = new Map<number, CachedPuzzleEntry>();
-let _cacheGeneration = 0;
 
 /** Default in-memory TTL for cached puzzle payloads so cross-instance blocked_words edits propagate. */
 export const DEFAULT_PUZZLE_CACHE_TTL_MS = 60_000;
@@ -363,14 +362,7 @@ export function setPuzzleCacheTtlMs(ttlMs: number): void {
 }
 
 /**
- * Return the active in-memory puzzle cache TTL in milliseconds.
- */
-export function getPuzzleCacheTtlMs(): number {
-  return _puzzleCacheTtlMs;
-}
-
-/**
- * Read a cached full puzzle by slot if present and unexpired in the current generation.
+ * Read a cached full puzzle by slot if present and unexpired.
  * Refreshes LRU recency when found.
  */
 export function getCachedPuzzle(slot: number): FullPuzzleData | undefined {
@@ -425,20 +417,4 @@ export function invalidatePuzzleCache(slot?: number): void {
     return;
   }
   _puzzleCache.clear();
-}
-
-/**
- * Bump the in-memory puzzle cache generation and clear all cached slot payloads.
- */
-export function bumpPuzzleCacheGeneration(): number {
-  _cacheGeneration += 1;
-  _puzzleCache.clear();
-  return _cacheGeneration;
-}
-
-/**
- * Return the current in-memory puzzle cache generation counter.
- */
-export function getPuzzleCacheGeneration(): number {
-  return _cacheGeneration;
 }

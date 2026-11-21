@@ -28,11 +28,6 @@ export interface NoHintMilestoneState extends NoHintMilestone {
   unlocked: boolean;
 }
 
-/** @deprecated Use NoHintMilestone instead */
-export type NoHintAchievement = NoHintMilestone;
-/** @deprecated Use NoHintMilestoneState instead */
-export type NoHintAchievementState = NoHintMilestoneState;
-
 export const RANK_NAMES = [
   'Etsi sanoja!',
   'Hyvä alku',
@@ -63,9 +58,6 @@ export const NO_HINT_MILESTONES: readonly NoHintMilestone[] = [
   { pct: 70, name: 'Ällistyttävä ilman apuja' },
 ];
 
-/** @deprecated Use NO_HINT_MILESTONES instead */
-export const NO_HINT_ACHIEVEMENTS: readonly NoHintMilestone[] = NO_HINT_MILESTONES;
-
 /** Score a single word. 4-letter words = 1 pt; longer = length. Pangram bonus +7. */
 export function scoreWord(word: string, allLetters: Set<string> | string[]): number {
   const pts = word.length === 4 ? 1 : word.length;
@@ -89,9 +81,8 @@ export function recalcScore(words: string[], allLetters: Set<string> | string[])
 /** Determine the rank name for a given score and max score. */
 export function rankForScore(score: number, maxScore: number): string {
   if (maxScore === 0) return LOWEST_RANK_NAME;
-  const pct = (score / maxScore) * 100;
   for (const r of RANKS) {
-    if (pct >= r.pct) return r.name;
+    if (score * 100 >= r.pct * maxScore) return r.name;
   }
   return LOWEST_RANK_NAME;
 }
@@ -100,7 +91,7 @@ export function rankForScore(score: number, maxScore: number): string {
 export function rankThresholds(currentRank: string, maxScore: number): RankThreshold[] {
   return [...RANKS].reverse().map((r) => ({
     name: r.name,
-    points: Math.ceil((r.pct / 100) * maxScore),
+    points: Math.ceil((r.pct * maxScore) / 100),
     isCurrent: currentRank === r.name,
   }));
 }
@@ -111,7 +102,7 @@ export function noHintMilestoneStates(
   maxScore: number,
 ): NoHintMilestoneState[] {
   return NO_HINT_MILESTONES.map((milestone) => {
-    const points = maxScore > 0 ? Math.ceil((milestone.pct / 100) * maxScore) : 0;
+    const points = maxScore > 0 ? Math.ceil((milestone.pct * maxScore) / 100) : 0;
     return {
       ...milestone,
       points,
@@ -120,21 +111,17 @@ export function noHintMilestoneStates(
   });
 }
 
-/** @deprecated Use noHintMilestoneStates instead */
-export const noHintAchievementStates = noHintMilestoneStates;
-
 /** Compute progress percentage toward the next rank (0–100). */
 export function progressToNextRank(score: number, maxScore: number): number {
   if (maxScore === 0) return 0;
-  const scorePct = (score / maxScore) * 100;
-  const currentIdx = RANKS.findIndex((r) => scorePct >= r.pct);
+  const currentIdx = RANKS.findIndex((r) => score * 100 >= r.pct * maxScore);
   if (currentIdx === -1) return 0;
   if (currentIdx === 0) return 100;
   const currentRank = RANKS[currentIdx];
   const nextRank = RANKS[currentIdx - 1];
   if (!currentRank || !nextRank) return 100;
-  const currentRankPts = Math.ceil((currentRank.pct / 100) * maxScore);
-  const nextRankPts = Math.ceil((nextRank.pct / 100) * maxScore);
+  const currentRankPts = Math.ceil((currentRank.pct * maxScore) / 100);
+  const nextRankPts = Math.ceil((nextRank.pct * maxScore) / 100);
   if (nextRankPts <= currentRankPts) return 100;
   return Math.min(100, ((score - currentRankPts) / (nextRankPts - currentRankPts)) * 100);
 }

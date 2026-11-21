@@ -1,7 +1,17 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
-import { getBlockedWords } from '../puzzle/puzzle.queries.js';
-import { computePuzzle } from '../puzzle/wordlist.js';
+import {
+  computePuzzleSlotForDate,
+  getBlockedWords,
+  getEpochDate,
+} from '../puzzle/puzzle.queries.js';
+import {
+  computePuzzle,
+  getCachedPuzzle,
+  invalidatePuzzleCache,
+  MIN_WORD_LENGTH,
+  normalizeWord,
+} from '../puzzle/wordlist.js';
 
 export interface PuzzleRow {
   slot: number;
@@ -18,10 +28,10 @@ export function normalizeLettersKey(letters: string | string[]): string {
   return Array.from(new Set(chars)).sort().join('');
 }
 
-export async function getAllActivePuzzles(db: Kysely<Database>) {
+async function getAllActivePuzzles(db: Kysely<Database>) {
   return db
     .selectFrom('puzzles')
-    .select(['slot', 'letters', 'center', 'is_active'])
+    .select(['slot', 'letters', 'center', 'is_active', 'max_score'])
     .where('is_active', '=', 1)
     .orderBy('slot', 'asc')
     .execute();
@@ -42,12 +52,14 @@ export async function getNeighbourSlots(
   const prevRow = await db
     .selectFrom('puzzles')
     .select((eb) => eb.fn.max<number | null>('slot').as('prev_slot'))
+    .where('is_active', '=', 1)
     .where('slot', '<', slot)
     .executeTakeFirst();
 
   const nextRow = await db
     .selectFrom('puzzles')
     .select((eb) => eb.fn.min<number | null>('slot').as('next_slot'))
+    .where('is_active', '=', 1)
     .where('slot', '>', slot)
     .executeTakeFirst();
 
@@ -123,17 +135,22 @@ export async function softDeletePuzzle(db: Kysely<Database>, slot: number) {
     .execute();
 }
 
-export async function swapPuzzles(db: Kysely<Database>, slotA: number, slotB: number) {
+export async function swapPuzzles(
+  db: Kysely<Database>,
+  slotA: number,
+  slotB: number,
+): Promise<boolean> {
   const rows = await db
     .selectFrom('puzzles')
     .select(['slot', 'letters', 'center', 'is_active', 'max_score'])
     .where('slot', 'in', [slotA, slotB])
+    .where('is_active', '=', 1)
     .execute();
 
   const pA = rows.find((r) => Number(r.slot) === slotA);
   const pB = rows.find((r) => Number(r.slot) === slotB);
   if (!pA || !pB) {
-    throw new Error('Molemmat pelit vaaditaan vaihtoon');
+    return false;
   }
 
   const now = new Date().toISOString();
@@ -160,6 +177,8 @@ export async function swapPuzzles(db: Kysely<Database>, slotA: number, slotB: nu
     })
     .where('slot', '=', slotB)
     .execute();
+
+  return true;
 }
 
 export async function updatePuzzleCenter(db: Kysely<Database>, slot: number, center: string) {
@@ -189,15 +208,172 @@ export async function getBlockedWordsList(db: Kysely<Database>) {
     .execute();
 }
 
-export async function insertBlockedWord(db: Kysely<Database>, word: string) {
-  await db
+export async function insertBlockedWord(db: Kysely<Database>, word: string): Promise<boolean> {
+  const inserted = await db
     .insertInto('blocked_words')
     .values({
       word: word.toLowerCase().trim(),
     })
-    .execute();
+    .onConflict((oc) => oc.column('word').doNothing())
+    .returning('id')
+    .executeTakeFirst();
+  return inserted !== undefined;
 }
 
-export async function deleteBlockedWord(db: Kysely<Database>, id: number) {
-  await db.deleteFrom('blocked_words').where('id', '=', id).execute();
+export async function deleteBlockedWord(db: Kysely<Database>, id: number): Promise<string | null> {
+  const deleted = await db
+    .deleteFrom('blocked_words')
+    .where('id', '=', id)
+    .returning('word')
+    .executeTakeFirst();
+  return deleted?.word ?? null;
+}
+
+/**
+ * Recompute and persist `puzzles.max_score` ONLY for active puzzles whose
+ * `(letters, center)` can form the newly blocked or unblocked word.
+ */
+export async function recomputeMaxScoresForAffectedWord(
+  db: Kysely<Database>,
+  rawWord: string,
+): Promise<number> {
+  const normWord = normalizeWord(rawWord);
+  if (normWord.length < MIN_WORD_LENGTH) return 0;
+
+  const activePuzzles = await getAllActivePuzzles(db);
+  const affected = activePuzzles.filter((p) => {
+    const centerChar = p.center.trim().toLowerCase();
+    if (!normWord.includes(centerChar)) return false;
+    const letterSet = new Set(normalizeLettersKey(p.letters));
+    for (const ch of normWord) {
+      if (!letterSet.has(ch)) return false;
+    }
+    return true;
+  });
+
+  if (affected.length === 0) return 0;
+
+  const blockedWords = await getBlockedWords(db);
+  let updated = 0;
+
+  for (const p of affected) {
+    const computed = computePuzzle(p.letters, p.center, blockedWords);
+    invalidatePuzzleCache(Number(p.slot));
+    if (computed.max_score !== p.max_score) {
+      await db
+        .updateTable('puzzles')
+        .set({
+          max_score: computed.max_score,
+          updated_at: new Date().toISOString(),
+        })
+        .where('slot', '=', p.slot)
+        .execute();
+      updated += 1;
+    }
+  }
+
+  return updated;
+}
+
+/**
+ * Assemble the N-day admin schedule in 3 parallel DB queries total,
+ * memoizing `computePuzzle` per unique slot in-request without polluting the 10-entry LRU.
+ */
+export async function buildAdminSchedule(
+  db: Kysely<Database>,
+  startDateStr: string,
+  days: number,
+  todayStr: string,
+) {
+  const [activePuzzles, epochDate, blockedWords] = await Promise.all([
+    getAllActivePuzzles(db),
+    getEpochDate(db),
+    getBlockedWords(db),
+  ]);
+
+  const activeSlots = activePuzzles.map((p) => Number(p.slot));
+  const puzzleBySlot = new Map(activePuzzles.map((p) => [Number(p.slot), p]));
+  const displayNumberBySlot = new Map(activeSlots.map((slot, index) => [slot, index + 1]));
+  const computedBySlot = new Map<
+    number,
+    { letters: string[]; center: string; wordCount: number; maxScore: number; pangramCount: number }
+  >();
+
+  const startDate = new Date(`${startDateStr}T00:00:00Z`);
+  const schedule = [];
+
+  for (let d = 0; d < days; d++) {
+    const curDate = new Date(startDate.getTime() + d * 86_400_000);
+    const dateKey = curDate.toISOString().slice(0, 10);
+    const slot = computePuzzleSlotForDate(activeSlots, epochDate, curDate);
+
+    let letters: string[] | null = null;
+    let center: string | null = null;
+    let wordCount = 0;
+    let maxScore = 0;
+    let pangramCount = 0;
+
+    if (slot !== null) {
+      let stats = computedBySlot.get(slot);
+      if (!stats) {
+        const puzzle = puzzleBySlot.get(slot);
+        if (puzzle) {
+          const parsedLetters = puzzle.letters.split(',').map((l) => l.trim());
+          const cached = getCachedPuzzle(slot);
+          if (
+            cached &&
+            cached.center === puzzle.center &&
+            cached.letters.join(',') === [...parsedLetters].sort().join(',')
+          ) {
+            stats = {
+              letters: parsedLetters,
+              center: puzzle.center,
+              wordCount: cached.hint_data.word_count,
+              maxScore: cached.max_score,
+              pangramCount: cached.hint_data.pangram_count,
+            };
+          } else {
+            const computed = computePuzzle(parsedLetters, puzzle.center, blockedWords);
+            stats = {
+              letters: parsedLetters,
+              center: puzzle.center,
+              wordCount: computed.hint_data.word_count,
+              maxScore: computed.max_score,
+              pangramCount: computed.hint_data.pangram_count,
+            };
+          }
+          computedBySlot.set(slot, stats);
+        }
+      }
+
+      if (stats) {
+        letters = stats.letters;
+        center = stats.center;
+        wordCount = stats.wordCount;
+        maxScore = stats.maxScore;
+        pangramCount = stats.pangramCount;
+      }
+    }
+
+    const dispNum = slot !== null ? (displayNumberBySlot.get(slot) ?? null) : null;
+
+    schedule.push({
+      date: dateKey,
+      slot: slot ?? 0,
+      display_number: dispNum ?? (slot !== null ? slot : 1),
+      letters,
+      center,
+      word_count: wordCount,
+      max_score: maxScore,
+      pangram_count: pangramCount,
+      is_today: dateKey === todayStr,
+    });
+  }
+
+  return {
+    start: startDateStr,
+    days,
+    schedule,
+    total_puzzles: activeSlots.length,
+  };
 }

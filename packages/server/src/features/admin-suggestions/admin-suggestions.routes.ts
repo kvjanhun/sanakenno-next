@@ -6,6 +6,7 @@ import {
 } from '@sanakenno/shared';
 import { Hono } from 'hono';
 import type { Kysely } from 'kysely';
+import { runImmediateTransactionWithRetry } from '../../db/connection.js';
 import type { Database } from '../../db/schema.js';
 import { zodErrorHook } from '../../lib/zod-validator.js';
 import {
@@ -33,84 +34,95 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
   admin.use('*', requireAdminAuth(db));
 
   return admin
-    .get('/combinations', zValidator('query', AdminCombinationsQuerySchema), async (c) => {
-      const q = c.req.valid('query') ?? {};
-      const requires = q.requires;
-      const excludes = q.excludes;
-      const min_pangrams = q.min_pangrams ? Number(q.min_pangrams) : undefined;
-      const max_pangrams = q.max_pangrams ? Number(q.max_pangrams) : undefined;
-      const min_words = q.min_words ? Number(q.min_words) : undefined;
-      const max_words = q.max_words ? Number(q.max_words) : undefined;
-      const in_rotation =
-        q.in_rotation !== undefined && q.in_rotation !== '' ? Number(q.in_rotation) : undefined;
-      const sort = q.sort;
-      const order = q.order === 'asc' ? 'asc' : 'desc';
-      const page = q.page ? Number(q.page) : 1;
-      const per_page = q.per_page ? Number(q.per_page) : 50;
+    .get(
+      '/combinations',
+      zValidator(
+        'query',
+        AdminCombinationsQuerySchema,
+        zodErrorHook('Virheelliset hakuparametrit'),
+      ),
+      async (c) => {
+        const q = c.req.valid('query') ?? {};
+        const requires = q.requires;
+        const excludes = q.excludes;
+        const min_pangrams = q.min_pangrams;
+        const max_pangrams = q.max_pangrams;
+        const min_words = q.min_words;
+        const max_words = q.max_words;
+        const in_rotation = q.in_rotation;
+        const sort = q.sort;
+        const order = q.order === 'asc' ? 'asc' : 'desc';
+        const page = q.page ?? 1;
+        const per_page = q.per_page ?? 50;
 
-      const { rows, total } = await getCombinations(db, {
-        requires,
-        excludes,
-        min_pangrams,
-        max_pangrams,
-        min_words,
-        max_words,
-        in_rotation,
-        sort,
-        order,
-        page,
-        per_page,
-      });
-
-      const combinations = rows.map((r) => ({
-        letters: r.letters,
-        total_pangrams: r.total_pangrams,
-        min_word_count: r.min_word_count,
-        max_word_count: r.max_word_count,
-        min_max_score: r.min_max_score,
-        max_max_score: r.max_max_score,
-        variations: parseVariations(r.variations),
-        in_rotation: Boolean(r.in_rotation),
-      }));
-
-      const pages = Math.ceil(total / per_page);
-
-      return c.json(
-        {
-          combinations,
-          total,
+        const { rows, total } = await getCombinations(db, {
+          requires,
+          excludes,
+          min_pangrams,
+          max_pangrams,
+          min_words,
+          max_words,
+          in_rotation,
+          sort,
+          order,
           page,
-          pages,
           per_page,
-        },
-        200,
-      );
-    })
-    .get('/suggestion', zValidator('query', AdminSuggestionQuerySchema), async (c) => {
-      const q = c.req.valid('query') ?? {};
-      const declinedParam = q.declined ?? '';
-      const clientDeclined = declinedParam
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const persistedDeclined = await persistedSuggestionRejectionKeys(db);
-      const allDeclined = [...clientDeclined, ...persistedDeclined];
+        });
 
-      const minWords = q.min_words ? Number(q.min_words) : undefined;
-      const maxWords = q.max_words ? Number(q.max_words) : undefined;
+        const combinations = rows.map((r) => ({
+          letters: r.letters,
+          total_pangrams: r.total_pangrams,
+          min_word_count: r.min_word_count,
+          max_word_count: r.max_word_count,
+          min_max_score: r.min_max_score,
+          max_max_score: r.max_max_score,
+          variations: parseVariations(r.variations),
+          in_rotation: Boolean(r.in_rotation),
+        }));
 
-      const suggestion = await suggestPuzzle(db, {
-        declined: allDeclined,
-        minWords,
-        maxWords,
-      });
+        const pages = Math.ceil(total / per_page);
 
-      if (!suggestion) {
-        return c.json({ error: 'Ei ehdotuksia saatavilla' }, 404);
-      }
+        return c.json(
+          {
+            combinations,
+            total,
+            page,
+            pages,
+            per_page,
+          },
+          200,
+        );
+      },
+    )
+    .get(
+      '/suggestion',
+      zValidator('query', AdminSuggestionQuerySchema, zodErrorHook('Virheelliset hakuparametrit')),
+      async (c) => {
+        const q = c.req.valid('query') ?? {};
+        const declinedParam = q.declined ?? '';
+        const clientDeclined = declinedParam
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const persistedDeclined = await persistedSuggestionRejectionKeys(db);
+        const allDeclined = [...clientDeclined, ...persistedDeclined];
 
-      return c.json(suggestion, 200);
-    })
+        const minWords = q.min_words;
+        const maxWords = q.max_words;
+
+        const suggestion = await suggestPuzzle(db, {
+          declined: allDeclined,
+          minWords,
+          maxWords,
+        });
+
+        if (!suggestion) {
+          return c.json({ error: 'Ei ehdotuksia saatavilla' }, 404);
+        }
+
+        return c.json(suggestion, 200);
+      },
+    )
     .get('/suggestion-rejections', async (c) => {
       const rows = await getSuggestionRejections(db);
       return c.json(
@@ -141,17 +153,20 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
           return c.json({ error: 'Kirjaimet ja keskuskirjain vaaditaan' }, 400);
         }
         const center = parsed.center.toLowerCase();
-        const row = await insertSuggestionRejection(db, lettersKey, center);
-
         const adminUser = c.get('admin');
-        if (adminUser?.adminId) {
-          await insertAdminLog(
-            db,
-            adminUser.adminId,
-            'suggestion_reject',
-            `${lettersKey}:${center}`,
-          );
-        }
+
+        const row = await runImmediateTransactionWithRetry(db, async (trx) => {
+          const inserted = await insertSuggestionRejection(trx, lettersKey, center);
+          if (adminUser?.adminId) {
+            await insertAdminLog(
+              trx,
+              adminUser.adminId,
+              'suggestion_reject',
+              `${lettersKey}:${center}`,
+            );
+          }
+          return inserted;
+        });
 
         return c.json(
           {
@@ -167,25 +182,28 @@ export function createAdminSuggestionsRoutes(db: Kysely<Database>) {
     )
     .delete('/suggestion-rejections/:id', requireCsrf, async (c) => {
       const id = Number(c.req.param('id'));
-      if (isNaN(id) || id <= 0) {
+      if (!Number.isInteger(id) || id <= 0) {
         return c.json({ error: 'Virheellinen tunniste' }, 400);
       }
 
-      const row = await getSuggestionRejectionById(db, id);
+      const adminUser = c.get('admin');
+      const row = await runImmediateTransactionWithRetry(db, async (trx) => {
+        const existing = await getSuggestionRejectionById(trx, id);
+        if (!existing) return null;
+        await deleteSuggestionRejection(trx, id);
+        if (adminUser?.adminId) {
+          await insertAdminLog(
+            trx,
+            adminUser.adminId,
+            'suggestion_restore',
+            `${existing.letters_key}:${existing.center}`,
+          );
+        }
+        return existing;
+      });
+
       if (!row) {
         return c.json({ error: 'Hylättyä ehdotusta ei löydy' }, 404);
-      }
-
-      await deleteSuggestionRejection(db, id);
-
-      const admin = c.get('admin');
-      if (admin?.adminId) {
-        await insertAdminLog(
-          db,
-          admin.adminId,
-          'suggestion_restore',
-          `${row.letters_key}:${row.center}`,
-        );
       }
 
       return c.json({

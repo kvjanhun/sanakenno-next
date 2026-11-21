@@ -180,6 +180,22 @@ describe('Admin Suggestion Scorer (Pure Unit Tests)', () => {
       const pool = selectCandidatePool(candidates, regularBand, 1);
       expect(pool).toHaveLength(1);
       expect(pool[0]!.grade).toBe('good');
+
+      // When only 'unreviewed' and 'risky' candidates exist, prefers 'unreviewed' (-10) over 'risky' (-80)
+      const fallbackPool = selectCandidatePool(
+        [
+          { ...candidates[1]!, grade: 'risky' },
+          {
+            ...candidates[0]!,
+            lettersKey: 'aekmnos',
+            grade: 'unreviewed',
+          },
+        ],
+        regularBand,
+        1,
+      );
+      expect(fallbackPool).toHaveLength(1);
+      expect(fallbackPool[0]!.grade).toBe('unreviewed');
     });
   });
 });

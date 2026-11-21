@@ -1,20 +1,20 @@
-import { RANK_NAMES } from '@sanakenno/shared';
+import { getHelsinkiDateString, RANK_NAMES } from '@sanakenno/shared';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 
-export interface AchievementStatRow {
+interface AchievementStatRow {
   rank: string;
   achieved_at: string;
   session_id: string | null;
 }
 
-export interface FailedGuessStatRow {
+interface FailedGuessStatRow {
   puzzle_date: string;
   word: string;
   count: number;
 }
 
-export interface WordFindStatRow {
+interface WordFindStatRow {
   word: string;
   count: number;
 }
@@ -25,7 +25,7 @@ export async function getAchievementRows(
   db: Kysely<Database>,
   days: number,
 ): Promise<AchievementStatRow[]> {
-  const cutoff = new Date(Date.now() - days * 86400000)
+  const cutoff = new Date(Date.now() - days * 86_400_000)
     .toISOString()
     .slice(0, 19)
     .replace('T', ' ');
@@ -48,6 +48,15 @@ export function groupAchievementsByDay(
   mode: 'users' | 'all',
   days: number,
 ) {
+  const todayHki = getHelsinkiDateString();
+  const anchor = new Date(`${todayHki}T12:00:00Z`);
+  const windowDates: string[] = [];
+  for (let d = 0; d < days; d++) {
+    const date = new Date(anchor.getTime() - d * 86_400_000);
+    windowDates.push(date.toISOString().slice(0, 10));
+  }
+  const windowDateSet = new Set(windowDates);
+
   const dailyMap = new Map<string, Record<string, number>>();
   const totals: Record<string, number> = {};
   for (const rank of RANK_NAMES) totals[rank] = 0;
@@ -60,9 +69,11 @@ export function groupAchievementsByDay(
       if (!row.session_id) continue;
       const isoStr = row.achieved_at.includes('T')
         ? row.achieved_at
-        : row.achieved_at.replace(' ', 'T') + 'Z';
+        : `${row.achieved_at.replace(' ', 'T')}Z`;
       const utcDate = new Date(isoStr);
-      const dateStr = utcDate.toLocaleDateString('en-CA', { timeZone: 'Europe/Helsinki' });
+      const dateStr = getHelsinkiDateString(utcDate);
+      if (!windowDateSet.has(dateStr)) continue;
+
       const key = `${dateStr}:${row.session_id}`;
       const idx = RANK_INDEX.get(row.rank) ?? 0;
 
@@ -93,9 +104,11 @@ export function groupAchievementsByDay(
     for (const row of rows) {
       const isoStr = row.achieved_at.includes('T')
         ? row.achieved_at
-        : row.achieved_at.replace(' ', 'T') + 'Z';
+        : `${row.achieved_at.replace(' ', 'T')}Z`;
       const utcDate = new Date(isoStr);
-      const dateStr = utcDate.toLocaleDateString('en-CA', { timeZone: 'Europe/Helsinki' });
+      const dateStr = getHelsinkiDateString(utcDate);
+      if (!windowDateSet.has(dateStr)) continue;
+
       if (!dailyMap.has(dateStr)) {
         dailyMap.set(dateStr, Object.fromEntries(RANK_NAMES.map((r) => [r, 0])));
       }
@@ -105,18 +118,13 @@ export function groupAchievementsByDay(
     }
   }
 
-  const todayHki = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Helsinki' });
-  const anchor = new Date(todayHki + 'T12:00:00Z');
-
   const daily: Array<{
     date: string;
     counts: Record<string, number>;
     total: number;
   }> = [];
 
-  for (let d = 0; d < days; d++) {
-    const date = new Date(anchor.getTime() - d * 86400000);
-    const dateStr = date.toISOString().slice(0, 10);
+  for (const dateStr of windowDates) {
     const counts = dailyMap.get(dateStr) ?? Object.fromEntries(RANK_NAMES.map((r) => [r, 0]));
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
     daily.push({ date: dateStr, counts, total });
@@ -129,7 +137,7 @@ export async function getFailedGuessRows(
   db: Kysely<Database>,
   days: number,
 ): Promise<FailedGuessStatRow[]> {
-  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const cutoff = getHelsinkiDateString(new Date(Date.now() - days * 86_400_000));
   const rows = await db
     .selectFrom('failed_guesses')
     .select(['puzzle_date', 'word', 'count'])
@@ -163,8 +171,8 @@ export function groupFailedGuessesByDay(rows: FailedGuessStatRow[], days: number
     }
   }
 
-  const todayHki = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Helsinki' });
-  const anchor = new Date(todayHki + 'T12:00:00Z');
+  const todayHki = getHelsinkiDateString();
+  const anchor = new Date(`${todayHki}T12:00:00Z`);
 
   const daily: Array<{
     date: string;
@@ -173,7 +181,7 @@ export function groupFailedGuessesByDay(rows: FailedGuessStatRow[], days: number
   }> = [];
 
   for (let d = 0; d < days; d++) {
-    const date = new Date(anchor.getTime() - d * 86400000);
+    const date = new Date(anchor.getTime() - d * 86_400_000);
     const dateStr = date.toISOString().slice(0, 10);
     daily.push({
       date: dateStr,

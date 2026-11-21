@@ -7,15 +7,6 @@ import type { PlayerStats } from './stats.js';
 /** Storage key where the player auth token is persisted. */
 export const AUTH_TOKEN_STORAGE_KEY = 'sanakenno_auth_token';
 
-/** Stored auth token shape. */
-export interface AuthToken {
-  token: string;
-  playerId: number;
-  expiresAt: string;
-  playerKey?: string;
-  linked?: boolean;
-}
-
 /** Wire shape for a puzzle state in sync requests and responses. */
 export interface SyncPuzzleState {
   puzzle_number: number;

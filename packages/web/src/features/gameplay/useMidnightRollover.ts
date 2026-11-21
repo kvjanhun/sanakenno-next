@@ -4,12 +4,56 @@ import { useUiStore } from './useUiStore.js';
 
 export { getHelsinkiDateString };
 
-/** Return milliseconds from `now` until the next midnight in `Europe/Helsinki` timezone. */
+function getHelsinkiWallClockParts(date: Date): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+} {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Helsinki',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return {
+    year: get('year'),
+    month: get('month'),
+    day: get('day'),
+    hour: get('hour'),
+    minute: get('minute'),
+    second: get('second'),
+  };
+}
+
+/**
+ * Return milliseconds from `now` until the next midnight in `Europe/Helsinki` timezone,
+ * using `Intl.DateTimeFormat.formatToParts` so non-Helsinki browser timezones and DST
+ * transitions never skew the delay.
+ */
 export function msUntilMidnight(now: Date = new Date()): number {
-  const helsinki = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Helsinki' }));
-  const midnight = new Date(helsinki);
-  midnight.setHours(24, 0, 0, 0);
-  return Math.max(1, midnight.getTime() - helsinki.getTime());
+  const p = getHelsinkiWallClockParts(now);
+  const nextDayUtcMidnight = Date.UTC(p.year, p.month - 1, p.day + 1, 0, 0, 0, 0);
+  const probe = getHelsinkiWallClockParts(new Date(nextDayUtcMidnight));
+  const probeAsUtc = Date.UTC(
+    probe.year,
+    probe.month - 1,
+    probe.day,
+    probe.hour,
+    probe.minute,
+    probe.second,
+    0,
+  );
+  const helsinkiOffsetMs = probeAsUtc - nextDayUtcMidnight;
+  const targetMidnightUtc = nextDayUtcMidnight - helsinkiOffsetMs;
+  return Math.max(1, targetMidnightUtc - now.getTime());
 }
 
 export interface MidnightRolloverOptions {

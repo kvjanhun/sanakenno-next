@@ -63,6 +63,12 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
       expect(thresholds[1]).toEqual({ name: 'Hyvä alku', points: 2, isCurrent: true });
       expect(progressToNextRank(6, 100)).toBe(50);
       expect(progressToNextRank(100, 100)).toBe(100);
+
+      // Integer threshold agreement when maxScore = 30, score = 3 (exact 10% for 'Nyt mennään!')
+      expect(rankForScore(3, 30)).toBe('Nyt mennään!');
+      const thresholds30 = rankThresholds('Nyt mennään!', 30);
+      expect(thresholds30.find((t) => t.name === 'Nyt mennään!')?.points).toBe(3);
+      expect(progressToNextRank(3, 30)).toBe(0);
     });
 
     it('computes no-hint milestone unlock states, word colorization, and column chunking', () => {
@@ -144,6 +150,15 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
 
       // Top suffixes and top pairs derived deterministically (remaining desc, Finnish alpha asc)
       expect(derived.topSuffixes).toEqual([{ suffix: 'tar', total: 1, found: 0, remaining: 1 }]);
+
+      // Uppercase or non-NFC foundWords and letters still match pangrams and matrix cells
+      const upperDerived = deriveHintData(
+        hintData,
+        new Set(['KANSALLINEN']),
+        new Set(['A', 'E', 'I', 'K', 'L', 'N', 'S']),
+      );
+      expect(upperDerived.unfoundPangrams).toEqual([{ length: 5, first_letter: 'k' }]);
+      expect(upperDerived.matrix.cells['k']?.[11]?.remaining).toBe(0);
     });
 
     it('getTopPairs and getTopSuffixes sort by remaining descending then Finnish alphabetical ascending with limit', async () => {
@@ -276,6 +291,20 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
       expect(merged.pangrams_found).toBe(1);
       expect(merged.best_no_hint_score).toBe(45);
       expect(isStatsRecordBetterThanServer(localRec, serverRec)).toBe(true);
+
+      // Upgrades max_score, preserves legacy daily (is_daily: undefined), and keeps explicit archive is_daily: false on partial incoming
+      const legacyDaily = mergeStatsRecord(
+        { ...localRec, max_score: 0, is_daily: undefined },
+        { ...serverRec, max_score: 120, is_daily: false },
+      );
+      expect(legacyDaily.max_score).toBe(120);
+      expect(legacyDaily.is_daily).toBe(true);
+
+      const archivePartial = mergeStatsRecord(
+        { ...localRec, is_daily: false, played_at_date: '2026-11-01' },
+        { ...serverRec, is_daily: undefined, played_at_date: undefined },
+      );
+      expect(archivePartial.is_daily).toBe(false);
 
       const localState: SyncPuzzleState = {
         puzzle_number: 5,
