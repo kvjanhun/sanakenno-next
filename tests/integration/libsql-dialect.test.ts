@@ -11,7 +11,6 @@ import {
 } from '../../packages/server/src/db/async-migrations.js';
 import {
   checkpointAndDestroyDb,
-  ensureForeignKeysOn,
   initDb,
   runImmediateTransactionWithRetry,
 } from '../../packages/server/src/db/connection.js';
@@ -42,7 +41,6 @@ describe('LibsqlDialect & Async Migrations Integration', () => {
     });
 
     try {
-      await ensureForeignKeysOn(db);
       const firstRunApplied = await runMigrationsAsync(db);
       expect(firstRunApplied).toBe(true);
 
@@ -322,6 +320,17 @@ describe('LibsqlDialect & Async Migrations Integration', () => {
       await driver.releaseConnection(conn);
       expect(closeSpies).toHaveLength(3);
       expect(closeSpies[2]).toHaveBeenCalledTimes(1);
+
+      // 4. Remote libsql:// URLs skip no-op per-request PRAGMA foreign_keys = ON during driver.init()
+      const remoteClient = createClient({ url: ':memory:' });
+      const remoteExecuteSpy = vi.spyOn(remoteClient, 'execute');
+      const remoteDriver = new LibsqlDialect({
+        url: 'libsql://example.turso.io',
+        client: remoteClient,
+      }).createDriver();
+      await remoteDriver.init();
+      expect(remoteExecuteSpy).not.toHaveBeenCalled();
+      remoteClient.close();
     } finally {
       await checkpointAndDestroyDb(db, 'kysely-libsql');
     }

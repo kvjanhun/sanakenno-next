@@ -58,7 +58,7 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
     rawSqlite.exec(rawV1Sql);
     rawSqlite.close();
 
-    const db = createDb(dbPath);
+    const db = await createDb(dbPath);
 
     try {
       const appliedMigrations = await db.selectFrom('schema_migrations').selectAll().execute();
@@ -231,7 +231,7 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
     `);
     legacySqlite.close();
 
-    const db = createDb(dbPath);
+    const db = await createDb(dbPath);
     try {
       const migrated = await db
         .selectFrom('puzzles')
@@ -340,10 +340,11 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
       INSERT INTO player_sessions (id, player_id, expires_at) VALUES ('valid-session-token', 1, '2099-01-01T00:00:00Z');
 
       -- Puzzle 1 & 2 played on their scheduled daily dates (2-day streak)
+      -- Puzzle 2 updated_at is 22:30:00 UTC on 2026-11-07, which is 2026-11-08 00:30 in Europe/Helsinki
       INSERT INTO player_stats (player_id, puzzle_number, date, best_rank, best_score, max_score, words_found, updated_at)
         VALUES (1, 1, '2026-11-07', 'Ällistyttävä', 80, 100, 3, '2026-11-07 18:30:00');
       INSERT INTO player_stats (player_id, puzzle_number, date, best_rank, best_score, max_score, words_found, updated_at)
-        VALUES (1, 2, '2026-11-08', 'Ällistyttävä', 90, 100, 2, '2026-11-08 09:15:00');
+        VALUES (1, 2, '2026-11-08', 'Ällistyttävä', 90, 100, 2, '2026-11-07 22:30:00');
       -- Puzzle 3 played from the archive 10 days after its scheduled date
       INSERT INTO player_stats (player_id, puzzle_number, date, best_rank, best_score, max_score, words_found, updated_at)
         VALUES (1, 3, '2026-10-20', 'Hyvä alku', 20, 100, 1, '2026-10-30 12:00:00');
@@ -355,7 +356,7 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
     `);
     v1Db.close();
 
-    const result = migrateV1DatabaseFile(sourcePath, outputPath);
+    const result = await migrateV1DatabaseFile(sourcePath, outputPath);
 
     expect(result.integrityCheck).toBe('ok');
     expect(result.totalPuzzles).toBe(3);
@@ -374,7 +375,7 @@ describe('Sanakenno 1.0 -> 2.0 SQLite Schema & Kysely Parity', () => {
     expect(sourceCols.some((c) => c.name === 'is_daily')).toBe(false);
 
     // Open migrated DB in 2.0 server and verify GET /api/player/sync preserves streak & long words
-    const db = createDb(outputPath);
+    const db = await createDb(outputPath);
     try {
       const app = createApp(db);
       const syncRes = await app.request('/api/player/sync', {

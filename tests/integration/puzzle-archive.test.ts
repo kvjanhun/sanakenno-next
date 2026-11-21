@@ -11,7 +11,6 @@ import {
   totalPuzzles,
 } from '../../packages/server/src/features/puzzle/puzzle.queries.js';
 import {
-  bumpPuzzleCacheGeneration,
   DEFAULT_SEED_WORDS,
   getCachedPuzzle,
   getPuzzleCacheSize,
@@ -22,14 +21,14 @@ import {
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
     // Fix time to 2026-01-03 12:00:00 Europe/Helsinki (UTC+2)
     vi.setSystemTime(new Date('2026-01-03T10:00:00Z'));
 
-    harness = createTestHarness();
+    harness = await createTestHarness();
     setWordlist(DEFAULT_SEED_WORDS);
 
     await harness.db
@@ -62,7 +61,7 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
       await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 2).execute();
       // Also soft-delete highest slot 4 to verify nextFreeSlot never reuses it
       await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 4).execute();
-      bumpPuzzleCacheGeneration();
+      invalidatePuzzleCache();
 
       expect(await getActiveSlots(harness.db)).toEqual([1, 3]);
       expect(await totalPuzzles(harness.db)).toBe(2);
@@ -180,6 +179,13 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
       });
       // Only 2 parallel queries: active slots + epoch date (no separate countActivePuzzles or duplicate getActiveSlots)
       expect(healthQueries).toBe(2);
+
+      // When slot 0 is active (played last in the cycle), computeDaysRemainingInCycle returns totalActive on day 1 and 1 on the final day
+      const { computeDaysRemainingInCycle } =
+        await import('../../packages/server/src/features/puzzle/puzzle.queries.js');
+      expect(computeDaysRemainingInCycle([0, 1, 2], '2026-01-01', '2026-01-01')).toBe(3);
+      expect(computeDaysRemainingInCycle([0, 1, 2], '2026-01-01', '2026-01-02')).toBe(2);
+      expect(computeDaysRemainingInCycle([0, 1, 2], '2026-01-01', '2026-01-03')).toBe(1);
     });
   });
 
@@ -246,17 +252,39 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
   });
 
   describe('GET /api/archive (7-day window and ?all=true cycle walk)', () => {
-    it('returns 7 newest-first entries by default with exactly one is_today entry', async () => {
+    it('caps early-epoch archive responses so they never wrap backwards into future slots, and returns 7 newest-first entries once >=7 days have elapsed', async () => {
+      // On day 3 after epoch (2026-01-03, epoch 2026-01-01), only 3 days have elapsed -> must NOT wrap into future slot 4
+      const earlyRes = await harness.client.api.archive.$get();
+      expect(earlyRes.status).toBe(200);
+      const earlyEntries = await earlyRes.json();
+      expect(earlyEntries.map((e) => e.date)).toEqual(['2026-01-03', '2026-01-02', '2026-01-01']);
+      expect(earlyEntries.map((e) => e.puzzle_number)).toEqual([3, 2, 1]);
+
+      // On day 1 after epoch (2026-01-01), ?all=true also caps to 1 entry
+      vi.setSystemTime(new Date('2026-01-01T10:00:00Z'));
+      const day1AllRes = await harness.app.request('/api/archive?all=true');
+      const day1Entries = (await day1AllRes.json()) as Array<{ puzzle_number: number }>;
+      expect(day1Entries.map((e) => e.puzzle_number)).toEqual([1]);
+
+      // Once >=7 days have elapsed with >=7 active slots, default archive returns full 7-day window
+      for (let s = 5; s <= 8; s++) {
+        await harness.db
+          .insertInto('puzzles')
+          .values({ slot: s, letters: 'a,e,i,k,l,n,s', center: 'a', is_active: 1 })
+          .execute();
+      }
+      vi.setSystemTime(new Date('2026-01-08T10:00:00Z'));
+
       const res = await harness.client.api.archive.$get();
       expect(res.status).toBe(200);
       const entries = await res.json();
 
       expect(entries).toHaveLength(7);
-      expect(entries[0]?.date).toBe('2026-01-03');
+      expect(entries[0]?.date).toBe('2026-01-08');
       expect(entries[0]?.is_today).toBe(true);
       expect(entries[0]?.letters).toHaveLength(7);
       expect(entries[0]?.letters[0]).toBe(entries[0]?.center);
-      expect(entries[6]?.date).toBe('2025-12-28');
+      expect(entries[6]?.date).toBe('2026-01-02');
       expect(entries.filter((e) => e.is_today)).toHaveLength(1);
     });
 

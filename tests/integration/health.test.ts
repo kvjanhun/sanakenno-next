@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('GET /api/health (Kysely + Hono RPC integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
-  beforeEach(() => {
-    harness = createTestHarness();
+  beforeEach(async () => {
+    harness = await createTestHarness();
   });
 
   afterEach(async () => {

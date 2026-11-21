@@ -1,21 +1,20 @@
 import { getHelsinkiDateString } from '@sanakenno/shared';
 import { sql, type Kysely } from 'kysely';
 import { computePuzzle } from '../features/puzzle/wordlist.js';
-import { BASELINE_SQL, CURATED_BLOCKED_WORDS } from './baseline-sql.js';
+import { BASELINE_STATEMENTS, CURATED_BLOCKED_WORDS } from './baseline-sql.js';
 import { runImmediateTransactionWithRetry } from './retry.js';
 import type { Database } from './schema.js';
+
+export interface BackfillStatsSummary {
+  statsBackfilled: number;
+  dailyStatsCount: number;
+  longWordsBackfilledCount: number;
+}
 
 interface AsyncMigration {
   version: string;
   description: string;
   up: (db: Kysely<Database>) => Promise<void>;
-}
-
-function splitSqlStatements(script: string): string[] {
-  return script
-    .split(';')
-    .map((stmt) => stmt.trim())
-    .filter((stmt) => stmt.length > 0);
 }
 
 async function hasTableAsync(db: Kysely<Database>, table: string): Promise<boolean> {
@@ -50,7 +49,7 @@ async function seedCuratedBlockedWordsAsync(db: Kysely<Database>): Promise<void>
     .execute();
 }
 
-async function recomputePuzzleMaxScoresAsync(
+export async function recomputePuzzleMaxScoresAsync(
   db: Kysely<Database>,
   onlyNull = false,
 ): Promise<number> {
@@ -93,8 +92,24 @@ async function recomputePuzzleMaxScoresAsync(
   return updated;
 }
 
-async function backfillPlayerStatsAsync(db: Kysely<Database>): Promise<void> {
-  if (!(await hasTableAsync(db, 'player_stats'))) return;
+function parseUpdatedAtToHelsinkiDate(updatedAt: string | null | undefined): string {
+  if (typeof updatedAt !== 'string' || updatedAt.length < 10) return '';
+  const trimmed = updatedAt.trim();
+  if (trimmed.length === 10) return trimmed;
+  const normalized = trimmed.includes('T') ? trimmed : `${trimmed.replace(' ', 'T')}Z`;
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) {
+    return getHelsinkiDateString(parsed);
+  }
+  return trimmed.slice(0, 10);
+}
+
+export async function backfillPlayerStatsAsync(
+  db: Kysely<Database>,
+): Promise<BackfillStatsSummary> {
+  if (!(await hasTableAsync(db, 'player_stats'))) {
+    return { statsBackfilled: 0, dailyStatsCount: 0, longWordsBackfilledCount: 0 };
+  }
 
   const stateMap = new Map<string, { foundWords: string[]; startedAt: number }>();
   if (await hasTableAsync(db, 'player_puzzle_states')) {
@@ -133,15 +148,16 @@ async function backfillPlayerStatsAsync(db: Kysely<Database>): Promise<void> {
     ])
     .execute();
 
+  let statsBackfilled = 0;
+  let dailyStatsCount = 0;
+  let longWordsBackfilledCount = 0;
+
   for (const row of statRows) {
     const state = stateMap.get(`${row.player_id}:${row.puzzle_number}`);
     const computedLongWords = state ? state.foundWords.filter((w) => w.length >= 10).length : 0;
     const nextLongWords = Math.max(Number(row.long_words_count ?? 0), computedLongWords);
 
-    const updatedAtDate =
-      typeof row.updated_at === 'string' && row.updated_at.length >= 10
-        ? row.updated_at.slice(0, 10)
-        : '';
+    const updatedAtDate = parseUpdatedAtToHelsinkiDate(row.updated_at);
     const startedAtDate =
       state && state.startedAt > 0 ? getHelsinkiDateString(new Date(state.startedAt)) : '';
 
@@ -168,8 +184,13 @@ async function backfillPlayerStatsAsync(db: Kysely<Database>): Promise<void> {
         })
         .where('id', '=', row.id)
         .execute();
+      statsBackfilled += 1;
     }
+    if (nextIsDaily === 1) dailyStatsCount += 1;
+    if (nextLongWords > 0) longWordsBackfilledCount += 1;
   }
+
+  return { statsBackfilled, dailyStatsCount, longWordsBackfilledCount };
 }
 
 export const ASYNC_MIGRATIONS: readonly AsyncMigration[] = [
@@ -258,7 +279,7 @@ export async function runMigrationsAsync(db: Kysely<Database>): Promise<boolean>
     // Fresh database without schema_migrations table yet
   }
 
-  for (const statement of splitSqlStatements(BASELINE_SQL)) {
+  for (const statement of BASELINE_STATEMENTS) {
     await sql.raw(statement).execute(db);
   }
 

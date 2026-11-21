@@ -6,8 +6,8 @@ import { seedDatabase } from './db/seed.js';
 /**
  * Create an isolated in-memory Kysely SQLite database and typed Hono RPC test client.
  */
-export function createTestHarness() {
-  const db = createDb(':memory:');
+export async function createTestHarness() {
+  const db = await createDb(':memory:');
   const app = createApp(db);
   const client = testClient(app);
   return {
@@ -18,3 +18,5 @@ export function createTestHarness() {
     destroy: () => db.destroy(),
   };
 }
+
+export type TestHarness = Awaited<ReturnType<typeof createTestHarness>>;

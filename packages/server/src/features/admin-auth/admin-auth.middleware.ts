@@ -14,8 +14,6 @@ export type AdminVariables = {
 
 export async function securityHeaders(c: Context, next: Next): Promise<void> {
   await next();
-  c.header('X-Content-Type-Options', 'nosniff');
-  c.header('X-Frame-Options', 'DENY');
   c.header('Cache-Control', 'no-store');
 }
 

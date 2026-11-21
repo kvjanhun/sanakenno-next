@@ -13,14 +13,14 @@ import {
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Player Auth & Sync Hardening (Spec 29)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   beforeEach(async () => {
     resetInitPlayerRateLimit();
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
     setWordlist([...DEFAULT_SEED_WORDS, 'kissa']);
-    harness = createTestHarness();
+    harness = await createTestHarness();
 
     await harness.db
       .insertInto('puzzles')
@@ -304,5 +304,170 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
     // Warm cache: 2 parallel queries inside getFullPuzzleBySlot (row + activeSlots), 0 blocked_words scans, and never repeated 3x inside tx
     expect(executedTables.filter((t) => t === 'puzzles')).toHaveLength(2);
     expect(executedTables.filter((t) => t === 'blocked_words')).toHaveLength(0);
+  });
+
+  it('persists 0-word hint-only syncs to player_puzzle_states without creating a 0-word player_stats row, and updates existing stats when present', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as { token: string };
+    const headers = { Authorization: `Bearer ${player.token}` };
+
+    // 1. Unlock a hint with 0 words found -> saves puzzle_state, creates NO stats record
+    const zeroWordHintRes = await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-10',
+          found_words: [],
+          score: 0,
+          max_score: 100,
+          hints_unlocked: ['tier1'],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: 0,
+          best_no_hint_score: 0,
+          is_daily: true,
+          played_at_date: '2026-04-10',
+        },
+      },
+      { headers },
+    );
+    expect(zeroWordHintRes.status).toBe(200);
+
+    const pull1 = await harness.client.api.player.sync.$get({}, { headers });
+    const data1 = (await pull1.json()) as {
+      puzzle_states: Array<{ hints_unlocked: string[]; score_before_hints: number | null }>;
+      stats: { records: Array<{ puzzle_number: number; hints_used: number }> };
+    };
+    expect(data1.puzzle_states).toHaveLength(1);
+    expect(data1.puzzle_states[0]?.hints_unlocked).toEqual(['tier1']);
+    expect(data1.puzzle_states[0]?.score_before_hints).toBe(0);
+    expect(data1.stats.records).toHaveLength(0);
+
+    // 2. Now find a word -> stats record is created; subsequent hint-only sync updates hints_used
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-10',
+          found_words: ['kana'],
+          score: 1,
+          max_score: 100,
+          hints_unlocked: ['tier1'],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: 0,
+          best_no_hint_score: 0,
+          is_daily: true,
+          played_at_date: '2026-04-10',
+        },
+      },
+      { headers },
+    );
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-10',
+          found_words: [],
+          score: 0,
+          max_score: 100,
+          hints_unlocked: ['tier1', 'tier2'],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: 0,
+          best_no_hint_score: 0,
+        },
+      },
+      { headers },
+    );
+
+    const pull2 = await harness.client.api.player.sync.$get({}, { headers });
+    const data2 = (await pull2.json()) as {
+      stats: { records: Array<{ words_found: number; hints_used: number; is_daily?: boolean }> };
+    };
+    expect(data2.stats.records).toHaveLength(1);
+    expect(data2.stats.records[0]?.words_found).toBe(1);
+    expect(data2.stats.records[0]?.hints_used).toBe(2);
+    expect(data2.stats.records[0]?.is_daily).toBe(true);
+  });
+
+  it('degrades corrupt JSON in player_puzzle_states safely to [] across sync pull, progress push, and transfer use', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as {
+      token: string;
+      player_id: number;
+      player_key: string;
+    };
+    const headers = { Authorization: `Bearer ${player.token}` };
+
+    await harness.db
+      .insertInto('player_puzzle_states')
+      .values({
+        player_id: player.player_id,
+        puzzle_number: 1,
+        found_words: '{corrupt-json',
+        score: 5,
+        hints_unlocked: 'not-an-array',
+        started_at: 1000,
+        total_paused_ms: 0,
+        score_before_hints: null,
+      })
+      .execute();
+
+    const pullRes = await harness.client.api.player.sync.$get({}, { headers });
+    expect(pullRes.status).toBe(200);
+    const pulled = (await pullRes.json()) as {
+      puzzle_states: Array<{ found_words: string[]; hints_unlocked: string[] }>;
+    };
+    expect(pulled.puzzle_states[0]?.found_words).toEqual([]);
+    expect(pulled.puzzle_states[0]?.hints_unlocked).toEqual([]);
+
+    const pushRes = await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-10',
+          found_words: ['kana'],
+          score: 1,
+          max_score: 100,
+          hints_unlocked: ['tier1'],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: 1,
+        },
+      },
+      { headers },
+    );
+    expect(pushRes.status).toBe(200);
+
+    // Re-corrupt before testing /auth/transfer/use bulk upsert
+    await harness.db
+      .updateTable('player_puzzle_states')
+      .set({ found_words: 'invalid', hints_unlocked: '{"bad":true}' })
+      .where('player_id', '=', player.player_id)
+      .execute();
+
+    const transferRes = await harness.client.api.player.auth.transfer.use.$post({
+      json: {
+        token: player.player_key,
+        puzzle_states: [
+          {
+            puzzle_number: 1,
+            found_words: ['kissa'],
+            score: 5,
+            hints_unlocked: ['tier2'],
+            started_at: 900,
+            total_paused_ms: 0,
+            score_before_hints: 0,
+          },
+        ],
+      },
+    });
+    expect(transferRes.status).toBe(200);
+    const transferred = (await transferRes.json()) as {
+      puzzle_states: Array<{ found_words: string[]; hints_unlocked: string[] }>;
+    };
+    expect(transferred.puzzle_states[0]?.found_words).toEqual(['kissa']);
+    expect(transferred.puzzle_states[0]?.hints_unlocked).toEqual(['tier2']);
   });
 });

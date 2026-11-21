@@ -40,17 +40,17 @@ describe.skipIf(!hasProdDbSnapshot)('Production 1.0 Snapshot Verification', () =
 
   let tempDir: string;
   let tempDbPath: string;
-  let db: ReturnType<typeof createDb>;
+  let db: Awaited<ReturnType<typeof createDb>>;
   let app: ReturnType<typeof createApp>;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     if (!hasProdDbSnapshot || !PROD_DB_SOURCE) return;
 
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sanakenno-snapshot-'));
     tempDbPath = path.join(tempDir, 'snapshot.db');
     fs.copyFileSync(PROD_DB_SOURCE, tempDbPath);
 
-    db = createDb(tempDbPath);
+    db = await createDb(tempDbPath);
     app = createApp(db);
   });
 

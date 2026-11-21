@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 async function seedFixtureSqlite(dbPath: string): Promise<void> {
-  const db = createDb(dbPath);
+  const db = await createDb(dbPath);
   try {
     await db
       .insertInto('puzzles')
@@ -132,6 +132,33 @@ describe('verifyDatabaseParity', () => {
       expect(missingReport.ok).toBe(false);
       expect(missingReport.mismatches.some((m) => m.includes('table player_stats'))).toBe(true);
       expect(missingReport.mismatches.some((m) => m.includes('player_stats.count'))).toBe(true);
+    } finally {
+      remoteClient.close();
+    }
+  });
+
+  it('accepts legacy rotation_epoch config key when epoch_date is absent', async () => {
+    const dir = createTempDir();
+    const localPath = path.join(dir, 'local-legacy.db');
+    const remotePath = path.join(dir, 'remote-legacy.db');
+
+    await seedFixtureSqlite(localPath);
+    const localDb = await createDb(localPath);
+    await localDb
+      .updateTable('config')
+      .set({ key: 'rotation_epoch' })
+      .where('key', '=', 'epoch_date')
+      .execute();
+    await localDb.destroy();
+
+    fs.copyFileSync(localPath, remotePath);
+    const remoteClient = createClient({ url: `file:${remotePath}` });
+    try {
+      const report = await verifyDatabaseParity(localPath, remoteClient);
+      expect(report.ok).toBe(true);
+      const epochInv = report.invariants.find((i) => i.name === 'config.epoch_date');
+      expect(epochInv?.localValue).toBe('2026-01-01');
+      expect(epochInv?.remoteValue).toBe('2026-01-01');
     } finally {
       remoteClient.close();
     }

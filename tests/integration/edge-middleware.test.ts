@@ -10,7 +10,7 @@ import {
 
 describe('Cloud Run Edge Middleware & Static Serving', () => {
   let tempStaticDir: string;
-  let db: ReturnType<typeof createDb>;
+  let db: Awaited<ReturnType<typeof createDb>>;
   let app: ReturnType<typeof createServerApp>;
 
   beforeAll(async () => {
@@ -32,7 +32,7 @@ describe('Cloud Run Edge Middleware & Static Serving', () => {
       JSON.stringify({ name: 'Sanakenno' }),
     );
 
-    db = createDb(':memory:');
+    db = await createDb(':memory:');
     await db
       .insertInto('puzzles')
       .values({ slot: 1, letters: 'a,e,i,k,l,n,s', center: 'a', is_active: 1 })
@@ -116,6 +116,21 @@ describe('Cloud Run Edge Middleware & Static Serving', () => {
     });
     expect(manifestRes.status).toBe(200);
     expect(manifestRes.headers.get('content-type')).toContain('application/manifest+json');
+
+    // When manifest.webmanifest is absent (404), do not overwrite Content-Type with application/manifest+json
+    const manifestPath = path.join(tempStaticDir, 'manifest.webmanifest');
+    fs.unlinkSync(manifestPath);
+    try {
+      const missingManifestRes = await app.request('https://sanakenno.fi/manifest.webmanifest', {
+        headers: { Host: 'sanakenno.fi' },
+      });
+      expect(missingManifestRes.status).toBe(404);
+      expect(missingManifestRes.headers.get('content-type') ?? '').not.toContain(
+        'application/manifest+json',
+      );
+    } finally {
+      fs.writeFileSync(manifestPath, JSON.stringify({ name: 'Sanakenno' }));
+    }
   });
 
   it('302-redirects /connect preserving query parameters to / for legacy device transfer links', async () => {

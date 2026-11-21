@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono, type MiddlewareHandler } from 'hono';
+import { secureHeaders } from 'hono/secure-headers';
 import type { Kysely } from 'kysely';
 import { createApp } from './app.js';
 import type { DbEngine } from './db/connection.js';
@@ -24,6 +25,33 @@ export const EDGE_SECURITY_HEADERS: Readonly<Record<string, string>> = {
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
 };
 
+export const edgeSecureHeadersMiddleware: MiddlewareHandler = secureHeaders({
+  strictTransportSecurity: 'max-age=31536000; includeSubDomains',
+  xFrameOptions: 'DENY',
+  referrerPolicy: 'strict-origin-when-cross-origin',
+  crossOriginOpenerPolicy: 'same-origin-allow-popups',
+  crossOriginResourcePolicy: 'same-origin',
+  xContentTypeOptions: 'nosniff',
+  permissionsPolicy: {
+    camera: [],
+    geolocation: [],
+    microphone: [],
+    focusWithoutUserActivation: [],
+  },
+  contentSecurityPolicy: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", 'data:'],
+    connectSrc: ["'self'"],
+    fontSrc: ["'self'"],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
+    frameAncestors: ["'none'"],
+  },
+});
+
 function extractRequestHost(rawHeader: string | undefined): string {
   if (!rawHeader) return '';
   const firstHost = rawHeader.split(',')[0]?.trim().toLowerCase() ?? '';
@@ -31,15 +59,11 @@ function extractRequestHost(rawHeader: string | undefined): string {
 }
 
 /**
- * Middleware that applies Google-recommended browser security headers and
- * 302-redirects `next.sanakenno.fi` and `www.sanakenno.fi` to `https://sanakenno.fi`
- * (exempting `/api/health` for infrastructure probes).
+ * Middleware that 302-redirects `next.sanakenno.fi` and `www.sanakenno.fi` to
+ * `https://sanakenno.fi` (exempting `/api/health` for infrastructure probes)
+ * and sets PWA caching / manifest headers.
  */
 export const edgeMiddleware: MiddlewareHandler = async (c, next) => {
-  for (const [header, value] of Object.entries(EDGE_SECURITY_HEADERS)) {
-    c.header(header, value);
-  }
-
   const host =
     extractRequestHost(c.req.header('x-forwarded-host')) ||
     extractRequestHost(c.req.header('host'));
@@ -58,7 +82,7 @@ export const edgeMiddleware: MiddlewareHandler = async (c, next) => {
     (c.req.path === '/sw.js' || c.req.path === '/' || c.req.path === '/index.html')
   ) {
     c.header('Cache-Control', 'no-cache');
-  } else if (c.req.path === '/manifest.webmanifest') {
+  } else if (c.req.path === '/manifest.webmanifest' && c.res.status >= 200 && c.res.status < 300) {
     c.header('Content-Type', 'application/manifest+json');
   }
 };
@@ -125,6 +149,7 @@ const MAINTENANCE_HTML = `<!doctype html>
  */
 export function createMaintenanceApp(staticDir: string | null = findStaticDir()): Hono {
   const app = new Hono();
+  app.use('*', edgeSecureHeadersMiddleware);
   app.use('*', edgeMiddleware);
 
   app.get('/api/health', (c) => {
@@ -171,6 +196,7 @@ export function createServerApp(
   const app = new Hono();
   const apiApp = createApp(db, engine);
 
+  app.use('*', edgeSecureHeadersMiddleware);
   app.use('*', edgeMiddleware);
   app.route('/', apiApp);
 
@@ -205,9 +231,6 @@ export function createServerApp(
   }
 
   app.notFound((c) => {
-    for (const [header, value] of Object.entries(EDGE_SECURITY_HEADERS)) {
-      c.header(header, value);
-    }
     if (c.req.path.startsWith('/api')) {
       return c.json({ error: 'Not found' }, 404);
     }

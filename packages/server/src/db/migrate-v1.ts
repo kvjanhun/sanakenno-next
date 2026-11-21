@@ -2,12 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import SQLite from 'better-sqlite3';
 import {
-  BASELINE_SQL,
-  backfillPlayerStatsInDb,
-  recomputePuzzleMaxScores,
-  runMigrations,
+  backfillPlayerStatsAsync,
+  recomputePuzzleMaxScoresAsync,
   type BackfillStatsSummary,
-} from './baseline-sql.js';
+} from './async-migrations.js';
+import { createDb, runImmediateTransactionWithRetry } from './connection.js';
 
 export interface MigrateV1DbResult extends BackfillStatsSummary {
   sourcePath: string;
@@ -24,16 +23,17 @@ export interface MigrateV1DbResult extends BackfillStatsSummary {
 
 /**
  * Safely copy a Sanakenno 1.0 SQLite database to `outputPath`, apply all 2.0
- * schema migrations, seed curated blocked words, recompute `puzzles.max_score`,
- * backfill `player_stats` (`is_daily`, `played_at_date`, `long_words_count`),
- * checkpoint WAL into a single portable SQLite file, and verify integrity.
+ * schema migrations via `runMigrationsAsync`, seed curated blocked words,
+ * recompute `puzzles.max_score`, backfill `player_stats` (`is_daily`,
+ * `played_at_date`, `long_words_count`), checkpoint WAL into a single portable
+ * SQLite file, and verify integrity.
  *
  * Never mutates `sourcePath`.
  */
-export function migrateV1DatabaseFile(
+export async function migrateV1DatabaseFile(
   sourcePath: string,
   outputPath = `${sourcePath.replace(/\.db$/, '')}-v2.db`,
-): MigrateV1DbResult {
+): Promise<MigrateV1DbResult> {
   const resolvedSource = path.resolve(sourcePath);
   const resolvedOutput = path.resolve(outputPath);
 
@@ -61,59 +61,55 @@ export function migrateV1DatabaseFile(
     sourceDb.close();
   }
 
-  const targetDb = new SQLite(resolvedOutput);
+  let preBackfillNullPlayedAt = 0;
+  const inspectDb = new SQLite(resolvedOutput);
   try {
-    targetDb.pragma('journal_mode = WAL');
-    targetDb.pragma('foreign_keys = ON');
-    targetDb.pragma('busy_timeout = 5000');
-
-    // Count rows needing backfill before migrations run
-    let preBackfillNullPlayedAt = 0;
-    const hasPlayerStats = targetDb
+    const hasPlayerStats = inspectDb
       .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='player_stats'")
       .get();
     if (hasPlayerStats) {
-      const cols = targetDb.prepare('PRAGMA table_info(player_stats)').all() as Array<{
+      const cols = inspectDb.prepare('PRAGMA table_info(player_stats)').all() as Array<{
         name: string;
       }>;
       if (!cols.some((c) => c.name === 'played_at_date')) {
-        const cntRow = targetDb.prepare('SELECT COUNT(*) AS cnt FROM player_stats').get() as {
+        const cntRow = inspectDb.prepare('SELECT COUNT(*) AS cnt FROM player_stats').get() as {
           cnt: number;
         };
         preBackfillNullPlayedAt = Number(cntRow.cnt);
       } else {
-        const cntRow = targetDb
+        const cntRow = inspectDb
           .prepare('SELECT COUNT(*) AS cnt FROM player_stats WHERE played_at_date IS NULL')
           .get() as { cnt: number };
         preBackfillNullPlayedAt = Number(cntRow.cnt);
       }
     }
+  } finally {
+    inspectDb.close();
+  }
 
-    targetDb.exec(BASELINE_SQL);
-    runMigrations(targetDb);
+  let puzzlesRecomputed = 0;
+  let statsSummary: BackfillStatsSummary = {
+    statsBackfilled: 0,
+    dailyStatsCount: 0,
+    longWordsBackfilledCount: 0,
+  };
 
-    // Ensure idempotent full backfill even if some migrations were already recorded
-    let puzzlesRecomputed = 0;
-    let statsSummary: BackfillStatsSummary = {
-      statsBackfilled: 0,
-      dailyStatsCount: 0,
-      longWordsBackfilledCount: 0,
-    };
+  const db = await createDb(resolvedOutput);
+  try {
+    await runImmediateTransactionWithRetry(db, async (trx) => {
+      puzzlesRecomputed = await recomputePuzzleMaxScoresAsync(trx, false);
+      statsSummary = await backfillPlayerStatsAsync(trx);
+    });
+  } finally {
+    await db.destroy();
+  }
 
-    targetDb.exec('BEGIN IMMEDIATE');
-    try {
-      puzzlesRecomputed = recomputePuzzleMaxScores(targetDb, false);
-      statsSummary = backfillPlayerStatsInDb(targetDb);
-      targetDb.exec('COMMIT');
-    } catch (err) {
-      targetDb.exec('ROLLBACK');
-      throw err;
-    }
-
+  const targetDb = new SQLite(resolvedOutput);
+  try {
     const totalStatsBackfilled = Math.max(preBackfillNullPlayedAt, statsSummary.statsBackfilled);
 
     // Consolidate WAL frames and switch to DELETE journal mode so the output
-    // is a standalone single file ready for GCS `seed.db` upload.
+    // is a standalone single file ready for upload.
     targetDb.pragma('wal_checkpoint(TRUNCATE)');
     targetDb.pragma('journal_mode = DELETE');
 

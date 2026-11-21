@@ -1,6 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  cleanupExpiredPlayerSessions,
+  countActivePlayerSessions,
+  createTransferTicket,
+} from '../../packages/server/src/features/player-auth/player-auth.queries.js';
 import {
   resetEmailRateLimit,
+  resetPlayerAuthRateLimits,
   resetTransferCreateRateLimit,
 } from '../../packages/server/src/features/player-auth/player-auth.routes.js';
 import { bulkUpsertLocalData } from '../../packages/server/src/features/player-sync/player-sync.queries.js';
@@ -13,13 +19,13 @@ import {
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Player Transfer Tickets & 6-Digit Pairing Codes (Kysely + Hono integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   beforeEach(async () => {
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
     setWordlist([...DEFAULT_SEED_WORDS, 'aasi', 'kissa']);
-    harness = createTestHarness();
+    harness = await createTestHarness();
 
     await harness.db
       .insertInto('puzzles')
@@ -364,5 +370,93 @@ describe('Player Transfer Tickets & 6-Digit Pairing Codes (Kysely + Hono integra
       'kana',
     ]);
     expect(data.puzzle_states.find((s) => s.puzzle_number === 2)?.found_words).toEqual(['kenno']);
+  });
+
+  it('enforces rate limits on POST /api/player/auth/transfer/use and /ticket', async () => {
+    const player = await createPlayer();
+    const headers = { Authorization: `Bearer ${player.token}` };
+
+    resetPlayerAuthRateLimits();
+    for (let i = 0; i < 10; i++) {
+      const res = await harness.client.api.player.auth.transfer.ticket.$post({}, { headers });
+      expect(res.status).toBe(200);
+    }
+    const floodedTicket = await harness.client.api.player.auth.transfer.ticket.$post(
+      {},
+      { headers },
+    );
+    expect(floodedTicket.status).toBe(429);
+
+    resetPlayerAuthRateLimits();
+    for (let i = 0; i < 10; i++) {
+      const res = await harness.client.api.player.auth.transfer.use.$post({
+        json: { token: '000-000' },
+      });
+      expect(res.status).toBe(400);
+    }
+    const bruteForced = await harness.client.api.player.auth.transfer.use.$post({
+      json: { token: '000-000' },
+    });
+    expect(bruteForced.status).toBe(429);
+  });
+
+  it('rejects invalid email formats and malformed player_key on POST /api/player/auth/transfer/create', async () => {
+    const player = await createPlayer();
+    const headers = { Authorization: `Bearer ${player.token}` };
+
+    const badEmail = await harness.client.api.player.auth.transfer.create.$post(
+      { json: { email: 'not-an-email' } },
+      { headers },
+    );
+    expect(badEmail.status).toBe(400);
+    expect(await badEmail.json()).toEqual({ error: 'Virheellinen sähköpostiosoite' });
+
+    const badKey = await harness.client.api.player.auth.transfer.create.$post(
+      { json: { email: 'valid@example.com', player_key: 'malformed-short-key' } },
+      { headers },
+    );
+    expect(badKey.status).toBe(400);
+    expect(await badKey.json()).toEqual({ error: 'Virheellinen tunniste' });
+  });
+
+  it('rethrows transient SQLITE_BUSY errors in createTransferTicket instead of swallowing them as code collisions', async () => {
+    const player = await createPlayer();
+    const busyDb = harness.db.withPlugin({
+      transformQuery(args) {
+        if (args.node.kind === 'InsertQueryNode') {
+          const err = new Error('SQLITE_BUSY: database is locked') as Error & { code: string };
+          err.code = 'SQLITE_BUSY';
+          throw err;
+        }
+        return args.node;
+      },
+      transformResult: (args) => Promise.resolve(args.result),
+    });
+
+    await expect(createTransferTicket(busyDb, player.player_id)).rejects.toThrow('SQLITE_BUSY');
+  });
+
+  it('preserves same-day future space-formatted UTC sessions and honors fake timers via julianday()', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-11-21T02:00:00.000Z'));
+      const player = await createPlayer();
+
+      // Insert a legacy space-formatted session expiring later the same UTC day ('2026-11-21 23:00:00')
+      await harness.db
+        .insertInto('player_sessions')
+        .values({
+          id: 'legacy-space-session',
+          player_id: player.player_id,
+          expires_at: '2026-11-21 23:00:00',
+        })
+        .execute();
+
+      await cleanupExpiredPlayerSessions(harness.db);
+      const count = await countActivePlayerSessions(harness.db, player.player_id);
+      expect(count).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -10,12 +10,12 @@ import { resetTelemetryRateLimits } from '../../packages/server/src/features/tel
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   beforeEach(async () => {
     resetTelemetryRateLimits();
     setWordlist([...DEFAULT_SEED_WORDS, 'kissa']);
-    harness = createTestHarness();
+    harness = await createTestHarness();
     await harness.db
       .insertInto('puzzles')
       .values([
@@ -124,13 +124,29 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
       expect(res.status).toBe(400);
     });
 
-    it('rejects failed guesses with future dates', async () => {
-      const res = await harness.client.api['failed-guess'].$post({
+    it('rejects failed guesses with future, pre-epoch, or invalid calendar dates', async () => {
+      await harness.db
+        .insertInto('config')
+        .values({ key: 'epoch_date', value: '2026-01-01' })
+        .execute();
+
+      const futureRes = await harness.client.api['failed-guess'].$post({
         json: { word: 'kissa', date: '2099-01-01' },
       });
-      expect(res.status).toBe(400);
-      const data = (await res.json()) as { error: string };
-      expect(data.error).toBe('Invalid date');
+      expect(futureRes.status).toBe(400);
+      expect(await futureRes.json()).toEqual({ error: 'Invalid date' });
+
+      const invalidCalendarRes = await harness.client.api['failed-guess'].$post({
+        json: { word: 'kissa', date: '2026-02-31' },
+      });
+      expect(invalidCalendarRes.status).toBe(400);
+      expect(await invalidCalendarRes.json()).toEqual({ error: 'Invalid date' });
+
+      const preEpochRes = await harness.client.api['failed-guess'].$post({
+        json: { word: 'kissa', date: '2025-12-31' },
+      });
+      expect(preEpochRes.status).toBe(400);
+      expect(await preEpochRes.json()).toEqual({ error: 'Invalid date' });
     });
 
     it('rejects words missing center letter or with illegal letters', async () => {
@@ -198,8 +214,28 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
       expect(await inactiveRes.json()).toEqual({
         error: 'Valittua peliä ei löydy tai se ei ole aktiivinen',
       });
-      // Only getFullPuzzleBySlot's 2 parallel reads (row + activeSlots); no separate isActivePuzzleSlot pre-check
+      // Only getSlotScheduleInfo's 2 parallel reads (activeSlots + epochDate); no extra puzzle queries
       expect(queries).toBe(2);
+    });
+
+    it('rejects future puzzle slots on POST /api/word-find with 403 to prevent word-membership oracle', async () => {
+      await harness.db
+        .insertInto('puzzles')
+        .values([
+          { slot: 3, letters: 'a,e,i,k,l,n,s', center: 'a', is_active: 1 },
+          { slot: 4, letters: 'a,e,i,k,l,n,s', center: 'k', is_active: 1 },
+        ])
+        .execute();
+      await harness.db
+        .insertInto('config')
+        .values({ key: 'epoch_date', value: '2026-11-21' })
+        .execute();
+
+      // When today is 2026-11-21 (epoch day 0 -> slot 1 is today), slot 4 is in the future
+      const futureRes = await harness.client.api['word-find'].$post({
+        json: { word: 'kana', puzzle_number: 4 },
+      });
+      expect(futureRes.status).toBe(403);
     });
 
     it('rejects invalid puzzle_number or word', async () => {

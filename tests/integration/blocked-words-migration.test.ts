@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import SQLite from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
-import { CURATED_BLOCKED_WORDS, runMigrations } from '../../packages/server/src/db/baseline-sql.js';
+import { CURATED_BLOCKED_WORDS } from '../../packages/server/src/db/baseline-sql.js';
 import { createDb } from '../../packages/server/src/db/connection.js';
 import { getBlockedWords } from '../../packages/server/src/features/puzzle/puzzle.queries.js';
 import { puzzleWords, setWordlist } from '../../packages/server/src/features/puzzle/wordlist.js';
@@ -32,7 +32,7 @@ describe('Blocked words curation & migration 0003 (integration)', () => {
 
   it('seeds curated slurs, hate speech, and explicit violence into blocked_words', async () => {
     const dbPath = makeTempDbPath();
-    const db = createDb(dbPath);
+    const db = await createDb(dbPath);
 
     try {
       const blocked = await getBlockedWords(db);
@@ -57,7 +57,7 @@ describe('Blocked words curation & migration 0003 (integration)', () => {
 
   it('keeps religious/cultural words and standard Finnish swearwords unblocked and playable', async () => {
     const dbPath = makeTempDbPath();
-    const db = createDb(dbPath);
+    const db = await createDb(dbPath);
 
     try {
       const blocked = await getBlockedWords(db);
@@ -121,11 +121,9 @@ describe('Blocked words curation & migration 0003 (integration)', () => {
     ).count;
     expect(countBefore).toBe(122);
 
-    // Apply migrations
-    runMigrations(rawSqlite);
     rawSqlite.close();
 
-    const db = createDb(dbPath);
+    const db = await createDb(dbPath);
     try {
       const blocked = await getBlockedWords(db);
 

@@ -117,14 +117,24 @@ export class LibsqlConnection implements DatabaseConnection {
   }
 }
 
+function isRemoteLibsqlConfig(config: LibsqlDialectConfig): boolean {
+  if (config.url && /^(libsql|https?|wss?):/i.test(config.url.trim())) {
+    return true;
+  }
+  const protocol = (config.client as { protocol?: string } | undefined)?.protocol;
+  return typeof protocol === 'string' && /^(libsql|https?|wss?)$/i.test(protocol);
+}
+
 /**
  * Kysely Driver over `@libsql/client` with `BEGIN IMMEDIATE` (`write`) transaction semantics
- * and `PRAGMA foreign_keys = ON` enforcement.
+ * and local `PRAGMA foreign_keys = ON` enforcement.
  */
 export class LibsqlDriver implements Driver {
   readonly #client: Client;
+  readonly #isRemoteUrl: boolean;
 
   constructor(config: LibsqlDialectConfig) {
+    this.#isRemoteUrl = isRemoteLibsqlConfig(config);
     if (config.client) {
       this.#client = config.client;
     } else if (config.url) {
@@ -138,7 +148,9 @@ export class LibsqlDriver implements Driver {
   }
 
   async init(): Promise<void> {
-    await this.#client.execute('PRAGMA foreign_keys = ON');
+    if (!this.#isRemoteUrl) {
+      await this.#client.execute('PRAGMA foreign_keys = ON');
+    }
   }
 
   async acquireConnection(): Promise<DatabaseConnection> {

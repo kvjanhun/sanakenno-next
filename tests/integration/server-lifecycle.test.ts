@@ -29,7 +29,7 @@ describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
 
   it('auto-seeds empty development database and skips once puzzles exist or in production', async () => {
     setWordlist(DEFAULT_SEED_WORDS);
-    const db = createDb(':memory:');
+    const db = await createDb(':memory:');
     try {
       const prodSkipped = await ensureBootSeed(db, { NODE_ENV: 'production' });
       expect(prodSkipped).toBe(false);
@@ -53,7 +53,7 @@ describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
 
   it('never auto-seeds an empty kysely-libsql database in development unless SEED_ON_BOOT=true', async () => {
     setWordlist(DEFAULT_SEED_WORDS);
-    const db = createDb(':memory:');
+    const db = await createDb(':memory:');
     try {
       const libsqlSkipped = await ensureBootSeed(db, { NODE_ENV: 'development' }, 'kysely-libsql');
       expect(libsqlSkipped).toBe(false);
@@ -88,28 +88,38 @@ describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
     );
     tempFiles.push(dbFile);
 
-    const db = createDb(dbFile);
+    const db = await createDb(dbFile);
     await db
       .insertInto('puzzles')
       .values({ slot: 1, letters: 'a,e,i,k,l,n,s', center: 'a', is_active: 1 })
       .execute();
 
+    const closeIdleSpy = vi.fn();
     const closeSpy = vi.fn((cb?: (err?: Error) => void) => {
       cb?.();
     });
 
-    await shutdownServer({ close: closeSpy }, db);
+    await shutdownServer({ close: closeSpy, closeIdleConnections: closeIdleSpy }, db);
 
+    expect(closeIdleSpy).toHaveBeenCalledTimes(1);
     expect(closeSpy).toHaveBeenCalledTimes(1);
     await expect(db.selectFrom('puzzles').select('slot').execute()).rejects.toThrow();
 
     // Verify WAL checkpoint truncated frames cleanly into the main DB file
-    const reopened = createDb(dbFile);
+    const reopened = await createDb(dbFile);
     try {
       const row = await reopened.selectFrom('puzzles').select('slot').executeTakeFirst();
       expect(row?.slot).toBe(1);
     } finally {
       await reopened.destroy();
     }
+
+    // Also verify bounded drain timeout when server.close hangs on keep-alive connections
+    const stalledDb = await createDb(':memory:');
+    const stalledClose = vi.fn(() => {
+      // Never invokes callback
+    });
+    await shutdownServer({ close: stalledClose }, stalledDb, 'kysely-sqlite', 25);
+    expect(stalledClose).toHaveBeenCalledTimes(1);
   });
 });

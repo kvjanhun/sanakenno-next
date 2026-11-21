@@ -16,13 +16,13 @@ function sha256(input: string): string {
 }
 
 describe('Player Auth & Cross-Device Sync (Kysely + Hono integration)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   beforeEach(async () => {
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
     setWordlist([...DEFAULT_SEED_WORDS, 'aasi', 'kissa']);
-    harness = createTestHarness();
+    harness = await createTestHarness();
 
     await harness.db
       .insertInto('puzzles')

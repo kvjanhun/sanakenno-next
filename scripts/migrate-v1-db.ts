@@ -1,6 +1,6 @@
 import { migrateV1DatabaseFile } from '../packages/server/src/db/migrate-v1.js';
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const sourcePath = args[0];
   const outputPath = args[1];
@@ -12,7 +12,7 @@ function main(): void {
     process.exit(1);
   }
 
-  const result = migrateV1DatabaseFile(sourcePath, outputPath);
+  const result = await migrateV1DatabaseFile(sourcePath, outputPath);
 
   console.log('Sanakenno 1.0 -> 2.0 Database Migration Complete');
   console.log('------------------------------------------------');
@@ -33,4 +33,4 @@ function main(): void {
   console.log(`Player Puzzle State Rows:   ${result.playerPuzzleStatesCount}`);
 }
 
-main();
+void main();

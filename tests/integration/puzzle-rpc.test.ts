@@ -12,14 +12,14 @@ import {
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
 describe('Puzzle RPC Anti-Spoiler Lock (Spec 29)', () => {
-  let harness: ReturnType<typeof createTestHarness>;
+  let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
     // 2026-01-02 12:00 Europe/Helsinki (epoch 2026-01-01 -> day 1 -> slot 2 is today)
     vi.setSystemTime(new Date('2026-01-02T10:00:00Z'));
 
-    harness = createTestHarness();
+    harness = await createTestHarness();
     setWordlist(DEFAULT_SEED_WORDS);
 
     await harness.db
@@ -76,6 +76,16 @@ describe('Puzzle RPC Anti-Spoiler Lock (Spec 29)', () => {
       param: { number: '3' },
     });
     expect(futureWords.status).toBe(403);
+
+    // Rejects pre-epoch date on GET /api/puzzle?date= so it cannot wrap modulo into future slot 3
+    const preEpochRes = await harness.app.request('/api/puzzle?date=2025-12-31');
+    expect(preEpochRes.status).toBe(400);
+
+    // Clamps minLength >= 4 on GET /api/puzzle/:number/words?minLength=1 so <4-letter words never leak
+    const minLenRes = await harness.app.request('/api/puzzle/1/words?minLength=1');
+    expect(minLenRes.status).toBe(200);
+    const minLenBody = (await minLenRes.json()) as { words: string[] };
+    expect(minLenBody.words.every((w) => w.replaceAll('-', '').length >= 4)).toBe(true);
   });
 
   it('recomputes cached puzzle immediately when letters or center change in DB without local invalidation', async () => {

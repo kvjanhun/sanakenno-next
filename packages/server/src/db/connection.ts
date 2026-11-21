@@ -11,7 +11,6 @@ import {
   type SqliteDialectConfig,
 } from 'kysely';
 import { runMigrationsAsync } from './async-migrations.js';
-import { BASELINE_SQL, runMigrations } from './baseline-sql.js';
 import { LibsqlDialect } from './libsql-dialect.js';
 import {
   isSqliteBusyError,
@@ -48,36 +47,31 @@ class ImmediateSqliteDialect extends SqliteDialect {
 }
 
 /**
- * Create a typed Kysely SQLite database instance, apply baseline schema, and run migrations.
+ * Create a typed Kysely SQLite database instance, apply baseline schema, and run async migrations.
  */
-export function createDb(
+export async function createDb(
   dbPath = process.env.DB_PATH ??
     (process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'sanakenno.db') : './sanakenno.dev.db'),
-): Kysely<Database> {
+): Promise<Kysely<Database>> {
   const sqlite = new SQLite(dbPath);
   if (dbPath !== ':memory:') {
     sqlite.pragma('journal_mode = WAL');
   }
   sqlite.pragma('foreign_keys = ON');
   sqlite.pragma('busy_timeout = 5000');
-  sqlite.exec(BASELINE_SQL);
-  runMigrations(sqlite);
 
-  return new Kysely<Database>({
+  const db = new Kysely<Database>({
     dialect: new ImmediateSqliteDialect({
       database: sqlite,
     }),
   });
+  await runMigrationsAsync(db);
+  return db;
 }
 
 /** Open a local SQLite file in read-only mode for verification utilities. */
 export function openReadonlySqlite(dbPath: string): SQLite.Database {
   return new SQLite(dbPath, { readonly: true });
-}
-
-/** Enable SQLite foreign-key cascade enforcement on the active connection. */
-export async function ensureForeignKeysOn(db: Kysely<Database>): Promise<void> {
-  await sql`PRAGMA foreign_keys = ON`.execute(db);
 }
 
 /**
@@ -101,7 +95,7 @@ export async function initDb(
 
   const dbPath =
     env.DB_PATH ?? (env.DATA_DIR ? path.join(env.DATA_DIR, 'sanakenno.db') : undefined);
-  const db = createDb(dbPath);
+  const db = await createDb(dbPath);
   return { db, engine: 'kysely-sqlite' };
 }
 
