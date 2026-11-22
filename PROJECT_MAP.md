@@ -13,10 +13,8 @@ sanakenno-next/
   scripts/
     create-admin.ts          # Admin credential provisioning CLI
     filter-kotus-wordlist.ts # Kotus dictionary filtering & hyphenated lemma extractor
-    migrate-v1-db.ts         # Standalone 1.0 -> 2.0 SQLite snapshot & backfill migration CLI
     screenshot-targets.ts    # Desktop/mobile screenshot scenario targets & CDP action builders
     screenshot.ts            # Single-CDP headless Chrome screenshot runner with auto server boot
-    verify-turso-parity.ts   # SQLite <-> Turso (libSQL) 18-table & data-invariant parity CLI
   .github/workflows/ci-web.yml# GitHub Actions CI & Cloud Run deploy workflow
   specs/                     # Sequenced specs driving autonomous implementation
     archive/                 # Shipped historical specs (superseded point-in-time slices)
@@ -26,31 +24,31 @@ sanakenno-next/
       src/
         edge-middleware.ts   # Canonical 302 host redirect (next/www -> sanakenno.fi), hono/secure-headers security headers, zero-DB MAINTENANCE_MODE app & PWA static serving
         lib/                 # Shared server utilities (@hono/zod-validator error hook helper)
-        db/                  # 18-table Kysely Database<Schema>, dual SQLite (BEGIN IMMEDIATE) & repo-owned Turso/libSQL dialect (libsql-dialect.ts), pre-commit transient retry policy (retry.ts), unified async 0001-0006 migration & 1.0 backfill runner (async-migrations.ts), deterministic seed
+        db/                  # 16-table Kysely Database<Schema>, dual SQLite (BEGIN IMMEDIATE) & repo-owned Turso/libSQL dialect (libsql-dialect.ts), pre-commit transient retry policy (retry.ts), unified async 0001-0009 migration runner (async-migrations.ts), deterministic seed
         features/
           health/            # System health & rotation headroom (GET /api/health)
-          puzzle/            # Finnish wordlist engine, bounded 10-entry TTL/content-validated LRU cache, daily/slot puzzle RPC & single-query archive (GET /api/archive)
+          puzzle/            # Finnish wordlist engine, DB-persisted precomputed puzzle payloads (`puzzles.computed_data`), daily/slot puzzle RPC & single-query archive (GET /api/archive)
           player-auth/       # Passwordless player Bearer auth, session TTL, atomic single-use 15-min transfer tickets & 6-digit PIN pairing (POST /api/player/auth/transfer/ticket, /create, /use), Resend EU support, sliding-window rate limiters, active device count (GET /api/player/me)
-          player-sync/       # Monotonic cross-device progress, revealed-puzzle sync, bulk transfer upsert (player-sync-bulk.queries.ts) & preference sync (GET /api/player/sync, POST /api/player/sync/progress, POST /api/player/sync/preferences)
+          player-sync/       # Canonical single-table (`player_puzzle_states`) cross-device progress, derived stats, revealed-puzzle freeze, bulk transfer upsert (player-sync-bulk.queries.ts) & preference sync (GET /api/player/sync, POST /api/player/sync/progress, POST /api/player/sync/preferences)
           telemetry/         # Hardened public gameplay telemetry with sliding-window rate limiters & wordlist validation (POST /api/achievement, /api/failed-guess, /api/word-find)
           admin-auth/        # Argon2id admin cookie session auth & CSRF guardrails (POST /api/auth/*)
           admin-puzzles/     # Puzzle CRUD, swap, center override, preview, blocked words & 14-day schedule (POST/GET/DELETE /api/admin/*)
           admin-suggestions/ # No-spoiler puzzle suggestion engine, curated pangram quality, combinations browser & rejections (GET/POST/DELETE /api/admin/*)
           admin-analytics/   # Achievement, failed-guess & per-puzzle word-find telemetry aggregations (GET /api/admin/*)
+    admin/                   # @sanakenno/admin — Lazy-loaded TanStack Query admin panel (AdminLayout, LoginPage, PuzzleEditor, usePuzzleEditorQueries, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore, api/admin-client.ts)
     web/                     # @sanakenno/web — React 19 + TanStack Query + Hono RPC client + lucide-react icons
       src/
-        api/                 # Typed Hono RPC client (hc<AppType>), split into client.ts and admin-client.ts
+        api/                 # Typed player Hono RPC client (hc<AppType>) in client.ts
         pwa.config.ts        # PWA manifest, service worker registration, Workbox runtime caching & vite:preloadError recovery
         features/
           gameplay/          # Core gameplay UI (Honeycomb, WordInput, RankProgress, FoundWords, HintPanels, AnnouncementBanner), announcements, gameplay-effects.ts, offline puzzle cache (storage.ts / usePuzzleQuery.ts), useMidnightRollover, and hybrid state
           modals/            # Statically bundled player modals (native <dialog> ModalShell, ArchiveModal, PuzzleWordsModal, StatsModal, RulesModal, SettingsModal) and native <details> PrivacySection (GDPR Art. 13 & localStorage disclosure)
           player-sync/       # Player auth store with debounced sync queue and keepalive, monotonic sync reconciliation, 6-digit PIN SyncModal, ConnectBanner
           theme/             # 6-palette CSS custom property theme system (usePaletteStore, reactive OS matchMedia useThemePreferenceStore, preference-sync, ThemeSelector, ThemeToggle)
-          admin/             # Code-split TanStack Query admin panel (AdminLayout, LoginPage, PuzzleEditor, usePuzzleEditorQueries, PuzzleSlotControls, VariationsGrid, WordList, AdminWordListPanel, ManualPuzzleForm, BlockedWords, Schedule, CombinationsBrowser, SuggestionPanel, SuggestionRejections, Stats, WordData, WordFinds, useAdminStore)
-        styles/              # CSS custom property design tokens (--color-*, --font-*, @custom-variant dark)
+        styles/              # CSS custom property design tokens (--color-*, --font-*, @custom-variant dark, @source admin)
   tests/
     architecture.test.ts     # Mechanical boundary & monolith guardrails
-    integration/             # In-memory Kysely SQLite + Hono testClient specs + edge middleware + production snapshot tests
+    integration/             # In-memory Kysely SQLite + Hono testClient specs + edge middleware + migration tests
     unit/                    # Fast Vitest + React Testing Library component & gameplay flow specs
 ```
 
@@ -62,7 +60,7 @@ sanakenno-next/
 
 Two numbers identify a puzzle and are **never** interchangeable:
 
-- **`slot`** (`puzzle_number` in storage/API): Permanent primary key. Soft-deleted puzzles keep their `slot` forever so `player_stats`, `player_puzzle_states`, `word_finds`, and `localStorage` keys stay valid. New puzzles append at `nextFreeSlot()`.
+- **`slot`** (`puzzle_number` in storage/API): Permanent primary key. Soft-deleted puzzles keep their `slot` forever so `player_puzzle_states`, `word_finds`, and `localStorage` keys stay valid. New puzzles append at `nextFreeSlot()`.
 - **`display_number`**: 1-based index among _active_ (`is_active = 1`) puzzles. Soft-deleting a puzzle closes the gap. Cycle positions must always be derived from active slot indices, never slot arithmetic.
 
 ### 2. Timezone

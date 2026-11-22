@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { AdminSuggestionResponse } from '@sanakenno/shared';
-import { adminGetSuggestion, adminRejectSuggestion } from '../../api/client.js';
+import { adminGetSuggestion, adminRejectSuggestion } from './api/admin-client.js';
 import {
   ADMIN_CARD_CLASS,
   ADMIN_CARD_STYLE,

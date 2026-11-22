@@ -1,15 +1,16 @@
 /**
- * Complete SQLite baseline DDL statements matching Sanakenno 1.0 `server/db/schema.sql`.
+ * Complete SQLite / libSQL baseline DDL statements for fresh databases.
  */
 export const BASELINE_STATEMENTS: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS puzzles (
-    slot        INTEGER PRIMARY KEY,
-    letters     TEXT NOT NULL,
-    center      TEXT NOT NULL,
-    is_active   INTEGER NOT NULL DEFAULT 1,
-    max_score   INTEGER,
-    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    slot          INTEGER PRIMARY KEY,
+    letters       TEXT NOT NULL,
+    center        TEXT NOT NULL,
+    is_active     INTEGER NOT NULL DEFAULT 1,
+    max_score     INTEGER,
+    computed_data TEXT DEFAULT NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
 )`,
   `CREATE TABLE IF NOT EXISTS blocked_words (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,15 +28,6 @@ export const BASELINE_STATEMENTS: readonly string[] = [
     session_id      TEXT,
     achieved_at     TEXT NOT NULL DEFAULT (datetime('now'))
 )`,
-  `CREATE TABLE IF NOT EXISTS page_views (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    visitor_id      TEXT NOT NULL,
-    puzzle_number   INTEGER,
-    path            TEXT NOT NULL,
-    viewed_at       TEXT NOT NULL DEFAULT (datetime('now'))
-)`,
-  `CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(viewed_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_page_views_visitor ON page_views(visitor_id)`,
   `CREATE TABLE IF NOT EXISTS combinations (
     letters         TEXT PRIMARY KEY,
     total_pangrams  INTEGER NOT NULL,
@@ -130,27 +122,6 @@ export const BASELINE_STATEMENTS: readonly string[] = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_transfer_tickets_code ON player_transfer_tickets(code)`,
   `CREATE INDEX IF NOT EXISTS idx_transfer_tickets_expires ON player_transfer_tickets(expires_at)`,
-  `CREATE TABLE IF NOT EXISTS player_stats (
-    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
-    player_id          INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    puzzle_number      INTEGER NOT NULL,
-    date               TEXT NOT NULL,
-    best_rank          TEXT NOT NULL,
-    best_score         INTEGER NOT NULL DEFAULT 0,
-    max_score          INTEGER NOT NULL DEFAULT 0,
-    words_found        INTEGER NOT NULL DEFAULT 0,
-    hints_used         INTEGER NOT NULL DEFAULT 0,
-    elapsed_ms         INTEGER NOT NULL DEFAULT 0,
-    longest_word       TEXT DEFAULT NULL,
-    pangrams_found     INTEGER NOT NULL DEFAULT 0,
-    best_no_hint_score INTEGER NOT NULL DEFAULT 0,
-    long_words_count   INTEGER NOT NULL DEFAULT 0,
-    is_daily           INTEGER NOT NULL DEFAULT 0,
-    played_at_date     TEXT DEFAULT NULL,
-    updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(player_id, puzzle_number)
-)`,
-  `CREATE INDEX IF NOT EXISTS idx_player_stats_player ON player_stats(player_id)`,
   `CREATE TABLE IF NOT EXISTS player_puzzle_states (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     player_id          INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -162,13 +133,17 @@ export const BASELINE_STATEMENTS: readonly string[] = [
     total_paused_ms    INTEGER NOT NULL DEFAULT 0,
     score_before_hints INTEGER,
     revealed           INTEGER NOT NULL DEFAULT 0,
+    date               TEXT DEFAULT NULL,
+    max_score          INTEGER NOT NULL DEFAULT 0,
+    is_daily           INTEGER NOT NULL DEFAULT 0,
+    played_at_date     TEXT DEFAULT NULL,
+    elapsed_ms         INTEGER NOT NULL DEFAULT 0,
+    frozen_stats_json  TEXT DEFAULT NULL,
     updated_at         TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(player_id, puzzle_number)
 )`,
   `CREATE INDEX IF NOT EXISTS idx_player_puzzle_states_player ON player_puzzle_states(player_id)`,
 ];
-
-export const BASELINE_SQL = `${BASELINE_STATEMENTS.join(';\n')};\n`;
 
 export const CURATED_BLOCKED_WORDS: readonly string[] = [
   'hintti',

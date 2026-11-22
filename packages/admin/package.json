@@ -1,0 +1,26 @@
+{
+  "name": "@sanakenno/admin",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sanakenno/shared": "workspace:*",
+    "@tanstack/react-query": "^5.69.0",
+    "hono": "^4.7.4",
+    "lucide-react": "^1.77.0",
+    "react": "^19.0.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@sanakenno/server": "workspace:*",
+    "@types/react": "^19.2.14",
+    "typescript": "^6.0.2"
+  }
+}

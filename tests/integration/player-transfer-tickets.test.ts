@@ -12,8 +12,6 @@ import {
 import { bulkUpsertLocalData } from '../../packages/server/src/features/player-sync/player-sync.queries.js';
 import {
   DEFAULT_SEED_WORDS,
-  getPuzzleCacheSize,
-  invalidatePuzzleCache,
   setWordlist,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
@@ -40,7 +38,6 @@ describe('Player Transfer Tickets & 6-Digit Pairing Codes (Kysely + Hono integra
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
     setWordlist(DEFAULT_SEED_WORDS);
-    invalidatePuzzleCache();
     await harness.destroy();
   });
 
@@ -261,15 +258,15 @@ describe('Player Transfer Tickets & 6-Digit Pairing Codes (Kysely + Hono integra
     const meData = (await meRes.json()) as { session_count: number };
     expect(meData.session_count).toBe(2);
 
-    // Only the winning request's stat record was persisted; the losing request rolled back cleanly
-    const persistedStats = await harness.db
-      .selectFrom('player_stats')
+    // Only the winning request's state row was persisted; the losing request rolled back cleanly
+    const persistedStates = await harness.db
+      .selectFrom('player_puzzle_states')
       .select('puzzle_number')
       .where('player_id', '=', playerA.player_id)
       .execute();
-    expect(persistedStats).toHaveLength(1);
+    expect(persistedStates).toHaveLength(1);
     const winningSlot = resB.status === 200 ? 1 : 2;
-    expect(Number(persistedStats[0]?.puzzle_number)).toBe(winningSlot);
+    expect(Number(persistedStates[0]?.puzzle_number)).toBe(winningSlot);
   });
 
   it('bulkUpsertLocalData merges multiple stats and puzzle states monotonically with bounded queries and zero cache pollution', async () => {
@@ -312,7 +309,6 @@ describe('Player Transfer Tickets & 6-Digit Pairing Codes (Kysely + Hono integra
         },
       ],
     );
-    invalidatePuzzleCache();
 
     let queryCount = 0;
     const countedDb = harness.db.withPlugin({
@@ -351,9 +347,8 @@ describe('Player Transfer Tickets & 6-Digit Pairing Codes (Kysely + Hono integra
       })),
     );
 
-    // 2 preload queries + 2 bulk SELECTs + 2 bulk UPSERTs = 6 bounded queries (vs 40+ O(N))
+    // Bounded bulk preload + SELECTs + UPSERTs (vs 40+ O(N))
     expect(queryCount).toBeLessThanOrEqual(6);
-    expect(getPuzzleCacheSize()).toBe(0);
 
     const pullRes = await harness.client.api.player.sync.$get(
       {},

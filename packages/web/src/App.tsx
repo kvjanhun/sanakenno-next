@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GameplayView } from './features/gameplay/GameplayView.js';
+import { ThemeToggle } from './features/theme/ThemeToggle.js';
 
-const AdminLayout = lazy(() => import('./features/admin/AdminLayout.js'));
+const AdminLayout = lazy(() => import('@sanakenno/admin'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,7 +35,7 @@ export function App() {
       {isAdmin ? (
         <div className="min-h-dvh flex flex-col">
           <Suspense fallback={<div className="p-8 text-center text-sm">Ladataan ylläpitoa...</div>}>
-            <AdminLayout />
+            <AdminLayout themeToggle={<ThemeToggle />} />
           </Suspense>
         </div>
       ) : (

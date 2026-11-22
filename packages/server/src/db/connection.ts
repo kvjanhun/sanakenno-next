@@ -1,4 +1,3 @@
-import path from 'node:path';
 import SQLite from 'better-sqlite3';
 import {
   CompiledQuery,
@@ -50,8 +49,7 @@ class ImmediateSqliteDialect extends SqliteDialect {
  * Create a typed Kysely SQLite database instance, apply baseline schema, and run async migrations.
  */
 export async function createDb(
-  dbPath = process.env.DB_PATH ??
-    (process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'sanakenno.db') : './sanakenno.dev.db'),
+  dbPath = process.env.DB_PATH ?? './sanakenno.dev.db',
 ): Promise<Kysely<Database>> {
   const sqlite = new SQLite(dbPath);
   if (dbPath !== ':memory:') {
@@ -67,11 +65,6 @@ export async function createDb(
   });
   await runMigrationsAsync(db);
   return db;
-}
-
-/** Open a local SQLite file in read-only mode for verification utilities. */
-export function openReadonlySqlite(dbPath: string): SQLite.Database {
-  return new SQLite(dbPath, { readonly: true });
 }
 
 /**
@@ -93,9 +86,7 @@ export async function initDb(
     return { db, engine: 'kysely-libsql' };
   }
 
-  const dbPath =
-    env.DB_PATH ?? (env.DATA_DIR ? path.join(env.DATA_DIR, 'sanakenno.db') : undefined);
-  const db = await createDb(dbPath);
+  const db = await createDb(env.DB_PATH);
   return { db, engine: 'kysely-sqlite' };
 }
 

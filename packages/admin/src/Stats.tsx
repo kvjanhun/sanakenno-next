@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AdminAchievementsResponse } from '@sanakenno/shared';
-import { adminGetAchievements } from '../../api/client.js';
+import { adminGetAchievements } from './api/admin-client.js';
 import {
   ADMIN_CARD_CLASS,
   ADMIN_CARD_STYLE,

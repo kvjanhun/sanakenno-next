@@ -50,27 +50,12 @@ export async function createPlayerIdentity(db: Kysely<Database>): Promise<{
   const playerKey = randomBytes(32).toString('hex');
   const playerKeyHash = hashPlayerKey(playerKey);
 
-  try {
-    await db
-      .insertInto('players')
-      .values({
-        player_key_hash: playerKeyHash,
-      })
-      .execute();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('players.email')) {
-      await db
-        .insertInto('players')
-        .values({
-          player_key_hash: playerKeyHash,
-          email: `legacy-${playerKeyHash}@invalid.local`,
-        })
-        .execute();
-    } else {
-      throw err;
-    }
-  }
+  await db
+    .insertInto('players')
+    .values({
+      player_key_hash: playerKeyHash,
+    })
+    .execute();
 
   const row = await db
     .selectFrom('players')

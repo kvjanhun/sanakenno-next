@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  adminCheckSession,
   adminDeletePuzzle,
   adminGetBlocked,
   adminGetSchedule,
   adminGetSlots,
   adminGetSuggestionRejections,
   adminSavePuzzle,
+} from '@sanakenno/admin';
+import {
   fetchPlayerMe,
   postAchievement,
   postPlayerTransferUse,
@@ -160,5 +163,8 @@ describe('Web API Clients (client.ts & admin-client.ts)', () => {
     await expect(adminGetSuggestionRejections('csrf-xyz')).rejects.toThrow(
       'Hylättyjen ehdotusten haku epäonnistui',
     );
+
+    fetchSpy.mockResolvedValueOnce(new Response('Unauthorized', { status: 401 }));
+    expect(await adminCheckSession()).toBeNull();
   });
 });

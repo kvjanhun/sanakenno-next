@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  emptyStats,
   STATS_STORAGE_KEY,
   type PlayerStats,
   type PuzzleResponse,
@@ -18,7 +17,6 @@ import {
 } from '../../packages/web/src/features/gameplay/storage.js';
 import { useGameStore } from '../../packages/web/src/features/gameplay/useGameStore.js';
 import { useUiStore } from '../../packages/web/src/features/gameplay/useUiStore.js';
-import { backfillNoHintStats } from '../../packages/web/src/features/modals/backfillStats.js';
 import {
   AUTH_TOKEN_STORAGE_KEY,
   gatherLocalData,
@@ -221,7 +219,7 @@ describe('Spec 38: Hint Activation Sync, Stats & Gameplay State Integrity', () =
     );
   });
 
-  it('isolates revealed puzzles from local stats, server sync, telemetry, gatherLocalData, and backfillNoHintStats', async () => {
+  it('isolates revealed puzzles from local stats, server sync, telemetry, and gatherLocalData', async () => {
     const syncSpy = vi
       .spyOn(useAuthStore.getState(), 'syncProgressDebounced')
       .mockImplementation(() => {});
@@ -267,11 +265,6 @@ describe('Spec 38: Hint Activation Sync, Stats & Gameplay State Integrity', () =
     expect(gathered.puzzle_states.map((s) => s.puzzle_number)).toEqual([40, 42]);
     expect(gathered.puzzle_states.find((s) => s.puzzle_number === 40)?.revealed).toBe(true);
     expect(gathered.puzzle_states.find((s) => s.puzzle_number === 42)?.revealed).toBeUndefined();
-
-    // backfillNoHintStats does not fabricate missing records for slot 40 or 42
-    const backfilled = backfillNoHintStats(emptyStats());
-    expect(backfilled.records).toEqual([]);
-    expect(backfilled.version).toBe(1);
 
     // pullAndMergeData preserves version: 1
     const serverPayload: SyncPayload = {

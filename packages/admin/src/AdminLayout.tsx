@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { ThemeToggle } from '../theme/ThemeToggle.js';
+import { useEffect, useState, type ReactNode } from 'react';
 import { adminButtonClass, adminButtonStyle } from './AdminPrimitives.js';
 import { BlockedWords } from './BlockedWords.js';
 import { CombinationsBrowser } from './CombinationsBrowser.js';
@@ -24,7 +23,11 @@ const ADMIN_TABS: readonly { id: Tab; label: string }[] = [
   { id: 'worddata', label: 'Sanadata' },
 ];
 
-export function AdminLayout(): React.JSX.Element {
+export interface AdminLayoutProps {
+  themeToggle?: ReactNode;
+}
+
+export function AdminLayout({ themeToggle }: AdminLayoutProps = {}): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('editor');
   const [prefillLetters, setPrefillLetters] = useState<string | null>(null);
   const isAuthenticated = useAdminStore((s) => s.isAuthenticated);
@@ -96,7 +99,7 @@ export function AdminLayout(): React.JSX.Element {
                   {username}
                 </span>
               )}
-              <ThemeToggle />
+              {themeToggle}
               <a
                 href="#/"
                 className={`${adminButtonClass('sm')} no-underline`}

@@ -7,12 +7,8 @@ import {
   type PlayerStats,
   type PuzzleResponse,
 } from '@sanakenno/shared';
-import { filterVisibleHintIds } from './hints.js';
 
 export { STATS_STORAGE_KEY };
-
-/** Legacy single-slot storage key used prior to per-slot keying. */
-export const LEGACY_STATE_KEY = 'sanakenno_state';
 
 /** Bounded localStorage key storing recently fetched PuzzleResponse payloads for offline reopen. */
 export const PUZZLE_CACHE_STORAGE_KEY = 'sanakenno_puzzle_cache_v1';
@@ -34,11 +30,6 @@ export interface PersistedPuzzleState {
   scoreBeforeHints: number | null;
   /** Last timestamp (ms) when this session was actively playing, used to exclude closed-tab idle gaps. */
   lastActiveAt?: number;
-}
-
-/** Legacy persisted shape including puzzleNumber inside the payload. */
-export interface LegacyPersistedPuzzleState extends PersistedPuzzleState {
-  puzzleNumber: number;
 }
 
 /** Build the localStorage key for a puzzle slot (`sanakenno_state_<slot>`). */
@@ -101,27 +92,9 @@ export function setRawStorage(key: string, value: string): void {
   }
 }
 
-/** Read saved puzzle state for a slot, migrating legacy single-slot storage if matching. */
+/** Read saved puzzle state for a slot. */
 export function readSavedPuzzleState(puzzleNumber: number): PersistedPuzzleState | null {
-  const key = puzzleStateKey(puzzleNumber);
-  const saved = loadFromStorage<PersistedPuzzleState>(key);
-  if (saved) return saved;
-
-  const legacy = loadFromStorage<LegacyPersistedPuzzleState>(LEGACY_STATE_KEY);
-  if (legacy && legacy.puzzleNumber === puzzleNumber) {
-    const migrated: PersistedPuzzleState = {
-      foundWords: legacy.foundWords,
-      score: legacy.score,
-      hintsUnlocked: filterVisibleHintIds(legacy.hintsUnlocked),
-      startedAt: legacy.startedAt,
-      totalPausedMs: legacy.totalPausedMs,
-      scoreBeforeHints: null,
-    };
-    saveToStorage(key, migrated);
-    removeFromStorage(LEGACY_STATE_KEY);
-    return migrated;
-  }
-  return null;
+  return loadFromStorage<PersistedPuzzleState>(puzzleStateKey(puzzleNumber));
 }
 
 /** Update `sanakenno_player_stats` in localStorage unless `revealed_<slot>` is set. */

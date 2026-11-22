@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { adminCheckSession, adminLogin, adminLogout } from '../../api/client.js';
+import { adminCheckSession, adminLogin, adminLogout } from './api/admin-client.js';
 
 export interface AdminState {
   isAuthenticated: boolean;

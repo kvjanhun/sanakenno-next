@@ -7,7 +7,7 @@ import {
   adminPreview,
   adminSavePuzzle,
   adminSwapPuzzles,
-} from '../../api/client.js';
+} from './api/admin-client.js';
 
 export interface PuzzleTargetParams {
   slot?: number;

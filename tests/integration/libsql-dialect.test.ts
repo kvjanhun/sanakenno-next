@@ -159,20 +159,16 @@ describe('LibsqlDialect & Async Migrations Integration', () => {
         .execute();
 
       await db
-        .insertInto('player_stats')
+        .insertInto('player_puzzle_states')
         .values({
           player_id: player.id,
           puzzle_number: 1,
+          found_words: '["sanakenno"]',
+          score: 42,
           date: '2026-01-01',
-          best_rank: 'Hyvä',
-          best_score: 42,
           max_score: 100,
-          words_found: 10,
-          hints_used: 0,
           elapsed_ms: 5000,
-          longest_word: 'sanakenno',
-          pangrams_found: 1,
-          best_no_hint_score: 42,
+          is_daily: 1,
         })
         .execute();
 
@@ -183,14 +179,14 @@ describe('LibsqlDialect & Async Migrations Integration', () => {
         .select('id')
         .where('player_id', '=', player.id)
         .execute();
-      const remainingStats = await db
-        .selectFrom('player_stats')
+      const remainingStates = await db
+        .selectFrom('player_puzzle_states')
         .select('id')
         .where('player_id', '=', player.id)
         .execute();
 
       expect(remainingSessions).toEqual([]);
-      expect(remainingStats).toEqual([]);
+      expect(remainingStates).toEqual([]);
     } finally {
       await checkpointAndDestroyDb(db, engine);
     }

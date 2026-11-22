@@ -7,6 +7,7 @@ const serverNodeModules = path.resolve(import.meta.dirname, 'packages/server/nod
 export default defineConfig({
   resolve: {
     alias: {
+      '@sanakenno/admin': path.resolve(import.meta.dirname, 'packages/admin/src/index.ts'),
       '@sanakenno/shared': path.resolve(import.meta.dirname, 'packages/shared/src/index.ts'),
       '@libsql/client': path.join(serverNodeModules, '@libsql/client'),
       'better-sqlite3': path.join(serverNodeModules, 'better-sqlite3'),

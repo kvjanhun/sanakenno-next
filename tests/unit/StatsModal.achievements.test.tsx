@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STATS_STORAGE_KEY, type PlayerStats, type StatsRecord } from '@sanakenno/shared';
-import { puzzleStateKey, saveToStorage } from '../../packages/web/src/features/gameplay/storage.js';
+import { saveToStorage } from '../../packages/web/src/features/gameplay/storage.js';
 import { StatsModal } from '../../packages/web/src/features/modals/StatsModal.js';
 
 function createMockRecord(overrides: Partial<StatsRecord> = {}): StatsRecord {
@@ -117,31 +117,19 @@ describe('StatsModal Achievements & Streak UI', () => {
     expect(screen.getByText('Pisin putki').nextElementSibling?.textContent).toBe('2');
   });
 
-  it('backfills long_words_count from saved puzzle states and evaluates Sanahirviö achievement correctly', () => {
-    // Legacy record without long_words_count
-    const legacyStats: PlayerStats = {
+  it('evaluates Sanahirviö achievement directly from persisted long_words_count', () => {
+    const statsWithLongWords: PlayerStats = {
       version: 1,
       records: [
         createMockRecord({
           puzzle_number: 42,
-          words_found: 3,
+          words_found: 4,
           longest_word: 'päivittäinen',
-          // long_words_count missing/undefined
+          long_words_count: 3,
         }),
       ],
     };
-    saveToStorage(STATS_STORAGE_KEY, legacyStats);
-
-    // Save actual puzzle state containing three words with length >= 10
-    // 'sanahirviö' (10 letters), 'kansallinen' (11 letters), 'päivittäinen' (12 letters)
-    saveToStorage(puzzleStateKey(42), {
-      foundWords: ['kana', 'sanahirviö', 'kansallinen', 'päivittäinen'],
-      score: 30,
-      hintsUnlocked: [],
-      startedAt: Date.now() - 50000,
-      totalPausedMs: 0,
-      scoreBeforeHints: null,
-    });
+    saveToStorage(STATS_STORAGE_KEY, statsWithLongWords);
 
     render(<StatsModal show={true} onClose={() => {}} />);
 
@@ -152,10 +140,6 @@ describe('StatsModal Achievements & Streak UI', () => {
     expect(sanahirvioCard).toBeInTheDocument();
     // 3 long words found out of next tier target 5
     expect(sanahirvioCard).toHaveTextContent('3 / 5');
-
-    // Stats in localStorage should be backfilled
-    const stored = JSON.parse(window.localStorage.getItem(STATS_STORAGE_KEY)!) as PlayerStats;
-    expect(stored.records[0]?.long_words_count).toBe(3);
   });
 
   it('displays canonical hyphenated lemma for Pisin sana in summary tab', () => {

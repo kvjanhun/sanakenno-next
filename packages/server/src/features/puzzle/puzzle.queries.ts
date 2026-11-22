@@ -1,40 +1,14 @@
 import { getHelsinkiDateString, type ArchiveEntry } from '@sanakenno/shared';
 import type { Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
-import {
-  computePuzzle,
-  getCachedPuzzle,
-  invalidatePuzzleCache,
-  setCachedPuzzle,
-  type FullPuzzleData,
-} from './wordlist.js';
+import { computePuzzle, parseComputedPuzzleData, type FullPuzzleData } from './wordlist.js';
 
 export interface PuzzleRow {
   slot: number;
   letters: string;
   center: string;
   max_score?: number | null;
-}
-
-let _lastDb: Kysely<Database> | null = null;
-
-function syncDbInstanceCache(db: Kysely<Database>): void {
-  if (db.isTransaction) {
-    return;
-  }
-  if (_lastDb !== null && _lastDb !== db) {
-    invalidatePuzzleCache();
-  }
-  _lastDb = db;
-}
-
-function normalizeLettersSignature(letters: string): string {
-  return letters
-    .split(',')
-    .map((l) => l.trim().toLowerCase())
-    .filter((l) => l.length > 0)
-    .sort()
-    .join(',');
+  computed_data?: string | null;
 }
 
 function parseOuterLetters(letters: string, centerNormalized: string): string[] {
@@ -149,19 +123,15 @@ export async function getBlockedWords(db: Kysely<Database>): Promise<string[]> {
 
 /**
  * Return the rotation epoch date string (`YYYY-MM-DD`) from config.
- * Supports both `epoch_date` and legacy 1.0 `rotation_epoch` keys.
  */
 export async function getEpochDate(db: Kysely<Database>): Promise<string> {
-  const rows = await db
+  const row = await db
     .selectFrom('config')
-    .select(['key', 'value'])
-    .where('key', 'in', ['epoch_date', 'rotation_epoch'])
-    .execute();
+    .select('value')
+    .where('key', '=', 'epoch_date')
+    .executeTakeFirst();
 
-  const epochRow =
-    rows.find((r) => r.key === 'epoch_date') ?? rows.find((r) => r.key === 'rotation_epoch');
-
-  return epochRow?.value ?? '2026-02-24';
+  return row?.value ?? '2026-02-24';
 }
 
 /** Purely resolve the active puzzle slot for a calendar date given active slots & epoch. */
@@ -259,7 +229,7 @@ export async function getSlotScheduleInfo(
 async function getPuzzleRowBySlot(db: Kysely<Database>, slot: number): Promise<PuzzleRow | null> {
   const row = await db
     .selectFrom('puzzles')
-    .select(['slot', 'letters', 'center', 'max_score'])
+    .select(['slot', 'letters', 'center', 'max_score', 'computed_data'])
     .where('slot', '=', slot)
     .where('is_active', '=', 1)
     .executeTakeFirst();
@@ -273,11 +243,13 @@ async function getPuzzleRowBySlot(db: Kysely<Database>, slot: number): Promise<P
     letters: row.letters,
     center: row.center,
     max_score: row.max_score !== null && row.max_score !== undefined ? Number(row.max_score) : null,
+    computed_data: row.computed_data ?? null,
   };
 }
 
 /**
- * Compute or retrieve cached full puzzle data for an active slot.
+ * Retrieve precomputed full puzzle data for an active slot directly from `puzzles.computed_data`,
+ * falling back to lazy write-through computation if `computed_data` is absent.
  * Returns null if the slot does not exist or is soft-deleted (`is_active = 0`).
  */
 export async function getFullPuzzleBySlot(
@@ -285,51 +257,50 @@ export async function getFullPuzzleBySlot(
   slot: number,
   preloadedActiveSlots?: number[],
 ): Promise<FullPuzzleData | null> {
-  syncDbInstanceCache(db);
-
   const [row, activeSlots] = preloadedActiveSlots
     ? [await getPuzzleRowBySlot(db, slot), preloadedActiveSlots]
     : await Promise.all([getPuzzleRowBySlot(db, slot), getActiveSlots(db)]);
 
   if (!row) {
-    invalidatePuzzleCache(slot);
     return null;
   }
 
   const activeIndex = activeSlots.indexOf(slot);
   if (activeIndex === -1) {
-    invalidatePuzzleCache(slot);
     return null;
   }
 
   const displayNumber = activeIndex + 1;
   const totalActive = activeSlots.length;
   const centerNormalized = row.center.trim().toLowerCase();
-  const lettersSignature = normalizeLettersSignature(row.letters);
+  const outerLetters = parseOuterLetters(row.letters, centerNormalized);
 
-  const cached = getCachedPuzzle(slot);
-  if (
-    cached &&
-    cached.center === centerNormalized &&
-    normalizeLettersSignature(cached.all_letters) === lettersSignature
-  ) {
-    if (cached.display_number === displayNumber && cached.total_puzzles === totalActive) {
-      return cached;
-    }
-    const updated: FullPuzzleData = {
-      ...cached,
+  const precomputed = parseComputedPuzzleData(row.computed_data);
+  if (precomputed) {
+    return {
+      center: centerNormalized,
+      letters: outerLetters,
+      all_letters: row.letters,
+      slot: row.slot,
       display_number: displayNumber,
       total_puzzles: totalActive,
+      ...precomputed,
     };
-    setCachedPuzzle(slot, updated, true);
-    return updated;
   }
 
   const blockedWords = await getBlockedWords(db);
   const computed = computePuzzle(row.letters, row.center, blockedWords);
-  const outerLetters = parseOuterLetters(row.letters, centerNormalized);
 
-  const fullResult: FullPuzzleData = {
+  await db
+    .updateTable('puzzles')
+    .set({
+      max_score: computed.max_score,
+      computed_data: JSON.stringify(computed),
+    })
+    .where('slot', '=', slot)
+    .execute();
+
+  return {
     center: centerNormalized,
     letters: outerLetters,
     all_letters: row.letters,
@@ -338,17 +309,6 @@ export async function getFullPuzzleBySlot(
     total_puzzles: totalActive,
     ...computed,
   };
-
-  if (row.max_score === null || row.max_score === undefined) {
-    await db
-      .updateTable('puzzles')
-      .set({ max_score: computed.max_score })
-      .where('slot', '=', slot)
-      .execute();
-  }
-
-  setCachedPuzzle(slot, fullResult);
-  return fullResult;
 }
 
 /**
@@ -416,7 +376,8 @@ export async function getArchiveMetadata(
   const days = Math.max(0, Math.min(targetDays, daysSinceEpoch + 1, totalActive));
 
   const entries: ArchiveEntry[] = [];
-  const missingScoresToUpdate: Array<{ slot: number; max_score: number }> = [];
+  const missingScoresToUpdate: Array<{ slot: number; max_score: number; computed_data: string }> =
+    [];
   let blockedWords: string[] | null = null;
 
   for (let daysAgo = 0; daysAgo < days; daysAgo++) {
@@ -437,7 +398,11 @@ export async function getArchiveMetadata(
       }
       const computed = computePuzzle(row.letters, row.center, blockedWords);
       maxScore = computed.max_score;
-      missingScoresToUpdate.push({ slot, max_score: maxScore });
+      missingScoresToUpdate.push({
+        slot,
+        max_score: maxScore,
+        computed_data: JSON.stringify(computed),
+      });
       row.max_score = maxScore;
     }
 
@@ -459,7 +424,7 @@ export async function getArchiveMetadata(
     for (const update of missingScoresToUpdate) {
       await db
         .updateTable('puzzles')
-        .set({ max_score: update.max_score })
+        .set({ max_score: update.max_score, computed_data: update.computed_data })
         .where('slot', '=', update.slot)
         .execute();
     }

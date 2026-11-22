@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminSuggestionRejection } from '@sanakenno/shared';
-import { adminDeleteSuggestionRejection, adminGetSuggestionRejections } from '../../api/client.js';
+import {
+  adminDeleteSuggestionRejection,
+  adminGetSuggestionRejections,
+} from './api/admin-client.js';
 import {
   ADMIN_CARD_STYLE,
   ADMIN_TABLE_HEAD_ROW_CLASS,

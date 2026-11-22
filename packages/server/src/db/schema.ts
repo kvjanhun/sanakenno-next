@@ -6,6 +6,7 @@ export interface PuzzlesTable {
   center: string;
   is_active: Generated<number>;
   max_score: Generated<number | null>;
+  computed_data: Generated<string | null>;
   created_at: Generated<string>;
   updated_at: Generated<string>;
 }
@@ -26,14 +27,6 @@ export interface AchievementsTable {
   elapsed_ms: number | null;
   session_id: string | null;
   achieved_at: Generated<string>;
-}
-
-export interface PageViewsTable {
-  id: Generated<number>;
-  visitor_id: string;
-  puzzle_number: number | null;
-  path: string;
-  viewed_at: Generated<string>;
 }
 
 export interface CombinationsTable {
@@ -104,7 +97,6 @@ export interface WordFindsTable {
 export interface PlayersTable {
   id: Generated<number>;
   player_key_hash: string;
-  email?: string | null;
   preferences: string | null;
   created_at: Generated<string>;
   updated_at: Generated<string>;
@@ -126,26 +118,6 @@ export interface PlayerTransferTicketsTable {
   created_at: Generated<string>;
 }
 
-export interface PlayerStatsTable {
-  id: Generated<number>;
-  player_id: number;
-  puzzle_number: number;
-  date: string;
-  best_rank: string;
-  best_score: Generated<number>;
-  max_score: Generated<number>;
-  words_found: Generated<number>;
-  hints_used: Generated<number>;
-  elapsed_ms: Generated<number>;
-  longest_word: string | null;
-  pangrams_found: Generated<number>;
-  best_no_hint_score: Generated<number>;
-  long_words_count?: Generated<number>;
-  is_daily?: Generated<number>;
-  played_at_date?: string | null;
-  updated_at: Generated<string>;
-}
-
 export interface PlayerPuzzleStatesTable {
   id: Generated<number>;
   player_id: number;
@@ -157,6 +129,12 @@ export interface PlayerPuzzleStatesTable {
   total_paused_ms: Generated<number>;
   score_before_hints: number | null;
   revealed: Generated<number>;
+  date: string | null;
+  max_score: Generated<number>;
+  is_daily: Generated<number>;
+  played_at_date: string | null;
+  elapsed_ms: Generated<number>;
+  frozen_stats_json: string | null;
   updated_at: Generated<string>;
 }
 
@@ -169,7 +147,6 @@ export interface Database {
   puzzles: PuzzlesTable;
   blocked_words: BlockedWordsTable;
   achievements: AchievementsTable;
-  page_views: PageViewsTable;
   combinations: CombinationsTable;
   suggestion_rejections: SuggestionRejectionsTable;
   admins: AdminsTable;
@@ -181,7 +158,6 @@ export interface Database {
   players: PlayersTable;
   player_sessions: PlayerSessionsTable;
   player_transfer_tickets: PlayerTransferTicketsTable;
-  player_stats: PlayerStatsTable;
   player_puzzle_states: PlayerPuzzleStatesTable;
   schema_migrations: SchemaMigrationsTable;
 }

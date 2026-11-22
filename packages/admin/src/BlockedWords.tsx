@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { adminBlockWord, adminGetBlocked, adminUnblockWord } from '../../api/client.js';
+import { adminBlockWord, adminGetBlocked, adminUnblockWord } from './api/admin-client.js';
 import {
   ADMIN_CARD_CLASS,
   ADMIN_CARD_STYLE,

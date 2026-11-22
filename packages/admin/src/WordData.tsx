@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AdminFailedGuessesResponse } from '@sanakenno/shared';
-import { adminGetFailedGuesses } from '../../api/client.js';
+import { adminGetFailedGuesses } from './api/admin-client.js';
 import {
   ADMIN_CARD_STYLE,
   ADMIN_TABLE_HEAD_ROW_CLASS,

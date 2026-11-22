@@ -5,7 +5,6 @@ import { runMigrationsAsync } from '../../packages/server/src/db/async-migration
 import type { Database as DbSchema } from '../../packages/server/src/db/schema.js';
 import {
   DEFAULT_SEED_WORDS,
-  invalidatePuzzleCache,
   setWordlist,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness, type TestHarness } from '../../packages/server/src/testing.js';
@@ -15,7 +14,6 @@ describe('Cross-device revealed puzzle sync (Spec 43)', () => {
 
   beforeEach(async () => {
     setWordlist(DEFAULT_SEED_WORDS);
-    invalidatePuzzleCache();
     harness = await createTestHarness();
     await harness.db
       .insertInto('puzzles')
@@ -170,5 +168,131 @@ describe('Cross-device revealed puzzle sync (Spec 43)', () => {
     };
     expect(body.puzzle_states).toHaveLength(1);
     expect(body.puzzle_states[0]?.revealed).toBe(true);
+  });
+
+  it('freezes pre-reveal derived stats permanently when transitioning revealed false -> true after finding words', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as { token: string };
+    const headers = { Authorization: `Bearer ${player.token}` };
+
+    // 1. Find 1 word ('kana', 1 pt) before revealing
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-12',
+          found_words: ['kana'],
+          score: 1,
+          max_score: 27,
+          hints_unlocked: [],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: null,
+          is_daily: true,
+          played_at_date: '2026-04-12',
+        },
+      },
+      { headers },
+    );
+
+    // 2. Reveal answers -> snapshots pre-reveal stats (1 word, 1 pt)
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-12',
+          found_words: ['kana'],
+          score: 1,
+          max_score: 27,
+          hints_unlocked: [],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: null,
+          revealed: true,
+        },
+      },
+      { headers },
+    );
+
+    // 3. Push additional words after reveal -> frozen stats must NOT increase
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-12',
+          found_words: ['kana', 'kansa', 'kansallinen'],
+          score: 24,
+          max_score: 27,
+          hints_unlocked: [],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: null,
+          revealed: true,
+        },
+      },
+      { headers },
+    );
+
+    const pull = await harness.client.api.player.sync.$get({}, { headers });
+    const data = (await pull.json()) as {
+      stats: { records: Array<{ puzzle_number: number; best_score: number; words_found: number }> };
+      puzzle_states: Array<{ puzzle_number: number; revealed?: boolean; found_words: string[] }>;
+    };
+    expect(data.stats.records).toHaveLength(1);
+    expect(data.stats.records[0]?.best_score).toBe(1);
+    expect(data.stats.records[0]?.words_found).toBe(1);
+    expect(data.puzzle_states[0]?.revealed).toBe(true);
+  });
+
+  it('preserves pre-reveal stats during /api/player/auth/transfer/use when pairing a locally revealed puzzle', async () => {
+    const initRes = await harness.client.api.player.auth.init.$post();
+    const player = (await initRes.json()) as { token: string; player_key: string };
+
+    const transferRes = await harness.client.api.player.auth.transfer.use.$post({
+      json: {
+        token: player.player_key,
+        stats: {
+          version: 1,
+          records: [
+            {
+              puzzle_number: 1,
+              date: '2026-04-12',
+              best_rank: 'Hyvä alku',
+              best_score: 6,
+              max_score: 27,
+              words_found: 2,
+              hints_used: 0,
+              elapsed_ms: 8000,
+              longest_word: 'kansa',
+              pangrams_found: 0,
+              best_no_hint_score: 6,
+              is_daily: true,
+              played_at_date: '2026-04-12',
+            },
+          ],
+        },
+        puzzle_states: [
+          {
+            puzzle_number: 1,
+            found_words: ['kana', 'kansa', 'kansallinen'],
+            score: 24,
+            hints_unlocked: [],
+            started_at: 1000,
+            total_paused_ms: 0,
+            score_before_hints: null,
+            revealed: true,
+          },
+        ],
+      },
+    });
+    expect(transferRes.status).toBe(200);
+    const body = (await transferRes.json()) as {
+      stats: { records: Array<{ puzzle_number: number; best_score: number; is_daily?: boolean }> };
+      puzzle_states: Array<{ puzzle_number: number; revealed?: boolean }>;
+    };
+    expect(body.puzzle_states[0]?.revealed).toBe(true);
+    expect(body.stats.records).toHaveLength(1);
+    expect(body.stats.records[0]?.best_score).toBe(6);
+    expect(body.stats.records[0]?.is_daily).toBe(true);
   });
 });

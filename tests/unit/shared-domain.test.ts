@@ -11,6 +11,7 @@ import {
   computeRankDistribution,
   computeStreak,
   deriveHintData,
+  deriveStatsRecordFromState,
   emptyStats,
   getHelsinkiDateString,
   getHoneycombCenterOverlayStops,
@@ -431,6 +432,54 @@ describe('@sanakenno/shared — Pure Finnish Domain Logic', () => {
           score_before_hints: null,
         }).success,
       ).toBe(true);
+    });
+
+    it('derives StatsRecord cleanly across unassisted, hinted, revealed, and orphan states', () => {
+      const meta = { allLetters: new Set(['a', 'e', 'i', 'k', 'l', 'n', 's']), maxScore: 40 };
+      const base = {
+        puzzle_number: 1,
+        found_words: ['kana', 'kansallinen'],
+        score: 19,
+        hints_unlocked: [] as string[],
+        started_at: 1000,
+        total_paused_ms: 0,
+        score_before_hints: null as number | null,
+        date: '2026-04-10',
+        is_daily: true,
+        played_at_date: '2026-04-10',
+        elapsed_ms: 15000,
+      };
+
+      const unassisted = deriveStatsRecordFromState(base, meta);
+      expect(unassisted).toMatchObject({
+        best_score: 19,
+        max_score: 40,
+        words_found: 2,
+        hints_used: 0,
+        pangrams_found: 1,
+        long_words_count: 1,
+        longest_word: 'kansallinen',
+        best_no_hint_score: 19,
+        is_daily: true,
+      });
+
+      const hinted = deriveStatsRecordFromState(
+        { ...base, hints_unlocked: ['tier1'], score_before_hints: 1, is_daily: false },
+        meta,
+      );
+      expect(hinted).toMatchObject({ hints_used: 1, best_no_hint_score: 1, is_daily: false });
+
+      expect(
+        deriveStatsRecordFromState({ ...base, revealed: true, frozen_stats: null }, meta),
+      ).toBeNull();
+      expect(
+        deriveStatsRecordFromState({ ...base, revealed: true, frozen_stats: unassisted }, meta)
+          ?.best_score,
+      ).toBe(19);
+      expect(
+        deriveStatsRecordFromState({ ...base, found_words: [], frozen_stats: unassisted }, meta)
+          ?.best_score,
+      ).toBe(19);
     });
   });
 });

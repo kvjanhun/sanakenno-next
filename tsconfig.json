@@ -4,6 +4,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "paths": {
+      "@sanakenno/admin": ["./packages/admin/src/index.ts"],
       "@sanakenno/shared": ["./packages/shared/src/index.ts"],
       "@sanakenno/server": ["./packages/server/src/app.ts"],
       "@sanakenno/server/*": ["./packages/server/src/*"],

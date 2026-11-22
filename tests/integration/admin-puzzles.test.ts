@@ -222,6 +222,13 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         { headers: adminHeaders() },
       );
       expect(res2.status).toBe(200);
+      const saved = (await res2.json()) as { slot: number };
+      const savedRow = await harness.db
+        .selectFrom('puzzles')
+        .select('computed_data')
+        .where('slot', '=', saved.slot)
+        .executeTakeFirstOrThrow();
+      expect(savedRow.computed_data).toBeTruthy();
     });
 
     it('soft-deletes puzzle, preserves slot, and closes display_number gap', async () => {
@@ -248,26 +255,41 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
       expect([1, 3]).toContain(slotsData.today_slot);
     });
 
-    it('swaps two puzzle slots', async () => {
+    it('swaps two puzzle slots including precomputed computed_data', async () => {
+      await harness.client.api.admin.puzzle.center.$post(
+        { json: { slot: 1, center: 'a' } },
+        { headers: adminHeaders() },
+      );
+      await harness.client.api.admin.puzzle.center.$post(
+        { json: { slot: 2, center: 'n' } },
+        { headers: adminHeaders() },
+      );
+      const before = await harness.db
+        .selectFrom('puzzles')
+        .select(['slot', 'computed_data'])
+        .where('slot', 'in', [1, 2])
+        .execute();
+      const before1 = before.find((r) => r.slot === 1)?.computed_data;
+      const before2 = before.find((r) => r.slot === 2)?.computed_data;
+
       const swapRes = await harness.client.api.admin.puzzle.swap.$post(
         { json: { slotA: 1, slotB: 2 } },
         { headers: adminHeaders() },
       );
       expect(swapRes.status).toBe(200);
 
-      const p1 = await harness.db
+      const after = await harness.db
         .selectFrom('puzzles')
         .selectAll()
-        .where('slot', '=', 1)
-        .executeTakeFirst();
-      const p2 = await harness.db
-        .selectFrom('puzzles')
-        .selectAll()
-        .where('slot', '=', 2)
-        .executeTakeFirst();
+        .where('slot', 'in', [1, 2])
+        .execute();
+      const p1 = after.find((r) => r.slot === 1);
+      const p2 = after.find((r) => r.slot === 2);
 
       expect(p1?.center).toBe('n');
       expect(p2?.center).toBe('a');
+      expect(p1?.computed_data).toBe(before2);
+      expect(p2?.computed_data).toBe(before1);
 
       // Refuses swapping with a missing or soft-deleted slot with 404
       const missingSwap = await harness.client.api.admin.puzzle.swap.$post(
@@ -298,6 +320,8 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
         .executeTakeFirst();
       expect(p1?.center).toBe('i');
       expect(p1?.max_score).toBeGreaterThan(0);
+      expect(p1?.computed_data).toBeTruthy();
+      expect((JSON.parse(p1!.computed_data!) as { words: string[] }).words).toContain('aika');
     });
 
     it('fetches puzzle variations by slot and display_number with neighbour slots', async () => {
@@ -392,13 +416,25 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
       );
       expect(dupBlockRes.status).toBe(409);
 
-      // Persisted puzzles.max_score for affected slot 1 decreased by 1 ('kana' = 4 letters = 1 pt)
+      // Persisted puzzles.max_score AND computed_data for affected slot 1 updated immediately
       const slot1Blocked = await harness.db
         .selectFrom('puzzles')
-        .select('max_score')
+        .select(['max_score', 'computed_data'])
         .where('slot', '=', 1)
         .executeTakeFirstOrThrow();
       expect(slot1Blocked.max_score).toBe(Number(slot1Before.max_score) - 1);
+      expect(slot1Blocked.computed_data).toBeTruthy();
+      expect((JSON.parse(slot1Blocked.computed_data!) as { words: string[] }).words).not.toContain(
+        'kana',
+      );
+
+      // Player read immediately observes the blocked word removal without any cache invalidation
+      const puzzleAfterBlock = await harness.client.api.puzzle[':number'].$get({
+        param: { number: '1' },
+      });
+      expect(puzzleAfterBlock.status).toBe(200);
+      const puzzleAfterBlockBody = (await puzzleAfterBlock.json()) as { max_score: number };
+      expect(puzzleAfterBlockBody.max_score).toBe(Number(slot1Before.max_score) - 1);
 
       const previewAfter = await harness.client.api.admin.preview.$post(
         { json: { letters: 'a,e,i,k,l,n,s', center: 'a' } },
@@ -418,13 +454,16 @@ describe('Admin Auth & Puzzle Editor (Kysely + Hono integration)', () => {
       );
       expect(unblockRes.status).toBe(200);
 
-      // Persisted puzzles.max_score restored after unblock, and deleting non-existent id returns 404
+      // Persisted puzzles.max_score and computed_data restored after unblock, and deleting non-existent id returns 404
       const slot1Restored = await harness.db
         .selectFrom('puzzles')
-        .select('max_score')
+        .select(['max_score', 'computed_data'])
         .where('slot', '=', 1)
         .executeTakeFirstOrThrow();
       expect(slot1Restored.max_score).toBe(slot1Before.max_score);
+      expect((JSON.parse(slot1Restored.computed_data!) as { words: string[] }).words).toContain(
+        'kana',
+      );
 
       const missingUnblock = await harness.client.api.admin.block[':id'].$delete(
         { param: { id: String(blockedId) } },

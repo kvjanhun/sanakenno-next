@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAdminStore } from '../../packages/web/src/features/admin/useAdminStore.js';
+import { useAdminStore } from '@sanakenno/admin';
 
 describe('Admin Store (Web)', () => {
   beforeEach(() => {

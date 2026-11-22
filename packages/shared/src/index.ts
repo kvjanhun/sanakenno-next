@@ -149,10 +149,13 @@ export {
 } from './honeycomb-theme.js';
 
 export {
+  deriveStatsRecordFromState,
   mergeStatsRecord,
   mergePuzzleState,
   isStatsRecordBetterThanServer,
   isPuzzleStateBetterThanServer,
+  type CanonicalPuzzleState,
+  type PuzzleMetaForStats,
 } from './sync-merge.js';
 
 export {

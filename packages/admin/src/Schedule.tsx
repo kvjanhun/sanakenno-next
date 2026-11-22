@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { adminGetSchedule } from '../../api/client.js';
+import { adminGetSchedule } from './api/admin-client.js';
 import {
   ADMIN_CARD_STYLE,
   ADMIN_TABLE_HEAD_ROW_CLASS,

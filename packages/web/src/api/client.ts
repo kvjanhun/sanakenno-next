@@ -17,8 +17,6 @@ import {
   type WordFindPayload,
 } from '@sanakenno/shared';
 
-export * from './admin-client.js';
-
 /**
  * Single typed Hono RPC client for @sanakenno/web.
  * Direct HTTP calls must go through `apiClient`; raw `fetch` is forbidden by tests/architecture.test.ts.
@@ -53,48 +51,57 @@ export async function readErrorMessage(res: Response, fallback: string): Promise
   }
 }
 
-export async function fetchPlayerMe(token: string): Promise<PlayerMeResponse | null> {
-  const res = await apiClient.api.player.me.$get({}, { headers: authHeaders(token) });
+async function unwrapJson<T>(res: Response, fallback: string): Promise<T> {
+  if (!res.ok) throw new Error(await readErrorMessage(res, fallback));
+  return (await res.json()) as T;
+}
+
+async function unwrapOptionalJson<T>(res: Response): Promise<T | null> {
   if (!res.ok) return null;
-  return (await res.json()) as PlayerMeResponse;
+  return (await res.json()) as T;
+}
+
+async function assertOk(res: Response, fallback: string): Promise<void> {
+  if (!res.ok) throw new Error(await readErrorMessage(res, fallback));
+}
+
+export async function fetchPlayerMe(token: string): Promise<PlayerMeResponse | null> {
+  return unwrapOptionalJson<PlayerMeResponse>(
+    await apiClient.api.player.me.$get({}, { headers: authHeaders(token) }),
+  );
 }
 
 export async function fetchPlayerSync(token: string): Promise<SyncPayload | null> {
-  const res = await apiClient.api.player.sync.$get({}, { headers: authHeaders(token) });
-  if (!res.ok) return null;
-  return (await res.json()) as SyncPayload;
+  return unwrapOptionalJson<SyncPayload>(
+    await apiClient.api.player.sync.$get({}, { headers: authHeaders(token) }),
+  );
 }
 
 export async function postPlayerAuthInit(): Promise<PlayerAuthInitResponse> {
-  const res = await apiClient.api.player.auth.init.$post();
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Alustus epäonnistui'));
-  }
-  return (await res.json()) as PlayerAuthInitResponse;
+  return unwrapJson<PlayerAuthInitResponse>(
+    await apiClient.api.player.auth.init.$post(),
+    'Alustus epäonnistui',
+  );
 }
 
 export async function postPlayerTransferTicket(token: string): Promise<TransferTicketResponse> {
-  const res = await apiClient.api.player.auth.transfer.ticket.$post(
-    {},
-    { headers: authHeaders(token) },
+  return unwrapJson<TransferTicketResponse>(
+    await apiClient.api.player.auth.transfer.ticket.$post({}, { headers: authHeaders(token) }),
+    'Koodin luominen epäonnistui',
   );
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Koodin luominen epäonnistui'));
-  }
-  return (await res.json()) as TransferTicketResponse;
 }
 
 export async function postPlayerTransferCreate(
   token: string,
   payload: { email: string; player_key?: string },
 ): Promise<void> {
-  const res = await apiClient.api.player.auth.transfer.create.$post(
-    { json: payload },
-    { headers: authHeaders(token) },
+  await assertOk(
+    await apiClient.api.player.auth.transfer.create.$post(
+      { json: payload },
+      { headers: authHeaders(token) },
+    ),
+    'Sähköpostin lähetys epäonnistui',
   );
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Sähköpostin lähetys epäonnistui'));
-  }
 }
 
 export async function postPlayerTransferUse(
@@ -107,22 +114,20 @@ export async function postPlayerTransferUse(
 ): Promise<TransferUseResponse> {
   const headers: Record<string, string> = {};
   if (currentToken) headers['Authorization'] = `Bearer ${currentToken}`;
-  const res = await apiClient.api.player.auth.transfer.use.$post(
-    { json: payload },
-    Object.keys(headers).length > 0 ? { headers } : undefined,
+  return unwrapJson<TransferUseResponse>(
+    await apiClient.api.player.auth.transfer.use.$post(
+      { json: payload },
+      Object.keys(headers).length > 0 ? { headers } : undefined,
+    ),
+    'Yhdistäminen epäonnistui',
   );
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Yhdistäminen epäonnistui'));
-  }
-  return (await res.json()) as TransferUseResponse;
 }
 
 export async function postPlayerRotate(token: string): Promise<PlayerAuthRotateResponse> {
-  const res = await apiClient.api.player.auth.rotate.$post({}, { headers: authHeaders(token) });
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Tunnisteen vaihto epäonnistui'));
-  }
-  return (await res.json()) as PlayerAuthRotateResponse;
+  return unwrapJson<PlayerAuthRotateResponse>(
+    await apiClient.api.player.auth.rotate.$post({}, { headers: authHeaders(token) }),
+    'Tunnisteen vaihto epäonnistui',
+  );
 }
 
 export async function postPlayerLogout(token: string): Promise<void> {
@@ -132,16 +137,16 @@ export async function postPlayerLogout(token: string): Promise<void> {
 }
 
 export async function postSyncProgress(token: string, payload: SyncProgressPayload): Promise<void> {
-  const res = await apiClient.api.player.sync.progress.$post(
-    { json: payload },
-    {
-      headers: authHeaders(token),
-      init: { keepalive: true },
-    },
+  await assertOk(
+    await apiClient.api.player.sync.progress.$post(
+      { json: payload },
+      {
+        headers: authHeaders(token),
+        init: { keepalive: true },
+      },
+    ),
+    'Synkronointi epäonnistui',
   );
-  if (!res.ok) {
-    throw new Error(await readErrorMessage(res, 'Synkronointi epäonnistui'));
-  }
 }
 
 export async function postSyncPreferences(token: string, prefs: PlayerPreferences): Promise<void> {

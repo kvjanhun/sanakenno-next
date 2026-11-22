@@ -37,11 +37,14 @@ describe('Architectural Fitness Guardrails', () => {
     expect(oversized).toEqual([]);
   });
 
-  it('forbids direct fetch() calls anywhere in @sanakenno/web (use typed apiClient)', () => {
-    const webFiles = walkFiles(path.join(ROOT, 'packages/web/src'), ['.ts', '.tsx']);
+  it('forbids direct fetch() calls anywhere in @sanakenno/web and @sanakenno/admin (use typed RPC client)', () => {
+    const frontendFiles = [
+      ...walkFiles(path.join(ROOT, 'packages/web/src'), ['.ts', '.tsx']),
+      ...walkFiles(path.join(ROOT, 'packages/admin/src'), ['.ts', '.tsx']),
+    ];
     const violations: string[] = [];
 
-    for (const file of webFiles) {
+    for (const file of frontendFiles) {
       const rel = path.relative(ROOT, file).replaceAll('\\', '/');
       const content = fs.readFileSync(file, 'utf8');
       if (/\bfetch\s*\(/.test(content)) {
@@ -52,14 +55,23 @@ describe('Architectural Fitness Guardrails', () => {
     expect(violations).toEqual([]);
   });
 
-  it('enforces type-only imports from @sanakenno/server inside @sanakenno/web', () => {
+  it('enforces type-only imports from @sanakenno/server inside @sanakenno/web and @sanakenno/admin, and zero @sanakenno/web imports inside @sanakenno/admin', () => {
     const webFiles = walkFiles(path.join(ROOT, 'packages/web/src'), ['.ts', '.tsx']);
+    const adminFiles = walkFiles(path.join(ROOT, 'packages/admin/src'), ['.ts', '.tsx']);
     const violations: string[] = [];
 
-    for (const file of webFiles) {
+    for (const file of [...webFiles, ...adminFiles]) {
       const rel = path.relative(ROOT, file).replaceAll('\\', '/');
       const content = fs.readFileSync(file, 'utf8');
       if (/import\s+(?!type\b)[^;]*from\s+['"]@sanakenno\/server/.test(content)) {
+        violations.push(rel);
+      }
+    }
+
+    for (const file of adminFiles) {
+      const rel = path.relative(ROOT, file).replaceAll('\\', '/');
+      const content = fs.readFileSync(file, 'utf8');
+      if (/from\s+['"](@sanakenno\/web|(\.\.\/)+web)/.test(content)) {
         violations.push(rel);
       }
     }
@@ -143,7 +155,10 @@ describe('Architectural Fitness Guardrails', () => {
   });
 
   it('forbids hardcoded hex colours in React components (.tsx) — use CSS custom properties', () => {
-    const tsxFiles = walkFiles(path.join(ROOT, 'packages/web/src'), ['.tsx']);
+    const tsxFiles = [
+      ...walkFiles(path.join(ROOT, 'packages/web/src'), ['.tsx']),
+      ...walkFiles(path.join(ROOT, 'packages/admin/src'), ['.tsx']),
+    ];
     const violations: string[] = [];
 
     for (const file of tsxFiles) {
@@ -221,11 +236,14 @@ describe('Architectural Fitness Guardrails', () => {
       expect(content).not.toMatch(/\bLitestream\b/i);
     }
 
-    const webPkg = JSON.parse(
-      fs.readFileSync(path.join(ROOT, 'packages/web/package.json'), 'utf8'),
-    ) as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-    expect(webPkg.dependencies?.['@sanakenno/server']).toBeUndefined();
-    expect(webPkg.devDependencies?.['@sanakenno/server']).toBe('workspace:*');
+    for (const pkgRel of ['packages/web/package.json', 'packages/admin/package.json']) {
+      const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, pkgRel), 'utf8')) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
+      expect(pkg.dependencies?.['@sanakenno/server']).toBeUndefined();
+      expect(pkg.devDependencies?.['@sanakenno/server']).toBe('workspace:*');
+    }
 
     const serverPkg = JSON.parse(
       fs.readFileSync(path.join(ROOT, 'packages/server/package.json'), 'utf8'),

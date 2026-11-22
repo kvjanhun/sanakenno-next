@@ -6,7 +6,6 @@ import {
   computePuzzle,
   DEFAULT_SEED_WORDS,
   getWordlist,
-  invalidatePuzzleCache,
   loadWordlist,
   setWordlist,
 } from '../features/puzzle/wordlist.js';
@@ -24,7 +23,6 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
       setWordlist(DEFAULT_SEED_WORDS);
     }
   }
-  invalidatePuzzleCache();
 
   const adminCount = await db
     .selectFrom('admins')
@@ -64,6 +62,7 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
         center: 'a',
         is_active: 1,
         max_score: p1.max_score,
+        computed_data: JSON.stringify(p1),
       },
       {
         slot: 2,
@@ -71,6 +70,7 @@ export async function seedDatabase(db: Kysely<Database>): Promise<void> {
         center: 'n',
         is_active: 1,
         max_score: p2.max_score,
+        computed_data: JSON.stringify(p2),
       },
     ])
     .execute();

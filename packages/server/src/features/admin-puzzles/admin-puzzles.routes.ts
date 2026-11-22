@@ -31,12 +31,7 @@ import {
   totalPuzzles,
 } from '../puzzle/puzzle.queries.js';
 import { isValidIsoCalendarDate } from '../puzzle/puzzle.routes.js';
-import {
-  computePuzzle,
-  computeVariations,
-  FINNISH_LETTERS,
-  invalidatePuzzleCache,
-} from '../puzzle/wordlist.js';
+import { computePuzzle, computeVariations, FINNISH_LETTERS } from '../puzzle/wordlist.js';
 import {
   buildAdminSchedule,
   deleteBlockedWord,
@@ -47,7 +42,7 @@ import {
   insertBlockedWord,
   insertOrUpdatePuzzle,
   normalizeLettersKey,
-  recomputeMaxScoresForAffectedWord,
+  recomputeAffectedPuzzlesForWord,
   softDeletePuzzle,
   swapPuzzles,
   updatePuzzleCenter,
@@ -165,7 +160,6 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         }
 
         const targetSlot = saveResult.targetSlot;
-        invalidatePuzzleCache();
         const displayNumber = (await getDisplayNumber(db, targetSlot)) ?? targetSlot + 1;
         const total = await totalPuzzles(db);
 
@@ -200,7 +194,6 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         await insertAdminLog(trx, admin.adminId, 'delete_puzzle', `slot=${slot}`);
       });
 
-      invalidatePuzzleCache();
       const total = await totalPuzzles(db);
       return c.json({ status: 'deleted' as const, slot, total_puzzles: total }, 200);
     })
@@ -229,7 +222,6 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
           return c.json({ error: 'Molemmat aktiiviset pelit vaaditaan vaihtoon' }, 404);
         }
 
-        invalidatePuzzleCache();
         return c.json({ status: 'swapped' as const, slotA, slotB }, 200);
       },
     )
@@ -266,7 +258,6 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
           );
         });
 
-        invalidatePuzzleCache();
         return c.json({ status: 'updated' as const, slot, center }, 200);
       },
     )
@@ -409,7 +400,7 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         const inserted = await runImmediateTransactionWithRetry(db, async (trx) => {
           const ok = await insertBlockedWord(trx, word);
           if (!ok) return false;
-          await recomputeMaxScoresForAffectedWord(trx, word);
+          await recomputeAffectedPuzzlesForWord(trx, word);
           await insertAdminLog(trx, admin.adminId, 'block_word', `word=${word}`);
           return true;
         });
@@ -418,7 +409,6 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
           return c.json({ error: 'Sana on jo estetty' }, 409);
         }
 
-        invalidatePuzzleCache();
         return c.json({ status: 'blocked' as const, word }, 200);
       },
     )
@@ -432,7 +422,7 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
       const deletedWord = await runImmediateTransactionWithRetry(db, async (trx) => {
         const word = await deleteBlockedWord(trx, id);
         if (!word) return null;
-        await recomputeMaxScoresForAffectedWord(trx, word);
+        await recomputeAffectedPuzzlesForWord(trx, word);
         await insertAdminLog(trx, admin.adminId, 'unblock_word', `id=${id},word=${word}`);
         return word;
       });
@@ -441,7 +431,6 @@ export function createAdminPuzzleRoutes(db: Kysely<Database>) {
         return c.json({ error: 'Estettyä sanaa ei löydy' }, 404);
       }
 
-      invalidatePuzzleCache();
       return c.json({ status: 'unblocked' as const, id }, 200);
     })
     .get('/schedule', zValidator('query', AdminScheduleQuerySchema), async (c) => {

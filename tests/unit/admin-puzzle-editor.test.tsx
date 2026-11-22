@@ -3,12 +3,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VariationData } from '@sanakenno/shared';
-import { AdminWordListPanel } from '../../packages/web/src/features/admin/AdminWordListPanel.js';
-import { PuzzleEditor } from '../../packages/web/src/features/admin/PuzzleEditor.js';
-import { PuzzleSlotControls } from '../../packages/web/src/features/admin/PuzzleSlotControls.js';
-import { useAdminStore } from '../../packages/web/src/features/admin/useAdminStore.js';
-import { VariationsGrid } from '../../packages/web/src/features/admin/VariationsGrid.js';
-import { WordList } from '../../packages/web/src/features/admin/WordList.js';
+import {
+  AdminWordListPanel,
+  PuzzleEditor,
+  PuzzleSlotControls,
+  useAdminStore,
+  VariationsGrid,
+  WordList,
+} from '@sanakenno/admin';
 
 const mockAdminGetSlots = vi.fn();
 const mockAdminGetPuzzleVariations = vi.fn();
@@ -17,7 +19,7 @@ const mockAdminSavePuzzle = vi.fn();
 const mockAdminGetSuggestion = vi.fn();
 const mockAdminDeletePuzzle = vi.fn();
 
-vi.mock('../../packages/web/src/api/client.js', () => ({
+vi.mock('../../packages/admin/src/api/admin-client.js', () => ({
   adminGetSlots: (...args: unknown[]) => mockAdminGetSlots(...args),
   adminGetPuzzleVariations: (...args: unknown[]) => mockAdminGetPuzzleVariations(...args),
   adminPreview: (...args: unknown[]) => mockAdminPreview(...args),
@@ -30,11 +32,7 @@ vi.mock('../../packages/web/src/api/client.js', () => ({
 }));
 
 function renderWithQuery(ui: ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
-  });
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 

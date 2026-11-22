@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AdminCombinationItem } from '@sanakenno/shared';
-import { adminGetCombinations } from '../../api/client.js';
+import { adminGetCombinations } from './api/admin-client.js';
 import {
   ADMIN_CARD_CLASS,
   ADMIN_CARD_STYLE,

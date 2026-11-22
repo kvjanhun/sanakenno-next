@@ -307,12 +307,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const keysToRemove: string[] = [];
           for (let i = 0; i < window.localStorage.length; i++) {
             const key = window.localStorage.key(i);
-            if (
-              key &&
-              (key.startsWith('sanakenno_state_') ||
-                key.startsWith('revealed_') ||
-                key === 'sanakenno_state')
-            ) {
+            if (key && (key.startsWith('sanakenno_state_') || key.startsWith('revealed_'))) {
               keysToRemove.push(key);
             }
           }

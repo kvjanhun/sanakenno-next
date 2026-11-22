@@ -2,16 +2,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { BlockedWords } from '../../packages/web/src/features/admin/BlockedWords.js';
-import { CombinationsBrowser } from '../../packages/web/src/features/admin/CombinationsBrowser.js';
-import { LoginPage } from '../../packages/web/src/features/admin/LoginPage.js';
-import { ManualPuzzleForm } from '../../packages/web/src/features/admin/ManualPuzzleForm.js';
-import { Schedule } from '../../packages/web/src/features/admin/Schedule.js';
-import { Stats } from '../../packages/web/src/features/admin/Stats.js';
-import { SuggestionPanel } from '../../packages/web/src/features/admin/SuggestionPanel.js';
-import { SuggestionRejections } from '../../packages/web/src/features/admin/SuggestionRejections.js';
-import { useAdminStore } from '../../packages/web/src/features/admin/useAdminStore.js';
-import { WordFinds } from '../../packages/web/src/features/admin/WordFinds.js';
+import {
+  BlockedWords,
+  CombinationsBrowser,
+  LoginPage,
+  ManualPuzzleForm,
+  Schedule,
+  Stats,
+  SuggestionPanel,
+  SuggestionRejections,
+  useAdminStore,
+  WordFinds,
+} from '@sanakenno/admin';
 
 const mockAdminGetBlocked = vi.fn();
 const mockAdminBlockWord = vi.fn();
@@ -26,7 +28,7 @@ const mockAdminGetCombinations = vi.fn();
 const mockAdminGetWordFinds = vi.fn();
 const mockAdminGetSlots = vi.fn();
 
-vi.mock('../../packages/web/src/api/client.js', () => ({
+vi.mock('../../packages/admin/src/api/admin-client.js', () => ({
   adminGetBlocked: (...args: unknown[]) => mockAdminGetBlocked(...args),
   adminBlockWord: (...args: unknown[]) => mockAdminBlockWord(...args),
   adminUnblockWord: (...args: unknown[]) => mockAdminUnblockWord(...args),

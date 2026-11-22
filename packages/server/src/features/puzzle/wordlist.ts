@@ -71,17 +71,6 @@ let _allWords = new Set<string>();
 let _lemmaMap = new Map<string, string>();
 let _wordlistLoaded = false;
 
-interface CachedPuzzleEntry {
-  data: FullPuzzleData;
-  cachedAt: number;
-}
-
-const _puzzleCache = new Map<number, CachedPuzzleEntry>();
-
-/** Default in-memory TTL for cached puzzle payloads so cross-instance blocked_words edits propagate. */
-export const DEFAULT_PUZZLE_CACHE_TTL_MS = 60_000;
-let _puzzleCacheTtlMs = DEFAULT_PUZZLE_CACHE_TTL_MS;
-
 /**
  * Normalize a raw candidate word by trimming, lowercasing, and stripping hyphens.
  */
@@ -102,10 +91,7 @@ function isFinnishAlphabetOnly(word: string): boolean {
 function resolveDefaultWordlistPath(): string | null {
   const candidates = [
     process.env.WORDLIST_PATH,
-    process.env.DATA_DIR ? path.join(process.env.DATA_DIR, 'kotus_words.txt') : null,
     path.resolve(import.meta.dirname, '../../../assets/kotus_words.txt'),
-    path.resolve(import.meta.dirname, '../../../data/kotus_words.txt'),
-    '/data/kotus_words.txt',
   ];
 
   for (const candidate of candidates) {
@@ -125,7 +111,6 @@ export function loadWordlist(customPath?: string): Set<string> {
     _allWords = new Set();
     _lemmaMap = new Map();
     _wordlistLoaded = true;
-    invalidatePuzzleCache();
     return _allWords;
   }
 
@@ -147,7 +132,6 @@ export function loadWordlist(customPath?: string): Set<string> {
   _allWords = words;
   _lemmaMap = lemmaMap;
   _wordlistLoaded = true;
-  invalidatePuzzleCache();
   return _allWords;
 }
 
@@ -195,7 +179,6 @@ export function setWordlist(words: Iterable<string>): void {
   _allWords = normalized;
   _lemmaMap = lemmaMap;
   _wordlistLoaded = true;
-  invalidatePuzzleCache();
 }
 
 function ensureWordlist(): void {
@@ -351,70 +334,42 @@ export function computeVariations(
   });
 }
 
-/** Maximum active puzzles retained in Node memory heap. */
-export const MAX_PUZZLE_CACHE_SIZE = 10;
-
 /**
- * Override the in-memory puzzle cache TTL in milliseconds (primarily for deterministic tests).
+ * Parse and validate a precomputed `PuzzleData` JSON string stored in `puzzles.computed_data`.
+ * Returns null if absent, malformed, or missing required fields.
  */
-export function setPuzzleCacheTtlMs(ttlMs: number): void {
-  _puzzleCacheTtlMs = ttlMs;
-}
-
-/**
- * Read a cached full puzzle by slot if present and unexpired.
- * Refreshes LRU recency when found.
- */
-export function getCachedPuzzle(slot: number): FullPuzzleData | undefined {
-  const entry = _puzzleCache.get(slot);
-  if (entry === undefined) {
-    return undefined;
-  }
-  if (Date.now() - entry.cachedAt >= _puzzleCacheTtlMs) {
-    _puzzleCache.delete(slot);
-    return undefined;
-  }
-  _puzzleCache.delete(slot);
-  _puzzleCache.set(slot, entry);
-  return entry.data;
-}
-
-/**
- * Store a computed full puzzle in the slot cache, evicting the least recently used
- * when exceeding MAX_PUZZLE_CACHE_SIZE.
- */
-export function setCachedPuzzle(
-  slot: number,
-  data: FullPuzzleData,
-  preserveCachedAt = false,
-): void {
-  const existing = _puzzleCache.get(slot);
-  const cachedAt = preserveCachedAt && existing ? existing.cachedAt : Date.now();
-  if (_puzzleCache.has(slot)) {
-    _puzzleCache.delete(slot);
-  } else if (_puzzleCache.size >= MAX_PUZZLE_CACHE_SIZE) {
-    const oldestKey = _puzzleCache.keys().next().value;
-    if (oldestKey !== undefined) {
-      _puzzleCache.delete(oldestKey);
+export function parseComputedPuzzleData(raw: string | null | undefined): PuzzleData | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const obj = parsed as Record<string, unknown>;
+    if (
+      !Array.isArray(obj.words) ||
+      !Array.isArray(obj.word_hashes) ||
+      typeof obj.max_score !== 'number' ||
+      !Number.isFinite(obj.max_score) ||
+      !obj.hint_data ||
+      typeof obj.hint_data !== 'object'
+    ) {
+      return null;
     }
+    const hintData = obj.hint_data as Record<string, unknown>;
+    if (
+      typeof hintData.word_count !== 'number' ||
+      typeof hintData.pangram_count !== 'number' ||
+      !obj.words.every((w) => typeof w === 'string') ||
+      !obj.word_hashes.every((h) => typeof h === 'string')
+    ) {
+      return null;
+    }
+    return {
+      words: obj.words as string[],
+      word_hashes: obj.word_hashes as string[],
+      max_score: obj.max_score,
+      hint_data: obj.hint_data as HintData,
+    };
+  } catch {
+    return null;
   }
-  _puzzleCache.set(slot, { data, cachedAt });
-}
-
-/**
- * Return current number of cached puzzles in memory.
- */
-export function getPuzzleCacheSize(): number {
-  return _puzzleCache.size;
-}
-
-/**
- * Invalidate cached puzzle data for a single slot or all slots when omitted.
- */
-export function invalidatePuzzleCache(slot?: number): void {
-  if (slot !== undefined) {
-    _puzzleCache.delete(slot);
-    return;
-  }
-  _puzzleCache.clear();
 }

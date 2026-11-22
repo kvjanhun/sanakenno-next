@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@sanakenno/admin": "workspace:*",
     "@sanakenno/shared": "workspace:*",
     "@tanstack/react-query": "^5.69.0",
     "hono": "^4.7.4",

@@ -15,7 +15,8 @@
 | :--- | :--- | :--- |
 | `@sanakenno/shared` | `packages/shared` | Pure Finnish scoring, ranks, streaks, achievements, Kotus lemma links, theme IDs, and shared Zod schemas (zero I/O). |
 | `@sanakenno/server` | `packages/server` | Hono API + `@hono/zod-validator` routes, Kysely dual-engine layer (Turso libSQL in production, `better-sqlite3` locally), edge security middleware, and SPA serving. |
-| `@sanakenno/web` | `packages/web` | React 19 + Vite PWA + Tailwind CSS 4 UI, Zustand stores, TanStack Query, typed `apiClient`, and admin panel. |
+| `@sanakenno/web` | `packages/web` | React 19 + Vite PWA + Tailwind CSS 4 player game UI, Zustand stores, TanStack Query, and typed `apiClient`. |
+| `@sanakenno/admin` | `packages/admin` | Lazy-loaded `#/admin` puzzle curation, scheduling, suggestion workbench, analytics UI, and typed `admin-client.ts`. |
 
 ## Quickstart
 

@@ -7,7 +7,6 @@ import {
 } from '../../packages/server/src/features/player-auth/player-auth.routes.js';
 import {
   DEFAULT_SEED_WORDS,
-  invalidatePuzzleCache,
   setWordlist,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
@@ -33,7 +32,6 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
     resetTransferCreateRateLimit();
     resetEmailRateLimit();
     setWordlist(DEFAULT_SEED_WORDS);
-    invalidatePuzzleCache();
     await harness.destroy();
   });
 
@@ -343,7 +341,32 @@ describe('Player Auth & Sync Hardening (Spec 29)', () => {
     expect(data1.puzzle_states[0]?.score_before_hints).toBe(0);
     expect(data1.stats.records).toHaveLength(0);
 
-    // 2. Now find a word -> stats record is created; subsequent hint-only sync updates hints_used
+    // 1b. A 0-word daily hint unlock must NOT persist is_daily=1 (archive play later stays is_daily=false)
+    await harness.client.api.player.sync.progress.$post(
+      {
+        json: {
+          puzzle_number: 1,
+          date: '2026-04-10',
+          found_words: ['kana'],
+          score: 1,
+          max_score: 100,
+          hints_unlocked: ['tier1'],
+          started_at: 1000,
+          total_paused_ms: 0,
+          score_before_hints: 0,
+          is_daily: false,
+          played_at_date: '2026-04-12',
+        },
+      },
+      { headers },
+    );
+    const pullArchive = await harness.client.api.player.sync.$get({}, { headers });
+    const dataArchive = (await pullArchive.json()) as {
+      stats: { records: Array<{ is_daily?: boolean }> };
+    };
+    expect(dataArchive.stats.records[0]?.is_daily).toBe(false);
+
+    // 2. Now find a word on daily -> is_daily upgrades monotonically; subsequent hint-only sync updates hints_used
     await harness.client.api.player.sync.progress.$post(
       {
         json: {

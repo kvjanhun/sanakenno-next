@@ -12,10 +12,6 @@ import {
 } from '../../packages/server/src/features/puzzle/puzzle.queries.js';
 import {
   DEFAULT_SEED_WORDS,
-  getCachedPuzzle,
-  getPuzzleCacheSize,
-  invalidatePuzzleCache,
-  MAX_PUZZLE_CACHE_SIZE,
   setWordlist,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
@@ -45,13 +41,10 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
       .insertInto('config')
       .values({ key: 'epoch_date', value: '2026-01-01' })
       .execute();
-
-    invalidatePuzzleCache();
   });
 
   afterEach(async () => {
     vi.useRealTimers();
-    invalidatePuzzleCache();
     await harness.destroy();
   });
 
@@ -61,7 +54,6 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
       await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 2).execute();
       // Also soft-delete highest slot 4 to verify nextFreeSlot never reuses it
       await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 4).execute();
-      invalidatePuzzleCache();
 
       expect(await getActiveSlots(harness.db)).toEqual([1, 3]);
       expect(await totalPuzzles(harness.db)).toBe(2);
@@ -99,7 +91,6 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
     it('rotates sequentially across active slots and skips soft-deleted slots without duplicate days', async () => {
       // Soft-delete slot 2 so active slots are [1, 3, 4]
       await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 2).execute();
-      invalidatePuzzleCache();
 
       // epoch 2026-01-01 -> index 0 -> slot 1 (display 1)
       // 2026-01-02 -> index 1 -> slot 3 (display 2)
@@ -238,7 +229,6 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
 
     it('returns canonical hyphenated lemmas for compound words in GET /api/puzzle/:number/words', async () => {
       setWordlist([...DEFAULT_SEED_WORDS, 'laina-aika']);
-      invalidatePuzzleCache();
 
       const res = await harness.client.api.puzzle[':number'].words.$get({
         param: { number: '1' },
@@ -291,7 +281,6 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
     it('walks the active cycle by cycle position on ?all=true and skips soft-deleted slots', async () => {
       // Soft-delete slot 2 so active slots are [1, 3, 4]
       await harness.db.updateTable('puzzles').set({ is_active: 0 }).where('slot', '=', 2).execute();
-      invalidatePuzzleCache();
 
       // Today (2026-01-03) is at active cycle index 2 (slot 4) -> ?all=true returns 3 entries (slots 4, 3, 1)
       const resMidCycle = await harness.app.request('/api/archive?all=true');
@@ -311,10 +300,7 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
       expect(startEntries.map((e) => e.puzzle_number)).toEqual([1, 4, 3]);
     });
 
-    it('returns archive entries with max_score and does NOT populate _puzzleCache', async () => {
-      invalidatePuzzleCache();
-      expect(getPuzzleCacheSize()).toBe(0);
-
+    it('returns archive entries with persisted max_score and lazily persists computed_data when missing', async () => {
       const res = await harness.app.request('/api/archive?all=true');
       expect(res.status).toBe(200);
       const entries = (await res.json()) as Array<{
@@ -327,49 +313,13 @@ describe('Daily Puzzle & Archive RPC (Kysely + Hono integration)', () => {
         expect(entry.max_score).toBeGreaterThan(0);
       }
 
-      // Archive batch querying must NOT populate or pollute _puzzleCache with historical games
-      expect(getPuzzleCacheSize()).toBe(0);
-    });
-
-    it('bounds _puzzleCache to MAX_PUZZLE_CACHE_SIZE using LRU eviction', async () => {
-      invalidatePuzzleCache();
-
-      // Seed 15 active puzzle slots
-      for (let s = 10; s <= 24; s++) {
-        await harness.db
-          .insertInto('puzzles')
-          .values({
-            slot: s,
-            letters: 'a,e,i,k,l,n,s',
-            center: 'a',
-            is_active: 1,
-            max_score: 100,
-          })
-          .execute();
-      }
-
-      // Advance time past full active cycle so all seeded slots 10..24 have appeared in rotation
-      vi.setSystemTime(new Date('2026-02-15T10:00:00Z'));
-
-      // Request each puzzle from 10 to 24 sequentially to load them into cache
-      for (let s = 10; s <= 24; s++) {
-        const res = await harness.client.api.puzzle[':number'].$get({
-          param: { number: String(s) },
-        });
-        expect(res.status).toBe(200);
-      }
-
-      // Cache size must never exceed MAX_PUZZLE_CACHE_SIZE (10)
-      expect(getPuzzleCacheSize()).toBe(MAX_PUZZLE_CACHE_SIZE);
-
-      // Oldest slots (10..14) should have been evicted
-      expect(getCachedPuzzle(10)).toBeUndefined();
-      expect(getCachedPuzzle(11)).toBeUndefined();
-      expect(getCachedPuzzle(14)).toBeUndefined();
-
-      // Recent slots (15..24) must remain in cache
-      expect(getCachedPuzzle(24)).toBeDefined();
-      expect(getCachedPuzzle(20)).toBeDefined();
+      const persisted = await harness.db
+        .selectFrom('puzzles')
+        .select(['slot', 'max_score', 'computed_data'])
+        .where('slot', '=', 1)
+        .executeTakeFirstOrThrow();
+      expect(persisted.max_score).toBeGreaterThan(0);
+      expect(persisted.computed_data).toBeTruthy();
     });
   });
 });

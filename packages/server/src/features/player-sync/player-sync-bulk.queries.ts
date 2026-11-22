@@ -1,22 +1,24 @@
 import {
   bestNoHintScoreForRecord,
+  deriveStatsRecordFromState,
   isDailyRecord,
   mergeIsDaily,
   mergePuzzleState,
   mergeStatsRecord,
   rankForScore,
   recalcScore,
+  type CanonicalPuzzleState,
   type PlayerStats,
+  type PuzzleMetaForStats,
   type StatsRecord,
   type SyncPuzzleState,
 } from '@sanakenno/shared';
 import { sql, type Kysely } from 'kysely';
 import type { Database } from '../../db/schema.js';
 import { getBlockedWords } from '../puzzle/puzzle.queries.js';
-import { computePuzzle, type FullPuzzleData } from '../puzzle/wordlist.js';
+import { computePuzzle, parseComputedPuzzleData, type FullPuzzleData } from '../puzzle/wordlist.js';
 
-const STATS_UPSERT_CHUNK_SIZE = 40;
-const STATE_UPSERT_CHUNK_SIZE = 50;
+const STATE_UPSERT_CHUNK_SIZE = 40;
 const SLOT_IN_QUERY_CHUNK_SIZE = 500;
 
 /**
@@ -33,10 +35,22 @@ export function parseStringArray(raw: string | null | undefined): string[] {
   }
 }
 
-export interface BulkPuzzleMeta {
-  allLetters: Set<string>;
+/**
+ * Safely parse a JSON string column into a `StatsRecord`, or null if absent/invalid.
+ */
+export function parseFrozenStats(raw: string | null | undefined): StatsRecord | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as StatsRecord;
+  } catch {
+    return null;
+  }
+}
+
+export interface BulkPuzzleMeta extends PuzzleMetaForStats {
   validWords: Set<string>;
-  maxScore: number;
   wordCount: number;
   pangramCount: number;
 }
@@ -109,17 +123,14 @@ export function sanitizeAndMergePuzzleState(
   };
 }
 
-/**
- * Sanitize incoming stats record against authoritative puzzle bounds and merge monotonically.
- */
-export function sanitizeAndMergeStatsRecord(
+function sanitizeIncomingStatsRecord(
   existing: StatsRecord | undefined,
   incoming: StatsRecord,
   meta: Pick<BulkPuzzleMeta, 'maxScore' | 'wordCount' | 'pangramCount'> | null,
 ): StatsRecord {
   const maxScore = meta ? meta.maxScore : incoming.max_score;
   const cappedScore = Math.min(incoming.best_score, maxScore);
-  const sanitizedIncoming: StatsRecord = {
+  const sanitized: StatsRecord = {
     ...incoming,
     max_score: maxScore,
     best_score: cappedScore,
@@ -134,12 +145,12 @@ export function sanitizeAndMergeStatsRecord(
         : undefined,
   };
 
-  const mergedBase = existing ? mergeStatsRecord(existing, sanitizedIncoming) : sanitizedIncoming;
+  const mergedBase = existing ? mergeStatsRecord(existing, sanitized) : sanitized;
   const mergedMaxScore = meta
     ? meta.maxScore
     : existing
-      ? Math.max(existing.max_score, sanitizedIncoming.max_score)
-      : sanitizedIncoming.max_score;
+      ? Math.max(existing.max_score, sanitized.max_score)
+      : sanitized.max_score;
   const mergedScore = Math.min(mergedBase.best_score, mergedMaxScore);
 
   return {
@@ -151,14 +162,13 @@ export function sanitizeAndMergeStatsRecord(
       Number(existing?.long_words_count ?? 0),
       mergedBase.long_words_count ?? 0,
     ),
-    is_daily: existing
-      ? mergeIsDaily(existing, sanitizedIncoming)
-      : isDailyRecord(sanitizedIncoming),
+    is_daily: existing ? mergeIsDaily(existing, sanitized) : isDailyRecord(sanitized),
     played_at_date: mergedBase.played_at_date ?? existing?.played_at_date,
+    best_no_hint_score: Math.min(bestNoHintScoreForRecord(mergedBase), mergedScore),
   };
 }
 
-function chunkArray<T>(items: T[], size: number): T[][] {
+export function chunkArray<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
     chunks.push(items.slice(i, i + size));
@@ -167,9 +177,9 @@ function chunkArray<T>(items: T[], size: number): T[][] {
 }
 
 /**
- * Pre-resolve sanitization metadata for all unique referenced puzzle slots outside a write
- * transaction using 2 parallel queries (`puzzles WHERE slot IN (...)` + `blocked_words`),
- * without polluting the 10-entry `_puzzleCache`.
+ * Pre-resolve sanitization metadata for all unique referenced puzzle slots directly from
+ * `puzzles.computed_data`, only querying `blocked_words` + running `computePuzzle` for
+ * legacy rows with `computed_data = NULL`.
  */
 export async function preloadBulkPuzzleMeta(
   db: Kysely<Database>,
@@ -191,20 +201,18 @@ export async function preloadBulkPuzzleMeta(
   }
 
   const slotChunks = chunkArray(uniqueSlots, SLOT_IN_QUERY_CHUNK_SIZE);
-  const [puzzleRowChunks, blockedWords] = await Promise.all([
-    Promise.all(
-      slotChunks.map((slots) =>
-        db
-          .selectFrom('puzzles')
-          .select(['slot', 'letters', 'center', 'max_score'])
-          .where('slot', 'in', slots)
-          .where('is_active', '=', 1)
-          .execute(),
-      ),
+  const puzzleRowChunks = await Promise.all(
+    slotChunks.map((slots) =>
+      db
+        .selectFrom('puzzles')
+        .select(['slot', 'letters', 'center', 'max_score', 'computed_data'])
+        .where('slot', 'in', slots)
+        .where('is_active', '=', 1)
+        .execute(),
     ),
-    getBlockedWords(db),
-  ]);
+  );
 
+  let blockedWords: string[] | null = null;
   for (const rows of puzzleRowChunks) {
     for (const row of rows) {
       const centerNormalized = row.center.trim().toLowerCase();
@@ -215,7 +223,13 @@ export async function preloadBulkPuzzleMeta(
           .filter(Boolean),
       );
       allLetters.add(centerNormalized);
-      const computed = computePuzzle(row.letters, row.center, blockedWords);
+      let computed = parseComputedPuzzleData(row.computed_data);
+      if (!computed) {
+        if (blockedWords === null) {
+          blockedWords = await getBlockedWords(db);
+        }
+        computed = computePuzzle(row.letters, row.center, blockedWords);
+      }
       metaMap.set(Number(row.slot), {
         allLetters,
         validWords: new Set(computed.words),
@@ -230,8 +244,8 @@ export async function preloadBulkPuzzleMeta(
 }
 
 /**
- * Bulk upsert client stats and puzzle states when pairing a device via `/auth/transfer/use`
- * using bounded bulk reads and chunked multi-row UPSERT statements.
+ * Bulk upsert client stats and puzzle states into the single canonical `player_puzzle_states` table
+ * when pairing a device via `/auth/transfer/use`.
  */
 export async function bulkUpsertLocalData(
   db: Kysely<Database>,
@@ -248,182 +262,198 @@ export async function bulkUpsertLocalData(
 
   const puzzleMetaMap = preloadedPuzzles ?? (await preloadBulkPuzzleMeta(db, stats, puzzleStates));
 
-  if (statRecords.length > 0) {
-    const existingRows = await db
-      .selectFrom('player_stats')
-      .select([
-        'puzzle_number',
-        'date',
-        'best_rank',
-        'best_score',
-        'max_score',
-        'words_found',
-        'hints_used',
-        'elapsed_ms',
-        'longest_word',
-        'pangrams_found',
-        'best_no_hint_score',
-        'long_words_count',
-        'is_daily',
-        'played_at_date',
-      ])
-      .where('player_id', '=', playerId)
-      .execute();
+  const existingRows = await db
+    .selectFrom('player_puzzle_states')
+    .select([
+      'puzzle_number',
+      'found_words',
+      'score',
+      'hints_unlocked',
+      'started_at',
+      'total_paused_ms',
+      'score_before_hints',
+      'revealed',
+      'date',
+      'max_score',
+      'is_daily',
+      'played_at_date',
+      'elapsed_ms',
+      'frozen_stats_json',
+    ])
+    .where('player_id', '=', playerId)
+    .execute();
 
-    const statsMap = new Map<number, StatsRecord>();
-    for (const row of existingRows) {
-      const puzzleNumber = Number(row.puzzle_number);
-      statsMap.set(puzzleNumber, {
-        puzzle_number: puzzleNumber,
-        date: row.date,
-        best_rank: row.best_rank,
-        best_score: Number(row.best_score),
-        max_score: Number(row.max_score),
-        words_found: Number(row.words_found),
-        hints_used: Number(row.hints_used),
-        elapsed_ms: Number(row.elapsed_ms),
-        longest_word: row.longest_word ?? undefined,
-        pangrams_found: Number(row.pangrams_found),
-        best_no_hint_score: Number(row.best_no_hint_score),
-        long_words_count: Number(row.long_words_count ?? 0),
-        is_daily: Boolean(row.is_daily),
-        played_at_date: row.played_at_date ?? undefined,
-      });
-    }
-
-    const dirtySlots = new Set<number>();
-    for (const incoming of statRecords) {
-      const merged = sanitizeAndMergeStatsRecord(
-        statsMap.get(incoming.puzzle_number),
-        incoming,
-        puzzleMetaMap.get(incoming.puzzle_number) ?? null,
-      );
-      statsMap.set(incoming.puzzle_number, merged);
-      dirtySlots.add(incoming.puzzle_number);
-    }
-
-    const valuesToUpsert = Array.from(dirtySlots).map((slot) => {
-      const merged = statsMap.get(slot)!;
-      return {
-        player_id: playerId,
-        puzzle_number: merged.puzzle_number,
-        date: merged.date,
-        best_rank: merged.best_rank,
-        best_score: merged.best_score,
-        max_score: merged.max_score,
-        words_found: merged.words_found,
-        hints_used: merged.hints_used,
-        elapsed_ms: merged.elapsed_ms,
-        longest_word:
-          merged.longest_word && merged.longest_word.length > 0 ? merged.longest_word : null,
-        pangrams_found: merged.pangrams_found ?? 0,
-        best_no_hint_score: bestNoHintScoreForRecord(merged),
-        long_words_count: merged.long_words_count ?? 0,
-        is_daily: merged.is_daily ? 1 : 0,
-        played_at_date: merged.played_at_date ?? null,
-      };
+  const canonicalMap = new Map<number, CanonicalPuzzleState>();
+  for (const row of existingRows) {
+    const puzzleNumber = Number(row.puzzle_number);
+    canonicalMap.set(puzzleNumber, {
+      puzzle_number: puzzleNumber,
+      found_words: parseStringArray(row.found_words),
+      score: Number(row.score),
+      hints_unlocked: parseStringArray(row.hints_unlocked),
+      started_at: Number(row.started_at),
+      total_paused_ms: Number(row.total_paused_ms),
+      score_before_hints: row.score_before_hints !== null ? Number(row.score_before_hints) : null,
+      revealed: Boolean(row.revealed),
+      date: row.date,
+      max_score: Number(row.max_score),
+      is_daily: Boolean(row.is_daily),
+      played_at_date: row.played_at_date,
+      elapsed_ms: Number(row.elapsed_ms),
+      frozen_stats: parseFrozenStats(row.frozen_stats_json),
     });
-
-    for (const chunk of chunkArray(valuesToUpsert, STATS_UPSERT_CHUNK_SIZE)) {
-      await db
-        .insertInto('player_stats')
-        .values(chunk)
-        .onConflict((oc) =>
-          oc.columns(['player_id', 'puzzle_number']).doUpdateSet((eb) => ({
-            date: eb.ref('excluded.date'),
-            best_rank: eb.ref('excluded.best_rank'),
-            best_score: eb.ref('excluded.best_score'),
-            max_score: eb.ref('excluded.max_score'),
-            words_found: eb.ref('excluded.words_found'),
-            hints_used: eb.ref('excluded.hints_used'),
-            elapsed_ms: eb.ref('excluded.elapsed_ms'),
-            longest_word: eb.ref('excluded.longest_word'),
-            pangrams_found: eb.ref('excluded.pangrams_found'),
-            best_no_hint_score: eb.ref('excluded.best_no_hint_score'),
-            long_words_count: eb.ref('excluded.long_words_count'),
-            is_daily: eb.ref('excluded.is_daily'),
-            played_at_date: eb.ref('excluded.played_at_date'),
-            updated_at: sql<string>`datetime('now')`,
-          })),
-        )
-        .execute();
-    }
   }
 
-  if (states.length > 0) {
-    const existingRows = await db
-      .selectFrom('player_puzzle_states')
-      .select([
-        'puzzle_number',
-        'found_words',
-        'score',
-        'hints_unlocked',
-        'started_at',
-        'total_paused_ms',
-        'score_before_hints',
-        'revealed',
-      ])
-      .where('player_id', '=', playerId)
-      .execute();
+  const incomingStatesBySlot = new Map<number, SyncPuzzleState>();
+  for (const st of states) {
+    incomingStatesBySlot.set(st.puzzle_number, st);
+  }
+  const incomingStatsBySlot = new Map<number, StatsRecord>();
+  for (const rec of statRecords) {
+    incomingStatsBySlot.set(rec.puzzle_number, rec);
+  }
 
-    const stateMap = new Map<number, SyncPuzzleState>();
-    for (const row of existingRows) {
-      const puzzleNumber = Number(row.puzzle_number);
-      stateMap.set(puzzleNumber, {
-        puzzle_number: puzzleNumber,
-        found_words: parseStringArray(row.found_words),
-        score: Number(row.score),
-        hints_unlocked: parseStringArray(row.hints_unlocked),
-        started_at: Number(row.started_at),
-        total_paused_ms: Number(row.total_paused_ms),
-        score_before_hints: row.score_before_hints !== null ? Number(row.score_before_hints) : null,
-        revealed: Boolean(row.revealed),
-      });
-    }
+  const dirtySlots = new Set<number>([
+    ...incomingStatesBySlot.keys(),
+    ...incomingStatsBySlot.keys(),
+  ]);
 
-    const dirtySlots = new Set<number>();
-    for (const incoming of states) {
-      const merged = sanitizeAndMergePuzzleState(
-        stateMap.get(incoming.puzzle_number),
-        incoming,
-        puzzleMetaMap.get(incoming.puzzle_number) ?? null,
-      );
-      stateMap.set(incoming.puzzle_number, merged);
-      dirtySlots.add(incoming.puzzle_number);
-    }
+  for (const slot of dirtySlots) {
+    const meta = puzzleMetaMap.get(slot) ?? null;
+    const existing = canonicalMap.get(slot);
+    const incomingState = incomingStatesBySlot.get(slot);
+    const incomingStat = incomingStatsBySlot.get(slot);
 
-    const valuesToUpsert = Array.from(dirtySlots).map((slot) => {
-      const merged = stateMap.get(slot)!;
-      return {
-        player_id: playerId,
-        puzzle_number: merged.puzzle_number,
-        found_words: JSON.stringify(merged.found_words),
-        score: merged.score,
-        hints_unlocked: JSON.stringify(merged.hints_unlocked),
-        started_at: merged.started_at,
-        total_paused_ms: merged.total_paused_ms,
-        score_before_hints: merged.score_before_hints ?? null,
-        revealed: merged.revealed ? 1 : 0,
+    const wasRevealed = Boolean(existing?.revealed);
+    const mergedState: SyncPuzzleState = incomingState
+      ? sanitizeAndMergePuzzleState(existing, incomingState, meta)
+      : (existing ?? {
+          puzzle_number: slot,
+          found_words: [],
+          score: 0,
+          hints_unlocked: [],
+          started_at: 0,
+          total_paused_ms: 0,
+          score_before_hints: null,
+          revealed: false,
+        });
+
+    const isNowRevealed = Boolean(mergedState.revealed);
+    let frozenStats = existing?.frozen_stats ?? null;
+    let date = existing?.date ?? null;
+    let maxScore = meta ? meta.maxScore : (existing?.max_score ?? 0);
+    let isDaily = Boolean(existing?.is_daily);
+    let playedAtDate = existing?.played_at_date ?? null;
+    let elapsedMs = existing?.elapsed_ms ?? 0;
+
+    if (!wasRevealed && isNowRevealed) {
+      const existingDerived = existing ? deriveStatsRecordFromState(existing, meta) : null;
+      if (incomingStat && incomingStat.words_found > 0) {
+        const mergedFrozen = sanitizeIncomingStatsRecord(
+          existingDerived ?? undefined,
+          incomingStat,
+          meta,
+        );
+        frozenStats = mergedFrozen;
+        date = date || mergedFrozen.date;
+        maxScore = meta ? meta.maxScore : Math.max(maxScore, mergedFrozen.max_score);
+        isDaily = Boolean(mergedFrozen.is_daily);
+        playedAtDate = mergedFrozen.played_at_date ?? playedAtDate;
+        elapsedMs = Math.max(elapsedMs, mergedFrozen.elapsed_ms);
+      } else {
+        frozenStats = existingDerived;
+      }
+    } else if (!isNowRevealed && incomingStat) {
+      const baseExistingStats = existing
+        ? (deriveStatsRecordFromState(existing, meta) ?? undefined)
+        : undefined;
+      const sanitizedStat = sanitizeIncomingStatsRecord(baseExistingStats, incomingStat, meta);
+      date = date || sanitizedStat.date;
+      maxScore = meta ? meta.maxScore : Math.max(maxScore, sanitizedStat.max_score);
+      isDaily = Boolean(sanitizedStat.is_daily);
+      playedAtDate = sanitizedStat.played_at_date ?? playedAtDate;
+      elapsedMs = Math.max(elapsedMs, sanitizedStat.elapsed_ms);
+
+      const candidateState: CanonicalPuzzleState = {
+        ...mergedState,
+        date,
+        max_score: maxScore,
+        is_daily: isDaily,
+        played_at_date: playedAtDate,
+        elapsed_ms: elapsedMs,
+        frozen_stats: null,
       };
-    });
+      const derivedOnly = deriveStatsRecordFromState(candidateState, meta);
+      const needsFrozen =
+        !derivedOnly ||
+        sanitizedStat.best_score > derivedOnly.best_score ||
+        sanitizedStat.words_found > derivedOnly.words_found ||
+        (sanitizedStat.pangrams_found ?? 0) > (derivedOnly.pangrams_found ?? 0) ||
+        (sanitizedStat.long_words_count ?? 0) > (derivedOnly.long_words_count ?? 0) ||
+        bestNoHintScoreForRecord(sanitizedStat) > bestNoHintScoreForRecord(derivedOnly) ||
+        (sanitizedStat.longest_word ?? '').length > (derivedOnly.longest_word ?? '').length ||
+        frozenStats !== null;
 
-    for (const chunk of chunkArray(valuesToUpsert, STATE_UPSERT_CHUNK_SIZE)) {
-      await db
-        .insertInto('player_puzzle_states')
-        .values(chunk)
-        .onConflict((oc) =>
-          oc.columns(['player_id', 'puzzle_number']).doUpdateSet((eb) => ({
-            found_words: eb.ref('excluded.found_words'),
-            score: eb.ref('excluded.score'),
-            hints_unlocked: eb.ref('excluded.hints_unlocked'),
-            started_at: eb.ref('excluded.started_at'),
-            total_paused_ms: eb.ref('excluded.total_paused_ms'),
-            score_before_hints: eb.ref('excluded.score_before_hints'),
-            revealed: eb.ref('excluded.revealed'),
-            updated_at: sql<string>`datetime('now')`,
-          })),
-        )
-        .execute();
+      if (needsFrozen) {
+        frozenStats = frozenStats ? mergeStatsRecord(frozenStats, sanitizedStat) : sanitizedStat;
+      }
     }
+
+    canonicalMap.set(slot, {
+      ...mergedState,
+      revealed: isNowRevealed,
+      date,
+      max_score: maxScore,
+      is_daily: isDaily,
+      played_at_date: playedAtDate,
+      elapsed_ms: elapsedMs,
+      frozen_stats: frozenStats,
+    });
+  }
+
+  const valuesToUpsert = Array.from(dirtySlots).map((slot) => {
+    const merged = canonicalMap.get(slot)!;
+    return {
+      player_id: playerId,
+      puzzle_number: merged.puzzle_number,
+      found_words: JSON.stringify(merged.found_words),
+      score: merged.score,
+      hints_unlocked: JSON.stringify(merged.hints_unlocked),
+      started_at: merged.started_at,
+      total_paused_ms: merged.total_paused_ms,
+      score_before_hints: merged.score_before_hints ?? null,
+      revealed: merged.revealed ? 1 : 0,
+      date: merged.date ?? null,
+      max_score: merged.max_score ?? 0,
+      is_daily: merged.is_daily ? 1 : 0,
+      played_at_date: merged.played_at_date ?? null,
+      elapsed_ms: merged.elapsed_ms ?? 0,
+      frozen_stats_json: merged.frozen_stats ? JSON.stringify(merged.frozen_stats) : null,
+    };
+  });
+
+  for (const chunk of chunkArray(valuesToUpsert, STATE_UPSERT_CHUNK_SIZE)) {
+    await db
+      .insertInto('player_puzzle_states')
+      .values(chunk)
+      .onConflict((oc) =>
+        oc.columns(['player_id', 'puzzle_number']).doUpdateSet((eb) => ({
+          found_words: eb.ref('excluded.found_words'),
+          score: eb.ref('excluded.score'),
+          hints_unlocked: eb.ref('excluded.hints_unlocked'),
+          started_at: eb.ref('excluded.started_at'),
+          total_paused_ms: eb.ref('excluded.total_paused_ms'),
+          score_before_hints: eb.ref('excluded.score_before_hints'),
+          revealed: eb.ref('excluded.revealed'),
+          date: eb.ref('excluded.date'),
+          max_score: eb.ref('excluded.max_score'),
+          is_daily: eb.ref('excluded.is_daily'),
+          played_at_date: eb.ref('excluded.played_at_date'),
+          elapsed_ms: eb.ref('excluded.elapsed_ms'),
+          frozen_stats_json: eb.ref('excluded.frozen_stats_json'),
+          updated_at: sql<string>`datetime('now')`,
+        })),
+      )
+      .execute();
   }
 }

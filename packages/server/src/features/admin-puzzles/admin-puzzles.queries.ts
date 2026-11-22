@@ -7,10 +7,9 @@ import {
 } from '../puzzle/puzzle.queries.js';
 import {
   computePuzzle,
-  getCachedPuzzle,
-  invalidatePuzzleCache,
   MIN_WORD_LENGTH,
   normalizeWord,
+  parseComputedPuzzleData,
 } from '../puzzle/wordlist.js';
 
 export interface PuzzleRow {
@@ -19,6 +18,7 @@ export interface PuzzleRow {
   center: string;
   is_active: number;
   max_score?: number | null;
+  computed_data?: string | null;
 }
 
 export function normalizeLettersKey(letters: string | string[]): string {
@@ -31,7 +31,7 @@ export function normalizeLettersKey(letters: string | string[]): string {
 async function getAllActivePuzzles(db: Kysely<Database>) {
   return db
     .selectFrom('puzzles')
-    .select(['slot', 'letters', 'center', 'is_active', 'max_score'])
+    .select(['slot', 'letters', 'center', 'is_active', 'max_score', 'computed_data'])
     .where('is_active', '=', 1)
     .orderBy('slot', 'asc')
     .execute();
@@ -96,6 +96,7 @@ export async function insertOrUpdatePuzzle(
   const blockedWords = await getBlockedWords(db);
   const computed = computePuzzle(letters, center, blockedWords);
   const maxScore = computed.max_score;
+  const computedJson = JSON.stringify(computed);
 
   const existing = await getPuzzleBySlot(db, slot);
   if (existing) {
@@ -105,6 +106,7 @@ export async function insertOrUpdatePuzzle(
         letters,
         center,
         max_score: maxScore,
+        computed_data: computedJson,
         is_active: 1,
         updated_at: new Date().toISOString(),
       })
@@ -118,6 +120,7 @@ export async function insertOrUpdatePuzzle(
         letters,
         center,
         max_score: maxScore,
+        computed_data: computedJson,
         is_active: 1,
       })
       .execute();
@@ -142,7 +145,7 @@ export async function swapPuzzles(
 ): Promise<boolean> {
   const rows = await db
     .selectFrom('puzzles')
-    .select(['slot', 'letters', 'center', 'is_active', 'max_score'])
+    .select(['slot', 'letters', 'center', 'is_active', 'max_score', 'computed_data'])
     .where('slot', 'in', [slotA, slotB])
     .where('is_active', '=', 1)
     .execute();
@@ -160,6 +163,7 @@ export async function swapPuzzles(
       letters: pB.letters,
       center: pB.center,
       max_score: pB.max_score,
+      computed_data: pB.computed_data,
       is_active: pB.is_active,
       updated_at: now,
     })
@@ -172,6 +176,7 @@ export async function swapPuzzles(
       letters: pA.letters,
       center: pA.center,
       max_score: pA.max_score,
+      computed_data: pA.computed_data,
       is_active: pA.is_active,
       updated_at: now,
     })
@@ -194,6 +199,7 @@ export async function updatePuzzleCenter(db: Kysely<Database>, slot: number, cen
     .set({
       center,
       max_score: computed.max_score,
+      computed_data: JSON.stringify(computed),
       updated_at: new Date().toISOString(),
     })
     .where('slot', '=', slot)
@@ -230,10 +236,10 @@ export async function deleteBlockedWord(db: Kysely<Database>, id: number): Promi
 }
 
 /**
- * Recompute and persist `puzzles.max_score` ONLY for active puzzles whose
- * `(letters, center)` can form the newly blocked or unblocked word.
+ * Recompute and persist `puzzles.max_score` and `puzzles.computed_data` ONLY for active
+ * puzzles whose `(letters, center)` can form the newly blocked or unblocked word.
  */
-export async function recomputeMaxScoresForAffectedWord(
+export async function recomputeAffectedPuzzlesForWord(
   db: Kysely<Database>,
   rawWord: string,
 ): Promise<number> {
@@ -258,26 +264,25 @@ export async function recomputeMaxScoresForAffectedWord(
 
   for (const p of affected) {
     const computed = computePuzzle(p.letters, p.center, blockedWords);
-    invalidatePuzzleCache(Number(p.slot));
-    if (computed.max_score !== p.max_score) {
-      await db
-        .updateTable('puzzles')
-        .set({
-          max_score: computed.max_score,
-          updated_at: new Date().toISOString(),
-        })
-        .where('slot', '=', p.slot)
-        .execute();
-      updated += 1;
-    }
+    const computedJson = JSON.stringify(computed);
+    await db
+      .updateTable('puzzles')
+      .set({
+        max_score: computed.max_score,
+        computed_data: computedJson,
+        updated_at: new Date().toISOString(),
+      })
+      .where('slot', '=', p.slot)
+      .execute();
+    updated += 1;
   }
 
   return updated;
 }
 
 /**
- * Assemble the N-day admin schedule in 3 parallel DB queries total,
- * memoizing `computePuzzle` per unique slot in-request without polluting the 10-entry LRU.
+ * Assemble the N-day admin schedule directly from `puzzles.computed_data` in 2 parallel DB queries,
+ * falling back to `computePuzzle` only for legacy rows with `computed_data = NULL`.
  */
 export async function buildAdminSchedule(
   db: Kysely<Database>,
@@ -285,11 +290,8 @@ export async function buildAdminSchedule(
   days: number,
   todayStr: string,
 ) {
-  const [activePuzzles, epochDate, blockedWords] = await Promise.all([
-    getAllActivePuzzles(db),
-    getEpochDate(db),
-    getBlockedWords(db),
-  ]);
+  const [activePuzzles, epochDate] = await Promise.all([getAllActivePuzzles(db), getEpochDate(db)]);
+  let blockedWords: string[] | null = null;
 
   const activeSlots = activePuzzles.map((p) => Number(p.slot));
   const puzzleBySlot = new Map(activePuzzles.map((p) => [Number(p.slot), p]));
@@ -319,20 +321,19 @@ export async function buildAdminSchedule(
         const puzzle = puzzleBySlot.get(slot);
         if (puzzle) {
           const parsedLetters = puzzle.letters.split(',').map((l) => l.trim());
-          const cached = getCachedPuzzle(slot);
-          if (
-            cached &&
-            cached.center === puzzle.center &&
-            cached.letters.join(',') === [...parsedLetters].sort().join(',')
-          ) {
+          const precomputed = parseComputedPuzzleData(puzzle.computed_data);
+          if (precomputed) {
             stats = {
               letters: parsedLetters,
               center: puzzle.center,
-              wordCount: cached.hint_data.word_count,
-              maxScore: cached.max_score,
-              pangramCount: cached.hint_data.pangram_count,
+              wordCount: precomputed.hint_data.word_count,
+              maxScore: precomputed.max_score,
+              pangramCount: precomputed.hint_data.pangram_count,
             };
           } else {
+            if (blockedWords === null) {
+              blockedWords = await getBlockedWords(db);
+            }
             const computed = computePuzzle(parsedLetters, puzzle.center, blockedWords);
             stats = {
               letters: parsedLetters,

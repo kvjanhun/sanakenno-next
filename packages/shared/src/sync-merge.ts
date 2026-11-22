@@ -4,13 +4,107 @@
  * Merge strategy: take the best of both sides. No data is ever discarded.
  */
 
+import { isPangram, rankForScore, recalcScore } from './scoring.js';
 import {
   bestNoHintScoreForRecord,
+  getHelsinkiDateString,
   mergeStatsRecordFields,
   rankIndex,
   type StatsRecord,
 } from './stats.js';
 import type { SyncPuzzleState } from './auth-types.js';
+
+export interface PuzzleMetaForStats {
+  allLetters: Set<string>;
+  maxScore: number;
+  wordCount?: number;
+  pangramCount?: number;
+}
+
+export interface CanonicalPuzzleState extends SyncPuzzleState {
+  date?: string | null;
+  max_score?: number;
+  is_daily?: boolean;
+  played_at_date?: string | null;
+  elapsed_ms?: number;
+  frozen_stats?: StatsRecord | null;
+}
+
+/**
+ * Deterministically derive a `StatsRecord` from a canonical `player_puzzle_states` row
+ * and optional puzzle metadata.
+ * - Revealed puzzles return only their pre-reveal `frozen_stats` snapshot (or `null` if revealed at 0 words).
+ * - Unrevealed 0-word puzzles return `frozen_stats` if present (historical orphan record), else `null`.
+ */
+export function deriveStatsRecordFromState(
+  state: CanonicalPuzzleState,
+  puzzleMeta: PuzzleMetaForStats | null,
+): StatsRecord | null {
+  if (state.revealed) {
+    return state.frozen_stats ?? null;
+  }
+
+  if (state.found_words.length === 0) {
+    return state.frozen_stats ?? null;
+  }
+
+  const score = puzzleMeta ? recalcScore(state.found_words, puzzleMeta.allLetters) : state.score;
+  const maxScore = puzzleMeta ? puzzleMeta.maxScore : Math.max(state.max_score ?? 0, score);
+  const longestWord = state.found_words.reduce(
+    (longest, word) => (word.length > longest.length ? word : longest),
+    '',
+  );
+  const pangramsFound = puzzleMeta
+    ? state.found_words.filter((word) => isPangram(word, puzzleMeta.allLetters)).length
+    : 0;
+  const longWordsCount = state.found_words.filter((word) => word.length >= 10).length;
+  const bestNoHintScore =
+    state.hints_unlocked.length === 0 ? score : Math.min(state.score_before_hints ?? 0, score);
+  const fallbackDate =
+    state.started_at > 0
+      ? getHelsinkiDateString(new Date(state.started_at))
+      : getHelsinkiDateString();
+  const date = state.date && state.date.length > 0 ? state.date : fallbackDate;
+
+  const derived: StatsRecord = {
+    puzzle_number: state.puzzle_number,
+    date,
+    best_rank: rankForScore(score, maxScore),
+    best_score: score,
+    max_score: maxScore,
+    words_found: state.found_words.length,
+    hints_used: state.hints_unlocked.length,
+    elapsed_ms: Math.max(0, state.elapsed_ms ?? 0),
+    longest_word: longestWord.length > 0 ? longestWord : undefined,
+    pangrams_found: pangramsFound,
+    best_no_hint_score: bestNoHintScore,
+    long_words_count: longWordsCount,
+    is_daily: Boolean(state.is_daily),
+    played_at_date: state.played_at_date ?? undefined,
+  };
+
+  if (!state.frozen_stats) {
+    return derived;
+  }
+
+  const merged = mergeStatsRecordFields(state.frozen_stats, derived);
+  const cappedScore = Math.min(merged.best_score, maxScore);
+  return {
+    ...merged,
+    max_score: maxScore,
+    best_score: cappedScore,
+    best_rank: rankForScore(cappedScore, maxScore),
+    words_found:
+      puzzleMeta?.wordCount !== undefined
+        ? Math.min(merged.words_found, puzzleMeta.wordCount)
+        : merged.words_found,
+    pangrams_found:
+      puzzleMeta?.pangramCount !== undefined
+        ? Math.min(merged.pangrams_found ?? 0, puzzleMeta.pangramCount)
+        : (merged.pangrams_found ?? 0),
+    best_no_hint_score: Math.min(bestNoHintScoreForRecord(merged), cappedScore),
+  };
+}
 
 function hasAdditionalItems(local: string[], server: string[]): boolean {
   const serverSet = new Set(server);

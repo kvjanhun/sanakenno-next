@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getFullPuzzleBySlot } from '../../packages/server/src/features/puzzle/puzzle.queries.js';
 import {
-  DEFAULT_PUZZLE_CACHE_TTL_MS,
+  computePuzzle,
   DEFAULT_SEED_WORDS,
-  getCachedPuzzle,
-  getPuzzleCacheSize,
-  invalidatePuzzleCache,
-  setPuzzleCacheTtlMs,
+  parseComputedPuzzleData,
   setWordlist,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 import { createTestHarness } from '../../packages/server/src/testing.js';
 
-describe('Puzzle RPC Anti-Spoiler Lock (Spec 29)', () => {
+describe('Puzzle RPC Anti-Spoiler Lock & Precomputed Payloads', () => {
   let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   beforeEach(async () => {
@@ -35,14 +32,11 @@ describe('Puzzle RPC Anti-Spoiler Lock (Spec 29)', () => {
       .insertInto('config')
       .values({ key: 'epoch_date', value: '2026-01-01' })
       .execute();
-
-    invalidatePuzzleCache();
   });
 
   afterEach(async () => {
     vi.useRealTimers();
-    setPuzzleCacheTtlMs(DEFAULT_PUZZLE_CACHE_TTL_MS);
-    invalidatePuzzleCache();
+    setWordlist(DEFAULT_SEED_WORDS);
     await harness.destroy();
   });
 
@@ -88,57 +82,67 @@ describe('Puzzle RPC Anti-Spoiler Lock (Spec 29)', () => {
     expect(minLenBody.words.every((w) => w.replaceAll('-', '').length >= 4)).toBe(true);
   });
 
-  it('recomputes cached puzzle immediately when letters or center change in DB without local invalidation', async () => {
+  it('lazily writes through computed_data on first read and serves subsequent reads without touching the wordlist', async () => {
+    const beforeRow = await harness.db
+      .selectFrom('puzzles')
+      .select('computed_data')
+      .where('slot', '=', 1)
+      .executeTakeFirstOrThrow();
+    expect(beforeRow.computed_data).toBeNull();
+
+    // First read computes and writes computed_data back to puzzles
     const first = await getFullPuzzleBySlot(harness.db, 1);
-    expect(first?.center).toBe('a');
     expect(first?.words).toContain('kana');
 
-    // Simulate cross-instance admin edit directly in DB without calling invalidatePuzzleCache()
+    const storedRow = await harness.db
+      .selectFrom('puzzles')
+      .select(['computed_data', 'max_score'])
+      .where('slot', '=', 1)
+      .executeTakeFirstOrThrow();
+    const parsedStored = parseComputedPuzzleData(storedRow.computed_data);
+    expect(parsedStored).not.toBeNull();
+    expect(parsedStored?.words).toContain('kana');
+    expect(storedRow.max_score).toBe(first?.max_score);
+
+    // Wipe in-memory wordlist completely — reads must still succeed straight from DB computed_data
+    setWordlist([]);
+
+    const apiRes = await harness.client.api.puzzle[':number'].$get({ param: { number: '1' } });
+    expect(apiRes.status).toBe(200);
+    const apiBody = (await apiRes.json()) as {
+      word_hashes: string[];
+      max_score: number;
+      hint_data: { word_count: number };
+    };
+    expect(apiBody.word_hashes).toEqual(first?.word_hashes);
+    expect(apiBody.max_score).toBe(first?.max_score);
+    expect(apiBody.hint_data.word_count).toBe(first?.words.length);
+
+    const wordsRes = await harness.client.api.puzzle[':number'].words.$get({
+      param: { number: '1' },
+    });
+    expect(wordsRes.status).toBe(200);
+    const wordsBody = (await wordsRes.json()) as { words: string[] };
+    expect(wordsBody.words).toContain('kana');
+  });
+
+  it('reflects cross-instance computed_data updates immediately on the very next read', async () => {
+    const initial = await getFullPuzzleBySlot(harness.db, 1);
+    expect(initial?.words).toContain('kana');
+
+    const updatedComputed = computePuzzle('a,e,i,k,l,n,s', 'a', ['kana']);
     await harness.db
       .updateTable('puzzles')
-      .set({ letters: 'e,h,i,k,n,o,s', center: 'n' })
+      .set({
+        max_score: updatedComputed.max_score,
+        computed_data: JSON.stringify(updatedComputed),
+      })
       .where('slot', '=', 1)
       .execute();
 
-    const updated = await getFullPuzzleBySlot(harness.db, 1);
-    expect(updated?.center).toBe('n');
-    expect(updated?.words).toContain('kenno');
-    expect(updated?.words).not.toContain('kana');
-  });
-
-  it('expires cached puzzles after TTL so cross-instance blocked_words updates propagate automatically', async () => {
-    setPuzzleCacheTtlMs(60_000);
-    const before = await getFullPuzzleBySlot(harness.db, 1);
-    expect(before?.words).toContain('kana');
-
-    // Simulate cross-instance blocked_words insert without calling invalidatePuzzleCache()
-    await harness.db.insertInto('blocked_words').values({ word: 'kana' }).execute();
-
-    // Still cached before TTL expires
-    const stillCached = await getFullPuzzleBySlot(harness.db, 1);
-    expect(stillCached?.words).toContain('kana');
-
-    // Advance past TTL -> cache entry expires and recomputes against DB blocked_words
-    vi.advanceTimersByTime(60_001);
-    const afterExpiry = await getFullPuzzleBySlot(harness.db, 1);
-    expect(afterExpiry?.words).not.toContain('kana');
-  });
-
-  it('does not wipe _puzzleCache when getFullPuzzleBySlot is called inside a Kysely transaction', async () => {
-    const slot1 = await getFullPuzzleBySlot(harness.db, 1);
-    const slot2 = await getFullPuzzleBySlot(harness.db, 2);
-    expect(slot1).not.toBeNull();
-    expect(slot2).not.toBeNull();
-    expect(getPuzzleCacheSize()).toBe(2);
-
-    await harness.db.transaction().execute(async (trx) => {
-      const inTx = await getFullPuzzleBySlot(trx, 1);
-      expect(inTx?.slot).toBe(1);
-    });
-
-    // Neither slot 1 nor slot 2 was wiped by the transaction handle
-    expect(getPuzzleCacheSize()).toBe(2);
-    expect(getCachedPuzzle(1)).toBeDefined();
-    expect(getCachedPuzzle(2)).toBeDefined();
+    // Zero TTL wait or local cache invalidation needed
+    const next = await getFullPuzzleBySlot(harness.db, 1);
+    expect(next?.words).not.toContain('kana');
+    expect(next?.max_score).toBe(updatedComputed.max_score);
   });
 });

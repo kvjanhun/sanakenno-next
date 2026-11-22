@@ -18,10 +18,7 @@ import { useUiStore } from '../gameplay/useUiStore.js';
 import { useAuthStore } from '../player-sync/useAuthStore.js';
 import { AchievementsList } from './AchievementsList.js';
 import { TrophyIcon } from './achievementIcons.js';
-import { backfillNoHintStats } from './backfillStats.js';
 import { ModalShell } from './ModalShell.js';
-
-export { backfillNoHintStats };
 
 export interface StatsModalProps {
   show: boolean;
@@ -50,7 +47,7 @@ export function StatsModal({
     if (show) {
       void useAuthStore.getState().flushPendingSync();
       const loaded = loadFromStorage<PlayerStats>(STATS_STORAGE_KEY);
-      setStats(backfillNoHintStats(loaded ?? emptyStats()));
+      setStats(loaded ?? emptyStats());
     }
   }, [show]);
 

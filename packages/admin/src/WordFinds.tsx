@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { compareFinnishAlphabetically, type AdminWordFindsResponse } from '@sanakenno/shared';
-import { adminBlockWord, adminGetSlots, adminGetWordFinds } from '../../api/client.js';
+import { adminBlockWord, adminGetSlots, adminGetWordFinds } from './api/admin-client.js';
 import {
   ADMIN_CARD_CLASS,
   ADMIN_CARD_STYLE,

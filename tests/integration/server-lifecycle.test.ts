@@ -6,7 +6,6 @@ import { createDb } from '../../packages/server/src/db/connection.js';
 import {
   DEFAULT_SEED_WORDS,
   getWordlist,
-  invalidatePuzzleCache,
   setWordlist,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 import { ensureBootSeed, shutdownServer } from '../../packages/server/src/index.js';
@@ -16,7 +15,6 @@ describe('Server Lifecycle (auto-seed & graceful shutdown)', () => {
 
   afterEach(() => {
     setWordlist(DEFAULT_SEED_WORDS);
-    invalidatePuzzleCache();
     for (const file of tempFiles.splice(0)) {
       for (const suffix of ['', '-wal', '-shm']) {
         const target = `${file}${suffix}`;

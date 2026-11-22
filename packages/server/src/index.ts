@@ -13,9 +13,7 @@ interface ClosableServer {
 }
 
 function resolveBootDbPath(env: NodeJS.ProcessEnv): string {
-  return (
-    env.DB_PATH ?? (env.DATA_DIR ? path.join(env.DATA_DIR, 'sanakenno.db') : './sanakenno.dev.db')
-  );
+  return env.DB_PATH ?? './sanakenno.dev.db';
 }
 
 /**

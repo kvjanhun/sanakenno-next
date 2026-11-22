@@ -8,6 +8,7 @@ WORKDIR /app
 
 # Copy workspace config and package.json files first for layer caching
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages/admin/package.json packages/admin/
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/
@@ -30,6 +31,7 @@ RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
 WORKDIR /app
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages/admin/package.json packages/admin/
 COPY packages/shared/package.json packages/shared/
 COPY packages/server/package.json packages/server/
 COPY packages/web/package.json packages/web/

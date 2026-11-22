@@ -1,14 +1,133 @@
-import { getHelsinkiDateString } from '@sanakenno/shared';
+import type { StatsRecord } from '@sanakenno/shared';
 import { sql, type Kysely } from 'kysely';
-import { computePuzzle } from '../features/puzzle/wordlist.js';
 import { BASELINE_STATEMENTS, CURATED_BLOCKED_WORDS } from './baseline-sql.js';
 import { runImmediateTransactionWithRetry } from './retry.js';
 import type { Database } from './schema.js';
 
-export interface BackfillStatsSummary {
-  statsBackfilled: number;
-  dailyStatsCount: number;
-  longWordsBackfilledCount: number;
+interface LegacyPlayerStatRow {
+  player_id: number;
+  puzzle_number: number;
+  date: string;
+  best_rank: string;
+  best_score: number;
+  max_score: number;
+  words_found: number;
+  hints_used: number;
+  elapsed_ms: number;
+  longest_word: string | null;
+  pangrams_found: number;
+  best_no_hint_score: number;
+  long_words_count?: number;
+  is_daily?: number;
+  played_at_date?: string | null;
+}
+
+async function consolidateLegacyPlayerStatsAsync(db: Kysely<Database>): Promise<void> {
+  if (!(await hasTableAsync(db, 'player_stats'))) return;
+
+  const statRowsResult = await sql<LegacyPlayerStatRow>`
+    SELECT player_id, puzzle_number, date, best_rank, best_score, max_score,
+           words_found, hints_used, elapsed_ms, longest_word, pangrams_found,
+           best_no_hint_score, long_words_count, is_daily, played_at_date
+    FROM player_stats
+  `.execute(db);
+
+  const existingStates = await db
+    .selectFrom('player_puzzle_states')
+    .select([
+      'player_id',
+      'puzzle_number',
+      'found_words',
+      'score',
+      'hints_unlocked',
+      'score_before_hints',
+      'revealed',
+    ])
+    .execute();
+
+  const stateMap = new Map(
+    existingStates.map((row) => [`${Number(row.player_id)}:${Number(row.puzzle_number)}`, row]),
+  );
+
+  for (const r of statRowsResult.rows) {
+    const playerId = Number(r.player_id);
+    const puzzleNumber = Number(r.puzzle_number);
+    const statRecord: StatsRecord = {
+      puzzle_number: puzzleNumber,
+      date: r.date,
+      best_rank: r.best_rank,
+      best_score: Number(r.best_score),
+      max_score: Number(r.max_score),
+      words_found: Number(r.words_found),
+      hints_used: Number(r.hints_used),
+      elapsed_ms: Number(r.elapsed_ms),
+      longest_word: r.longest_word ?? undefined,
+      pangrams_found: Number(r.pangrams_found),
+      best_no_hint_score: Number(r.best_no_hint_score),
+      long_words_count: Number(r.long_words_count ?? 0),
+      is_daily: Boolean(r.is_daily),
+      played_at_date: r.played_at_date ?? undefined,
+    };
+
+    const existing = stateMap.get(`${playerId}:${puzzleNumber}`);
+    if (existing) {
+      let foundCount = 0;
+      let hintsCount = 0;
+      try {
+        const fw = JSON.parse(existing.found_words) as unknown;
+        if (Array.isArray(fw)) foundCount = fw.length;
+        const hu = JSON.parse(existing.hints_unlocked) as unknown;
+        if (Array.isArray(hu)) hintsCount = hu.length;
+      } catch {
+        // fallback to frozen snapshot
+      }
+      const stateScore = Number(existing.score);
+      const stateNoHint = hintsCount === 0 ? stateScore : Number(existing.score_before_hints ?? 0);
+      const needsFrozen =
+        Boolean(existing.revealed) ||
+        foundCount === 0 ||
+        statRecord.best_score > stateScore ||
+        statRecord.words_found > foundCount ||
+        (statRecord.best_no_hint_score ?? 0) > stateNoHint;
+
+      await db
+        .updateTable('player_puzzle_states')
+        .set({
+          date: statRecord.date,
+          max_score: statRecord.max_score,
+          is_daily: statRecord.is_daily ? 1 : 0,
+          played_at_date: statRecord.played_at_date ?? null,
+          elapsed_ms: statRecord.elapsed_ms,
+          frozen_stats_json: needsFrozen ? JSON.stringify(statRecord) : null,
+        })
+        .where('player_id', '=', playerId)
+        .where('puzzle_number', '=', puzzleNumber)
+        .execute();
+    } else {
+      await db
+        .insertInto('player_puzzle_states')
+        .values({
+          player_id: playerId,
+          puzzle_number: puzzleNumber,
+          found_words: '[]',
+          score: statRecord.best_score,
+          hints_unlocked: '[]',
+          started_at: 0,
+          total_paused_ms: 0,
+          score_before_hints: null,
+          revealed: 0,
+          date: statRecord.date,
+          max_score: statRecord.max_score,
+          is_daily: statRecord.is_daily ? 1 : 0,
+          played_at_date: statRecord.played_at_date ?? null,
+          elapsed_ms: statRecord.elapsed_ms,
+          frozen_stats_json: JSON.stringify(statRecord),
+        })
+        .execute();
+    }
+  }
+
+  await sql`DROP TABLE IF EXISTS player_stats`.execute(db);
 }
 
 interface AsyncMigration {
@@ -24,7 +143,7 @@ async function hasTableAsync(db: Kysely<Database>, table: string): Promise<boole
   return result.rows.length > 0;
 }
 
-async function ensureColumnAsync(
+export async function ensureColumnAsync(
   db: Kysely<Database>,
   table: string,
   column: string,
@@ -49,155 +168,10 @@ async function seedCuratedBlockedWordsAsync(db: Kysely<Database>): Promise<void>
     .execute();
 }
 
-export async function recomputePuzzleMaxScoresAsync(
-  db: Kysely<Database>,
-  onlyNull = false,
-): Promise<number> {
-  if (!(await hasTableAsync(db, 'puzzles'))) return 0;
-  await seedCuratedBlockedWordsAsync(db);
-
-  let query = db.selectFrom('puzzles').select(['slot', 'letters', 'center']);
-  if (onlyNull) {
-    query = query.where('max_score', 'is', null);
-  }
-  const rows = await query.execute();
-  if (rows.length === 0) return 0;
-
-  let blockedWords: string[] = [];
-  if (await hasTableAsync(db, 'blocked_words')) {
-    try {
-      const blockedRows = await db.selectFrom('blocked_words').select('word').execute();
-      blockedWords = blockedRows.map((row) => row.word);
-    } catch {
-      blockedWords = [];
-    }
-  }
-
-  let updated = 0;
-  for (const row of rows) {
-    try {
-      const data = computePuzzle(row.letters, row.center, blockedWords);
-      if (data && typeof data.max_score === 'number') {
-        await db
-          .updateTable('puzzles')
-          .set({ max_score: data.max_score })
-          .where('slot', '=', row.slot)
-          .execute();
-        updated += 1;
-      }
-    } catch {
-      // Opportunistic query backfill handles missing wordlist environments
-    }
-  }
-  return updated;
-}
-
-function parseUpdatedAtToHelsinkiDate(updatedAt: string | null | undefined): string {
-  if (typeof updatedAt !== 'string' || updatedAt.length < 10) return '';
-  const trimmed = updatedAt.trim();
-  if (trimmed.length === 10) return trimmed;
-  const normalized = trimmed.includes('T') ? trimmed : `${trimmed.replace(' ', 'T')}Z`;
-  const parsed = new Date(normalized);
-  if (!Number.isNaN(parsed.getTime())) {
-    return getHelsinkiDateString(parsed);
-  }
-  return trimmed.slice(0, 10);
-}
-
-export async function backfillPlayerStatsAsync(
-  db: Kysely<Database>,
-): Promise<BackfillStatsSummary> {
-  if (!(await hasTableAsync(db, 'player_stats'))) {
-    return { statsBackfilled: 0, dailyStatsCount: 0, longWordsBackfilledCount: 0 };
-  }
-
-  const stateMap = new Map<string, { foundWords: string[]; startedAt: number }>();
-  if (await hasTableAsync(db, 'player_puzzle_states')) {
-    const stateRows = await db
-      .selectFrom('player_puzzle_states')
-      .select(['player_id', 'puzzle_number', 'found_words', 'started_at'])
-      .execute();
-    for (const st of stateRows) {
-      let parsedWords: string[] = [];
-      try {
-        const raw = JSON.parse(st.found_words) as unknown;
-        if (Array.isArray(raw)) {
-          parsedWords = raw.filter((w): w is string => typeof w === 'string');
-        }
-      } catch {
-        parsedWords = [];
-      }
-      stateMap.set(`${st.player_id}:${st.puzzle_number}`, {
-        foundWords: parsedWords,
-        startedAt: Number(st.started_at ?? 0),
-      });
-    }
-  }
-
-  const statRows = await db
-    .selectFrom('player_stats')
-    .select([
-      'id',
-      'player_id',
-      'puzzle_number',
-      'date',
-      'updated_at',
-      'is_daily',
-      'played_at_date',
-      'long_words_count',
-    ])
-    .execute();
-
-  let statsBackfilled = 0;
-  let dailyStatsCount = 0;
-  let longWordsBackfilledCount = 0;
-
-  for (const row of statRows) {
-    const state = stateMap.get(`${row.player_id}:${row.puzzle_number}`);
-    const computedLongWords = state ? state.foundWords.filter((w) => w.length >= 10).length : 0;
-    const nextLongWords = Math.max(Number(row.long_words_count ?? 0), computedLongWords);
-
-    const updatedAtDate = parseUpdatedAtToHelsinkiDate(row.updated_at);
-    const startedAtDate =
-      state && state.startedAt > 0 ? getHelsinkiDateString(new Date(state.startedAt)) : '';
-
-    let nextIsDaily = Number(row.is_daily ?? 0);
-    let nextPlayedAtDate = row.played_at_date ?? null;
-
-    if (nextPlayedAtDate === null) {
-      const wasDaily = updatedAtDate === row.date || startedAtDate === row.date;
-      nextIsDaily = wasDaily || nextIsDaily === 1 ? 1 : 0;
-      nextPlayedAtDate = wasDaily ? row.date : updatedAtDate || startedAtDate || row.date;
-    }
-
-    if (
-      nextIsDaily !== Number(row.is_daily ?? 0) ||
-      nextPlayedAtDate !== (row.played_at_date ?? null) ||
-      nextLongWords !== Number(row.long_words_count ?? 0)
-    ) {
-      await db
-        .updateTable('player_stats')
-        .set({
-          is_daily: nextIsDaily,
-          played_at_date: nextPlayedAtDate,
-          long_words_count: nextLongWords,
-        })
-        .where('id', '=', row.id)
-        .execute();
-      statsBackfilled += 1;
-    }
-    if (nextIsDaily === 1) dailyStatsCount += 1;
-    if (nextLongWords > 0) longWordsBackfilledCount += 1;
-  }
-
-  return { statsBackfilled, dailyStatsCount, longWordsBackfilledCount };
-}
-
 export const ASYNC_MIGRATIONS: readonly AsyncMigration[] = [
   {
     version: '0001-baseline',
-    description:
-      'Adopt pre-migration schema drift: player preferences, puzzle is_active, no-hint scores, and retired transfer-token table',
+    description: 'Adopt baseline schema columns',
     async up(db) {
       await ensureColumnAsync(db, 'players', 'preferences', 'TEXT');
       await ensureColumnAsync(db, 'puzzles', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
@@ -207,15 +181,13 @@ export const ASYNC_MIGRATIONS: readonly AsyncMigration[] = [
         'best_no_hint_score',
         'INTEGER NOT NULL DEFAULT 0',
       );
-      await sql`DROP TABLE IF EXISTS player_transfer_tokens`.execute(db);
     },
   },
   {
     version: '0002-add-puzzle-max-score',
-    description: 'Add max_score to puzzles table and backfill existing puzzles',
+    description: 'Ensure max_score column exists on puzzles',
     async up(db) {
       await ensureColumnAsync(db, 'puzzles', 'max_score', 'INTEGER');
-      await recomputePuzzleMaxScoresAsync(db, true);
     },
   },
   {
@@ -223,24 +195,20 @@ export const ASYNC_MIGRATIONS: readonly AsyncMigration[] = [
     description: 'Seed curated slurs, hate speech, and explicit violence into blocked_words',
     async up(db) {
       await seedCuratedBlockedWordsAsync(db);
-      await recomputePuzzleMaxScoresAsync(db, false);
     },
   },
   {
     version: '0004-add-player-stats-long-words-and-streak-integrity',
-    description:
-      'Add long_words_count, is_daily, and played_at_date to player_stats table and backfill historical rows',
+    description: 'Ensure long_words_count, is_daily, and played_at_date exist on player_stats',
     async up(db) {
       await ensureColumnAsync(db, 'player_stats', 'long_words_count', 'INTEGER NOT NULL DEFAULT 0');
       await ensureColumnAsync(db, 'player_stats', 'is_daily', 'INTEGER NOT NULL DEFAULT 0');
       await ensureColumnAsync(db, 'player_stats', 'played_at_date', 'TEXT DEFAULT NULL');
-      await backfillPlayerStatsAsync(db);
     },
   },
   {
     version: '0005-add-player-transfer-tickets',
-    description:
-      'Add player_transfer_tickets table for short-lived 15-minute pairing tickets and 6-digit codes',
+    description: 'Ensure player_transfer_tickets table exists for 15-minute pairing tickets',
     async up(db) {
       await sql`
         CREATE TABLE IF NOT EXISTS player_transfer_tickets (
@@ -262,10 +230,55 @@ export const ASYNC_MIGRATIONS: readonly AsyncMigration[] = [
   },
   {
     version: '0006-add-player-puzzle-state-revealed',
-    description:
-      'Add revealed flag to player_puzzle_states for monotonic cross-device answer-reveal sync',
+    description: 'Add revealed flag to player_puzzle_states for monotonic answer-reveal sync',
     async up(db) {
       await ensureColumnAsync(db, 'player_puzzle_states', 'revealed', 'INTEGER NOT NULL DEFAULT 0');
+    },
+  },
+  {
+    version: '0007-cleanup-legacy-schema',
+    description: 'Drop unused page_views table and normalize legacy config.rotation_epoch key',
+    async up(db) {
+      await sql`DROP TABLE IF EXISTS page_views`.execute(db);
+      await sql`DROP TABLE IF EXISTS player_transfer_tokens`.execute(db);
+      if (await hasTableAsync(db, 'config')) {
+        await sql`
+          INSERT OR IGNORE INTO config (key, value)
+          SELECT 'epoch_date', value FROM config WHERE key = 'rotation_epoch'
+        `.execute(db);
+        await sql`DELETE FROM config WHERE key = 'rotation_epoch'`.execute(db);
+      }
+    },
+  },
+  {
+    version: '0008-add-puzzle-computed-data',
+    description: 'Add computed_data JSON column to puzzles for precomputed puzzle payloads',
+    async up(db) {
+      await ensureColumnAsync(db, 'puzzles', 'computed_data', 'TEXT DEFAULT NULL');
+    },
+  },
+  {
+    version: '0009-consolidate-player-stats-into-puzzle-states',
+    description:
+      'Consolidate player_stats metadata and frozen/orphan snapshots into player_puzzle_states and drop player_stats',
+    async up(db) {
+      await ensureColumnAsync(db, 'player_puzzle_states', 'date', 'TEXT DEFAULT NULL');
+      await ensureColumnAsync(
+        db,
+        'player_puzzle_states',
+        'max_score',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
+      await ensureColumnAsync(db, 'player_puzzle_states', 'is_daily', 'INTEGER NOT NULL DEFAULT 0');
+      await ensureColumnAsync(db, 'player_puzzle_states', 'played_at_date', 'TEXT DEFAULT NULL');
+      await ensureColumnAsync(
+        db,
+        'player_puzzle_states',
+        'elapsed_ms',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
+      await ensureColumnAsync(db, 'player_puzzle_states', 'frozen_stats_json', 'TEXT DEFAULT NULL');
+      await consolidateLegacyPlayerStatsAsync(db);
     },
   },
 ];

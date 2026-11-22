@@ -8,21 +8,18 @@ import {
   computeVariations,
   DEFAULT_SEED_WORDS,
   FINNISH_LETTERS,
-  getCachedPuzzle,
   getCanonicalLemma,
   getLemmaMap,
   getWordlist,
   hashWord,
-  invalidatePuzzleCache,
   isPangram,
   loadWordlist,
   MIN_WORD_LENGTH,
   normalizeWord,
+  parseComputedPuzzleData,
   puzzleWords,
   scoreWord,
-  setCachedPuzzle,
   setWordlist,
-  type FullPuzzleData,
 } from '../../packages/server/src/features/puzzle/wordlist.js';
 
 describe('wordlist engine (unit)', () => {
@@ -48,7 +45,6 @@ describe('wordlist engine (unit)', () => {
 
   afterEach(() => {
     setWordlist(DEFAULT_SEED_WORDS);
-    invalidatePuzzleCache();
   });
 
   it('defines the 29-letter Finnish alphabet and minimum word length of 4', () => {
@@ -188,27 +184,20 @@ describe('wordlist engine (unit)', () => {
     });
   });
 
-  it('manages slot cache and invalidates per-slot or globally', () => {
-    const sample: FullPuzzleData = {
-      center: 'a',
-      letters: ['e', 'i', 'k', 'l', 'n', 's'],
-      all_letters: letters,
-      slot: 1,
-      display_number: 1,
-      total_puzzles: 2,
-      ...computePuzzle(letters, center),
-    };
+  it('parses valid precomputed puzzle JSON snapshots and rejects null or malformed input', () => {
+    const computed = computePuzzle(letters, center);
+    const parsed = parseComputedPuzzleData(JSON.stringify(computed));
+    expect(parsed).toEqual(computed);
 
-    setCachedPuzzle(1, sample);
-    setCachedPuzzle(2, { ...sample, slot: 2, display_number: 2 });
-    expect(getCachedPuzzle(1)).toEqual(sample);
-    expect(getCachedPuzzle(2)?.slot).toBe(2);
-
-    invalidatePuzzleCache(1);
-    expect(getCachedPuzzle(1)).toBeUndefined();
-    expect(getCachedPuzzle(2)?.slot).toBe(2);
-
-    invalidatePuzzleCache();
-    expect(getCachedPuzzle(2)).toBeUndefined();
+    expect(parseComputedPuzzleData(null)).toBeNull();
+    expect(parseComputedPuzzleData(undefined)).toBeNull();
+    expect(parseComputedPuzzleData('')).toBeNull();
+    expect(parseComputedPuzzleData('{not-json')).toBeNull();
+    expect(parseComputedPuzzleData(JSON.stringify({ words: ['kana'] }))).toBeNull();
+    expect(
+      parseComputedPuzzleData(
+        JSON.stringify({ words: [123], word_hashes: [], max_score: 1, hint_data: {} }),
+      ),
+    ).toBeNull();
   });
 });
