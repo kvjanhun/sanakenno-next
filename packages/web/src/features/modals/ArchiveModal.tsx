@@ -259,7 +259,7 @@ export function ArchiveModal({
           aria-labelledby="confirm-reveal-title"
           aria-describedby="confirm-reveal-desc"
           tabIndex={-1}
-          className="m-auto w-[calc(100%-2rem)] max-w-xs rounded-xl p-4 flex flex-col gap-3 shadow-xl outline-none backdrop:bg-black/50"
+          className="m-auto w-[calc(100%-2rem)] max-w-xs rounded-xl p-4 open:flex flex-col gap-3 shadow-xl outline-none backdrop:bg-black/50"
           style={{
             backgroundColor: 'var(--color-bg-primary)',
             border: '1px solid var(--color-border)',

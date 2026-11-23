@@ -75,7 +75,7 @@ export function ModalShell({
       ref={dialogRef}
       aria-labelledby={titleId}
       tabIndex={-1}
-      className={`m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl overflow-hidden flex flex-col max-h-[88vh] shadow-xl outline-none backdrop:bg-black/60 p-0 ${className}`}
+      className={`m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl overflow-hidden open:flex flex-col max-h-[88dvh] shadow-xl outline-none backdrop:bg-black/60 p-0 ${className}`}
       style={{
         backgroundColor: 'var(--color-bg-primary)',
         border: '1px solid var(--color-border)',
@@ -152,7 +152,7 @@ export function ModalShell({
 
       <div
         data-modal-body
-        className={`flex-1 min-h-0 overflow-y-auto px-4 ${subHeader ? 'pt-1 pb-3.5' : 'py-3.5'} ${bodyClassName}`}
+        className={`flex-auto min-h-0 overflow-y-auto overscroll-contain px-4 ${subHeader ? 'pt-1 pb-3.5' : 'py-3.5'} ${bodyClassName}`}
       >
         {children}
       </div>
