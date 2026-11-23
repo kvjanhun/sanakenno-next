@@ -1,4 +1,4 @@
-import type { RankName } from '@sanakenno/shared';
+import { getHelsinkiDateString, type RankName } from '@sanakenno/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../packages/server/src/app.js';
 import {
@@ -226,10 +226,10 @@ describe('Public Telemetry Endpoints (Kysely + Hono integration)', () => {
         .execute();
       await harness.db
         .insertInto('config')
-        .values({ key: 'epoch_date', value: '2026-11-21' })
+        .values({ key: 'epoch_date', value: getHelsinkiDateString() })
         .execute();
 
-      // When today is 2026-11-21 (epoch day 0 -> slot 1 is today), slot 4 is in the future
+      // With epoch_date set to today in Helsinki (epoch day 0 -> slot 1 is today), slot 4 is in the future
       const futureRes = await harness.client.api['word-find'].$post({
         json: { word: 'kana', puzzle_number: 4 },
       });
